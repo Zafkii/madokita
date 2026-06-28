@@ -60,8 +60,7 @@ type HurtboxRow struct {
 	Width      float64
 	Height     float64
 	Rotation   float64
-	Damage     float64
-	Multiplier float64
+	DmgMult    float64
 }
 
 type HitboxRow struct {
