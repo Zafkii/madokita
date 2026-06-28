@@ -224,6 +224,39 @@ No more multiple highlighted rows — each click selects exactly one row across 
 
 ---
 
+## Movement Data Pattern
+
+Movement data files (`internal/data/characters/movements/*.go`) use **dot-import + constructors** for compact, readable definitions:
+
+```go
+package movements
+
+import . "madokita/internal/animation"
+
+var SayakaMovement = Movement{
+    AssetKey:       "sayaka_movement",
+    DefaultOriginX: 0.506,
+    DefaultOriginY: 0.586,
+    Animations: map[string]MovementAnimDef{
+        "idle": Anim(3, true,
+            F(0, HB(95, 61, 1.5, -32.5), HB(54, 130, 4, 62)),
+        ),
+    },
+}
+```
+
+| Constructor | Args | Purpose |
+|-------------|------|---------|
+| `Anim(fps, loop, frames...)` | FPS, loop flag, variadic frames | Wraps `MovementAnimDef` |
+| `F(spriteFrame, hurtboxes...)` | Single sprite index, variadic hurtboxes | Wraps `Frame` (offset/rotation default to 0) |
+| `HB(w, h, ox, oy)` | Width, Height, OffsetX, OffsetY | Wraps `FrameHurtbox` (scale=1, rot=0, mult=1) |
+| `HBR(w, h, ox, oy, rot)` | + Rotation for angled hurtboxes | Same with custom rotation |
+
+**Rules:**
+- Always use dot-import in movement data files (zero logic, pure data)
+- Never use struct literals — always the constructors
+- Keep everything inline (no extracted vars), each frame is one `F(...)` call
+
 ## Key Patterns & Conventions
 
 - **Error handling**: Go standard (`if err != nil { return err }`), no panics in production paths

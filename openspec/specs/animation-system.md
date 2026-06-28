@@ -111,6 +111,49 @@ type ProjectData struct {
 
 - `MultiSpriteAnimator` supports N-sprite playback (for multi-part characters or effects)
 
+## Movement Data Files
+
+Movement data lives in `internal/data/characters/movements/*.go`. Each file defines one `animation.Movement` variable.
+
+**Pattern**: dot-import `madokita/internal/animation` + constructors for zero-noise data definitions.
+
+Available constructors (defined in `internal/animation/types.go`):
+
+| Constructor | Signature | Purpose |
+|-------------|-----------|---------|
+| `Anim` | `(fps float64, loop bool, frames ...Frame)` | Builds `MovementAnimDef` |
+| `F` | `(spriteFrame int, hurtboxes ...FrameHurtbox)` | Builds `Frame` (offset/rotation default 0) |
+| `HB` | `(w, h, ox, oy float64)` | Builds `FrameHurtbox` with defaults (scale=1, rot=0, mult=1) |
+| `HBR` | `(w, h, ox, oy, rot float64)` | Builds `FrameHurtbox` with custom rotation |
+
+**Rules**:
+- MUST use dot-import — movement files are pure data, no logic
+- MUST use constructors, never struct literals
+- SHOULD keep frames inline (one `F(...)` per line)
+- MAY define shared `[]FrameHurtbox` vars only when the same set repeats across many frames AND hurts readability less than repetition
+
+**Example (`sayaka.go`):**
+
+```go
+package movements
+
+import . "madokita/internal/animation"
+
+var SayakaMovement = Movement{
+    AssetKey:       "sayaka_movement",
+    DefaultOriginX: 0.506,
+    DefaultOriginY: 0.586,
+    Animations: map[string]MovementAnimDef{
+        "walk": Anim(10, true,
+            F(4, HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
+            F(5, HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
+            F(6, HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
+            F(7, HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
+        ),
+    },
+}
+```
+
 ## Character Registry
 
 `internal/data/registry.go`
