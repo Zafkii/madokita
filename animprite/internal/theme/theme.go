@@ -91,7 +91,7 @@ var Dark = Palette{
 	DropdownPopupBorder:       color.RGBA{65, 65, 85, 255},
 	DropdownPopupText:         color.RGBA{255, 255, 255, 255},
 	DropdownPopupHover:        color.RGBA{0, 214, 214, 102},
-	DropdownPopupSelectedBG:   color.RGBA{0, 123, 255, 255},
+	DropdownPopupSelectedBG:   color.RGBA{255, 179, 0, 255},
 	DropdownPopupSelectedText: color.RGBA{255, 255, 255, 255},
 
 	// Inputs
