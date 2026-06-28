@@ -147,7 +147,7 @@ func parseAnimCall(call *ast.CallExpr, anim *project.AnimationRow) {
 		if fn != "F" {
 			continue
 		}
-		frame := project.AnimationFrame{SpriteFrameIdx: 0, Phase: project.PhaseWindup}
+		frame := project.AnimationFrame{SpriteFrameIdx: 0, Phase: project.PhaseWindup, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5}
 		if len(fc.Args) > 0 {
 			frame.SpriteFrameIdx = intLit(fc.Args[0])
 		}
