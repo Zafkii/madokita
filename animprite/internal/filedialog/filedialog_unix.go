@@ -8,6 +8,7 @@ import (
 )
 
 func openFile(title, filter string) (string, error) {
+	filter = sanitizeFilter(filter)
 	cmd := exec.Command("zenity", "--file-selection", "--title="+title,
 		"--file-filter="+filter)
 	out, err := cmd.Output()
@@ -24,6 +25,7 @@ func openFile(title, filter string) (string, error) {
 }
 
 func saveFile(title, filter string) (string, error) {
+	filter = sanitizeFilter(filter)
 	cmd := exec.Command("zenity", "--file-selection", "--save", "--title="+title,
 		"--file-filter="+filter)
 	out, err := cmd.Output()
@@ -36,4 +38,18 @@ func saveFile(title, filter string) (string, error) {
 		return strings.TrimSpace(string(out2)), nil
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+func sanitizeFilter(filter string) string {
+	parts := strings.Split(filter, "\000")
+	if len(parts) <= 1 {
+		return filter
+	}
+	var patterns []string
+	for i, p := range parts {
+		if i%2 == 1 {
+			patterns = append(patterns, p)
+		}
+	}
+	return strings.Join(patterns, " ")
 }
