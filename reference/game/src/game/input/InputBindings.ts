@@ -1,0 +1,16 @@
+import { INPUT_ACTIONS } from "./InputAction"
+import type { InputAction } from "./InputAction"
+
+export const DEFAULT_INPUT_BINDINGS: Record<InputAction, string> = {
+  [INPUT_ACTIONS.MOVE_LEFT]: "A",
+  [INPUT_ACTIONS.MOVE_RIGHT]: "D",
+  [INPUT_ACTIONS.JUMP]: "W",
+  [INPUT_ACTIONS.DODGE]: "SHIFT",
+  [INPUT_ACTIONS.ATTACK]: "SPACE",
+  [INPUT_ACTIONS.SKILL]: "E",
+  [INPUT_ACTIONS.TRANSFORM]: "Q",
+  [INPUT_ACTIONS.MENU_UP]: "UP",
+  [INPUT_ACTIONS.MENU_DOWN]: "DOWN",
+  [INPUT_ACTIONS.MENU_CONFIRM]: "ENTER",
+  [INPUT_ACTIONS.MENU_BACK]: "ESC",
+}

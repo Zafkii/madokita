@@ -1,0 +1,17 @@
+{
+  "settings": {
+    "createTable": "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+
+    "set": "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+
+    "get": "SELECT value FROM settings WHERE key = ?"
+  },
+
+  "saveSlots": {
+    "createTable": "CREATE TABLE IF NOT EXISTS save_slots (id INTEGER PRIMARY KEY AUTOINCREMENT, slot_name TEXT NOT NULL UNIQUE, save_version INTEGER NOT NULL, save_data TEXT NOT NULL, updated_at TEXT NOT NULL)",
+
+    "set": "INSERT INTO save_slots (slot_name, save_version, save_data, updated_at) VALUES (?, ?, ?, datetime('now')) ON CONFLICT(slot_name) DO UPDATE SET save_version = excluded.save_version, save_data = excluded.save_data, updated_at = datetime('now')",
+
+    "get": "SELECT save_data FROM save_slots WHERE slot_name = ?"
+  }
+}

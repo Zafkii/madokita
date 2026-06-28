@@ -1,0 +1,23 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  bin = "tmp/game.exe"
+  cmd = "go build -o tmp/game.exe ./cmd/game"
+  delay = 1000
+  exclude_dir = ["tmp", "assets", "vendor", "CopiedInfoForMigrate", "openspec", "reference", "animedit"]
+  exclude_regex = [".*_test.go"]
+  include_ext = ["go"]
+  stop_on_error = true
+  kill_delay = 500
+  send_interrupt = false
+
+[run]
+  cmd = "tmp/game.exe"
+
+[color]
+  build = "yellow"
+  runner = "green"
+
+[log]
+  time = true

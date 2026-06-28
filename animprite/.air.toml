@@ -1,0 +1,10 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/animprite.exe ./cmd/editor"
+  bin = "./tmp/animprite.exe"
+  delay = 500
+  exclude_dir = ["tmp"]
+  include_ext = ["go"]
+  exclude_regex = ["_test\\.go"]

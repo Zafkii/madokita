@@ -1,0 +1,81 @@
+schema: spec-driven
+
+context: |
+  Two-module Go project:
+    1. Madokita (fighting game) — root module
+    2. animprite (animation editor) — submodule at animprite/
+
+  Tech stack: Go 1.26.4, Ebitengine/v2 v2.9.9
+  Architecture: ECS-influenced, scene-based, phase-driven runtime (PRE_INIT→INIT→POST_INIT→READY→RUNNING→SHUTDOWN)
+  Testing: None yet (fresh migration from TypeScript/Phaser/Electron)
+  Style: Modular engine-oriented, Go-first, platform-abstraction via platform.API
+
+  Quick Reference — key files & patterns:
+
+  Engine: internal/engine/
+    Runtime: Phase-driven lifecycle (PhasePreInit→PhaseInit→PhasePostInit→PhaseReady→PhaseRunning→PhaseShutdown)
+    Systems: SystemManager (optional hooks: Initialize/Start/Ready/Shutdown)
+    DI: Container via Register(key, svc) pattern (events, input, platform)
+    Entry: cmd/game/main.go → NewGameApp() → runtime.Initialize → ebiten.RunGame
+    Platform: platform.API interface → platform.NewDesktop()
+    Scenes: scene.Manager (Add→SwitchTo), Scene interface (Update/Draw/Enter/Exit/Pause/Resume/IsActive)
+    Input: input.Manager
+    Events: event.Bus (typed pub/sub)
+
+  Combat: internal/combat/
+    CollisionSystem: frame overlap check (hitbox↔hurtbox), team filtering
+    CombatActor: team/stats/hurtboxes — stagger, invincibility, hyper armor, death
+    HitResult: damage calculation
+    Attacks: AttackConfig + Attack lifecycle
+    Target: TargetSystem (closest enemy by distance)
+
+  Entities: internal/entity/
+    Player: player.go composes combat + scene
+    Character registry: internal/data/registry.go
+    Enemies: enemy.go
+    Effects: effect.go
+
+  Animation System: internal/animation/
+    Frame/MovementAnimDef/AttackAnimDef types
+    MultiSpriteAnimator for N-sprite playback
+    Editor: animprite/ — standalone Ebitengine editor (independent Go module)
+
+  Events: internal/event/
+    EventBus: typed pub/sub
+
+  Menu: internal/menu/
+    Menu types and components (intro, main-menu, settings)
+
+  Persistence: internal/save/, internal/settings/
+    SaveManager (SQLite), SettingsManager (SQLite)
+
+  Debug/Math: internal/math/ (vector, rect)
+
+  Editor (animprite/):
+    - Standalone Ebitengine app, independent Go module
+    - Immediate-mode vector UI (no widget tree)
+    - Visual layer complete: title bar, camera, canvas, dark/light theme, 4 data tables, right panel inputs, preview UI
+    - Functionality pending: sprite loading, canvas rendering, hitbox/hurtbox interaction, preview playback, Open/Save, undo/redo
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing code patterns: RuntimeSystem lifecycle, EventBus, platform.API
+    tdd: false
+    test_command: "go test ./..."
+  verify:
+    test_command: "go test ./..."
+    build_command: "go build ./cmd/game"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

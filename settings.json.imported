@@ -1,0 +1,12 @@
+{
+  "resolution": {
+    "width": 1600,
+    "height": 900
+  },
+  "fullscreen": false,
+  "language": "en",
+  "fpsLimit": 60,
+  "keyBindings": {
+    "MenuDown": 28
+  }
+}

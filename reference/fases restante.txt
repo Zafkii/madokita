@@ -1,0 +1,18 @@
+que fases nos quedan?
++ Thought: 3.0s
+De la todo list y lo que vimos hasta ahora:
+Completado â (4/7):
+1. Foundation (theme, camera, canvas, UI, layout, undo/redo)
+2. Sprite loading + property inspector
+3. Canvas interaction (body drag, handle drag, double-click origin)
+4. Animation tables (multi-anim, frame nav, hurtbox editing) â reciÃ©n
+Pendiente:
+#	Fase	DescripciÃ³n	Prioridad
+5	Preview playback	Play/pause, speed slider, loop, frame counter sobre el canvas	Media
+6	Import/Export JSON	Save/Open button â dialogs reales o CLI flags, serializaciÃ³n completa	Media
+7	Attack editor	AttackEditor data model, fases windup/active/recover por frame, UI especÃ­fica	Baja
+AdemÃ¡s hay features secundarios que no estÃ¡n en el roadmap original pero aparecieron como necesarios:
+- Hitbox display en canvas (referencia del diseÃ±o original, solo render)
+- Sprite-sheet frame nav (usar TotalFrame/FrameIdx para navegar frames internos del sprite)
+- Hurtbox canvas interaction (drag handles de hurtbox, add/remove desde canvas)
+Â¿Seguimos con Preview playback? Eso te da el feedback visual inmediato de cÃ³mo se ve la animaciÃ³n c

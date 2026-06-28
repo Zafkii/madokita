@@ -1,0 +1,15 @@
+#Temp Folders
+CopiedInfoForMigrate
+referenceCopy/src
+tools
+# Go build artifacts
+*.exe
+/game
+tmp/game
+animedit/editor
+*.test
+*.out
+
+# IDE
+.vscode/
+.idea/
