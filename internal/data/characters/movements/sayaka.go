@@ -2,6 +2,33 @@ package movements
 
 import "madokita/internal/animation"
 
+var (
+	idleHB = []animation.FrameHurtbox{
+		animation.HB(95, 61, 1.5, -32.5),
+		animation.HB(54, 130, 4, 62),
+	}
+	walkHB = []animation.FrameHurtbox{
+		animation.HB(100, 57, 1, -32.5),
+		animation.HB(52, 130, 1, 61),
+	}
+	jumpHB1 = []animation.FrameHurtbox{
+		animation.HB(92, 63, 0, -34.5),
+		animation.HB(52, 103, -2, 49.5),
+	}
+	jumpHB2 = []animation.FrameHurtbox{
+		animation.HB(92, 63, 0, -34.5),
+		animation.HB(52, 128, -2, 62),
+	}
+	jumpHB3 = []animation.FrameHurtbox{
+		animation.HB(92, 63, 0, -34.5),
+		animation.HB(52, 107, -2, 51.5),
+	}
+	burstHB = []animation.FrameHurtbox{
+		animation.HB(93, 61, -3.5, -34.5),
+		animation.HB(35, 131, -1.5, 59.5),
+	}
+)
+
 var SayakaMovement = animation.Movement{
 	AssetKey:       "sayaka_movement",
 	DefaultOriginX: 0.506,
@@ -11,286 +38,67 @@ var SayakaMovement = animation.Movement{
 			FPS:  3,
 			Loop: true,
 			Frames: []animation.Frame{
-				{
-					SpriteFrames: []int{0},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 95, H: 61, OffsetX: 1.5, OffsetY: -32.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 54, H: 130, OffsetX: 4, OffsetY: 62, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{1},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 95, H: 61, OffsetX: 1.5, OffsetY: -32.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 54, H: 130, OffsetX: 4, OffsetY: 62, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{2},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 95, H: 61, OffsetX: 1.5, OffsetY: -32.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 54, H: 130, OffsetX: 4, OffsetY: 62, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{3},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 95, H: 61, OffsetX: 1.5, OffsetY: -32.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 54, H: 130, OffsetX: 4, OffsetY: 62, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
+				animation.F(0, idleHB...),
+				animation.F(1, idleHB...),
+				animation.F(2, idleHB...),
+				animation.F(3, idleHB...),
 			},
 		},
 		"walk": {
 			FPS:  10,
 			Loop: true,
 			Frames: []animation.Frame{
-				{
-					SpriteFrames: []int{4},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 100, H: 57, OffsetX: 1, OffsetY: -32.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 130, OffsetX: 1, OffsetY: 61, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{5},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 100, H: 57, OffsetX: 1, OffsetY: -32.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 130, OffsetX: 1, OffsetY: 61, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{6},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 100, H: 57, OffsetX: 1, OffsetY: -32.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 130, OffsetX: 1, OffsetY: 61, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{7},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 100, H: 57, OffsetX: 1, OffsetY: -32.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 130, OffsetX: 1, OffsetY: 61, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
+				animation.F(4, walkHB...),
+				animation.F(5, walkHB...),
+				animation.F(6, walkHB...),
+				animation.F(7, walkHB...),
 			},
 		},
 		"jump": {
 			FPS:  7,
 			Loop: false,
 			Frames: []animation.Frame{
-				{
-					SpriteFrames: []int{17},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 92, H: 63, OffsetX: 0, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 103, OffsetX: -2, OffsetY: 49.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{18},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 92, H: 63, OffsetX: 0, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 128, OffsetX: -2, OffsetY: 62, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{19},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 92, H: 63, OffsetX: 0, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 128, OffsetX: -2, OffsetY: 62, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{20},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 92, H: 63, OffsetX: 0, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 128, OffsetX: -2, OffsetY: 62, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{21},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 92, H: 63, OffsetX: 0, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 128, OffsetX: -2, OffsetY: 62, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{22},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 92, H: 63, OffsetX: 0, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 128, OffsetX: -2, OffsetY: 62, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{23},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 92, H: 63, OffsetX: 0, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 107, OffsetX: -2, OffsetY: 51.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
+				animation.F(17, jumpHB1...),
+				animation.F(18, jumpHB2...),
+				animation.F(19, jumpHB2...),
+				animation.F(20, jumpHB2...),
+				animation.F(21, jumpHB2...),
+				animation.F(22, jumpHB2...),
+				animation.F(23, jumpHB3...),
 			},
 		},
 		"dodge": {
 			FPS:  1,
 			Loop: false,
 			Frames: []animation.Frame{
-				{
-					SpriteFrames: []int{24},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 89, H: 74, OffsetX: 5, OffsetY: -11, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 40, H: 102, OffsetX: -35.1, OffsetY: 69.65, ScaleX: 1, ScaleY: 1, Rotation: 35, DamageMultiplier: 1},
-					},
-				},
+				animation.F(24,
+					animation.HBR(89, 74, 5, -11, 0),
+					animation.HBR(40, 102, -35.1, 69.65, 35),
+				),
 			},
 		},
 		"skill": {
 			FPS:  8,
 			Loop: false,
 			Frames: []animation.Frame{
-				{
-					SpriteFrames: []int{8},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 96, H: 56, OffsetX: 1, OffsetY: -34, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 52, H: 133, OffsetX: 8, OffsetY: 60.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
+				animation.F(8,
+					animation.HB(96, 56, 1, -34),
+					animation.HB(52, 133, 8, 60.5),
+				),
 			},
 		},
 		"burst": {
 			FPS:  7,
 			Loop: false,
 			Frames: []animation.Frame{
-				{
-					SpriteFrames: []int{9},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 93, H: 61, OffsetX: -3.5, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 35, H: 131, OffsetX: -1.5, OffsetY: 59.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{10},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 93, H: 61, OffsetX: -3.5, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 35, H: 131, OffsetX: -1.5, OffsetY: 59.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{11},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 93, H: 61, OffsetX: -3.5, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 35, H: 131, OffsetX: -1.5, OffsetY: 59.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{12},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 93, H: 61, OffsetX: -3.5, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 35, H: 131, OffsetX: -1.5, OffsetY: 59.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{13},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 93, H: 61, OffsetX: -3.5, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 35, H: 131, OffsetX: -1.5, OffsetY: 59.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{14},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 93, H: 61, OffsetX: -3.5, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 35, H: 131, OffsetX: -1.5, OffsetY: 59.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{15},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 93, H: 61, OffsetX: -3.5, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 35, H: 131, OffsetX: -1.5, OffsetY: 59.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
-				{
-					SpriteFrames: []int{16},
-					OffsetX:      []float64{0},
-					OffsetY:      []float64{0},
-					Rotation:     []float64{0},
-					Hurtboxes: []animation.FrameHurtbox{
-						{W: 93, H: 61, OffsetX: -3.5, OffsetY: -34.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-						{W: 35, H: 131, OffsetX: -1.5, OffsetY: 59.5, ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1},
-					},
-				},
+				animation.F(9, burstHB...),
+				animation.F(10, burstHB...),
+				animation.F(11, burstHB...),
+				animation.F(12, burstHB...),
+				animation.F(13, burstHB...),
+				animation.F(14, burstHB...),
+				animation.F(15, burstHB...),
+				animation.F(16, burstHB...),
 			},
 		},
 	},

@@ -67,3 +67,27 @@ type Attack struct {
 	DefaultOriginY float64
 	Animations     map[string]AttackAnimDef
 }
+
+func F(spriteFrame int, hurtboxes ...FrameHurtbox) Frame {
+	return Frame{
+		SpriteFrames: []int{spriteFrame},
+		OffsetX:      []float64{0},
+		OffsetY:      []float64{0},
+		Rotation:     []float64{0},
+		Hurtboxes:    hurtboxes,
+	}
+}
+
+func HB(w, h, ox, oy float64) FrameHurtbox {
+	return FrameHurtbox{
+		W: w, H: h, OffsetX: ox, OffsetY: oy,
+		ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1,
+	}
+}
+
+func HBR(w, h, ox, oy, rot float64) FrameHurtbox {
+	return FrameHurtbox{
+		W: w, H: h, OffsetX: ox, OffsetY: oy,
+		ScaleX: 1, ScaleY: 1, Rotation: rot, DamageMultiplier: 1,
+	}
+}
