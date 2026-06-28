@@ -26,6 +26,7 @@ type AnimationFrame struct {
 type AnimationRow struct {
 	Name       string
 	CurrentIdx int
+	Loop       bool
 	Frames     []AnimationFrame
 
 	Windup   float64
@@ -69,7 +70,11 @@ type HitboxRow struct {
 }
 
 type ProjectData struct {
-	Animations []AnimationRow
-	Sprites    []SpriteRow
-	HitDefs    []HitboxRow
+	AssetName      string
+	AssetKey       string
+	DefaultOriginX float64
+	DefaultOriginY float64
+	Animations     []AnimationRow
+	Sprites        []SpriteRow
+	HitDefs        []HitboxRow
 }

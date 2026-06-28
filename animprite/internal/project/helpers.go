@@ -2,9 +2,13 @@ package project
 
 func DeepCopy(src *ProjectData) ProjectData {
 	dst := ProjectData{
-		Animations: make([]AnimationRow, len(src.Animations)),
-		Sprites:    make([]SpriteRow, len(src.Sprites)),
-		HitDefs:    append([]HitboxRow(nil), src.HitDefs...),
+		AssetName:      src.AssetName,
+		AssetKey:       src.AssetKey,
+		DefaultOriginX: src.DefaultOriginX,
+		DefaultOriginY: src.DefaultOriginY,
+		Animations:     make([]AnimationRow, len(src.Animations)),
+		Sprites:        make([]SpriteRow, len(src.Sprites)),
+		HitDefs:        append([]HitboxRow(nil), src.HitDefs...),
 	}
 	for i := range src.Animations {
 		dst.Animations[i] = src.Animations[i]

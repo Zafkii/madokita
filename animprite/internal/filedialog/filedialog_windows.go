@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	comdlg32         = syscall.NewLazyDLL("comdlg32.dll")
-	getOpenFileNameW = comdlg32.NewProc("GetOpenFileNameW")
+	comdlg32          = syscall.NewLazyDLL("comdlg32.dll")
+	getOpenFileNameW  = comdlg32.NewProc("GetOpenFileNameW")
+	getSaveFileNameW  = comdlg32.NewProc("GetSaveFileNameW")
 )
 
 type openFileNameW struct {
@@ -55,6 +56,30 @@ func openFile(title, filter string) (string, error) {
 	}
 
 	ret, _, _ := getOpenFileNameW.Call(uintptr(unsafe.Pointer(ofn)))
+	if ret == 0 {
+		return "", errNoSelection
+	}
+
+	return syscall.UTF16ToString(buf), nil
+}
+
+func saveFile(title, filter string) (string, error) {
+	buf := make([]uint16, 1024)
+	buf[0] = 0
+
+	titleW, _ := syscall.UTF16PtrFromString(title)
+	filterW, _ := syscall.UTF16PtrFromString(filter)
+
+	ofn := &openFileNameW{
+		lStructSize: uint32(unsafe.Sizeof(openFileNameW{})),
+		lpstrFilter: filterW,
+		lpstrFile:   &buf[0],
+		nMaxFile:    uint32(len(buf)),
+		lpstrTitle:  titleW,
+		flags:       0x00000002, // OFN_OVERWRITEPROMPT
+	}
+
+	ret, _, _ := getSaveFileNameW.Call(uintptr(unsafe.Pointer(ofn)))
 	if ret == 0 {
 		return "", errNoSelection
 	}
