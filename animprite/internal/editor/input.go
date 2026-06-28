@@ -125,11 +125,6 @@ func (a *EditorApp) handleRightPanelMouse(mx, my int, justL bool) {
 	}
 	a.baseRotInput.HandleMouse(mx, my, justL)
 
-	a.assetNameInput.HandleMouse(mx, my, justL)
-	a.assetKeyInput.HandleMouse(mx, my, justL)
-	for i := range a.defaultOriginInput {
-		a.defaultOriginInput[i].HandleMouse(mx, my, justL)
-	}
 	a.loopInput.HandleMouse(mx, my, justL)
 
 	for i := range a.atkTimingInputs {

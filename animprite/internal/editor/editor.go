@@ -87,9 +87,6 @@ type EditorApp struct {
 	atkTimingInputs     [5]*ui.TextInput
 	fpsInput            *ui.TextInput
 
-	assetNameInput     *ui.TextInput
-	assetKeyInput      *ui.TextInput
-	defaultOriginInput [2]*ui.TextInput
 	loopInput          *ui.TextInput
 
 	loadedSprites map[int]*ebiten.Image
@@ -347,17 +344,6 @@ func (a *EditorApp) initRightPanelWidgets() {
 	a.atkTimingInputs[4] = newNum("Armed FPS", 14, 1, 120, 1)
 
 	a.fpsInput = newNum("FPS", 14, 1, 120, 1)
-
-	a.assetNameInput = ui.NewTextInput(px, 0, iw, rightPanelInputH, th)
-	a.assetNameInput.SetLabel("Asset Name")
-	a.assetNameInput.Text = "MyMovement"
-
-	a.assetKeyInput = ui.NewTextInput(px, 0, iw, rightPanelInputH, th)
-	a.assetKeyInput.SetLabel("Asset Key")
-	a.assetKeyInput.Text = "my_movement"
-
-	a.defaultOriginInput[0] = newNum("Default Origin X", 0.5, 0, 1, 0.01)
-	a.defaultOriginInput[1] = newNum("Default Origin Y", 0.5, 0, 1, 0.01)
 
 	a.loopInput = ui.NewTextInput(px, 0, iw, rightPanelInputH, th)
 	a.loopInput.SetLabel("Loop")

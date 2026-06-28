@@ -456,11 +456,6 @@ func (a *EditorApp) syncLayout() {
 		inp.X = px
 	}
 	a.baseRotInput.X = px
-	a.assetNameInput.X = px
-	a.assetKeyInput.X = px
-	for _, inp := range a.defaultOriginInput {
-		inp.X = px
-	}
 	a.loopInput.X = px
 	for _, inp := range a.atkTimingInputs {
 		inp.X = px
@@ -469,10 +464,6 @@ func (a *EditorApp) syncLayout() {
 }
 
 func (a *EditorApp) syncMovementInputs() {
-	a.assetNameInput.Text = a.proj.AssetName
-	a.assetKeyInput.Text = a.proj.AssetKey
-	a.defaultOriginInput[0].SetNumeric(a.proj.DefaultOriginX)
-	a.defaultOriginInput[1].SetNumeric(a.proj.DefaultOriginY)
 	if animIdx := a.animTable.SelectedIdx; animIdx >= 0 && animIdx < len(a.proj.Animations) {
 		anim := &a.proj.Animations[animIdx]
 		a.loopInput.Text = "false"

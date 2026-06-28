@@ -230,7 +230,6 @@ func (a *EditorApp) drawRightPanel(screen *ebiten.Image, p theme.Palette) {
 		iy = a.drawFrameSection(a.rp.buf, p, px, iy)
 	}
 	iy = a.drawAnimationSection(a.rp.buf, p, px, iy)
-	iy = a.drawProjectSection(a.rp.buf, p, px, iy)
 	iy = a.drawPreviewSection(a.rp.buf, p, px, iy)
 
 	a.rp.contentH = iy - y + a.rp.scroll
@@ -322,17 +321,6 @@ func (a *EditorApp) drawAnimationSection(screen *ebiten.Image, p theme.Palette, 
 	iy = a.drawLabeledInput(screen, a.loopInput, iy)
 
 	iy += 4
-
-	return iy + 4
-}
-
-func (a *EditorApp) drawProjectSection(screen *ebiten.Image, p theme.Palette, px, iy int) int {
-	iy = a.drawSectionHeader(screen, p, px, iy, "Project")
-
-	iy = a.drawLabeledInput(screen, a.assetNameInput, iy)
-	iy = a.drawLabeledInput(screen, a.assetKeyInput, iy)
-	iy = a.drawLabeledInput(screen, a.defaultOriginInput[0], iy)
-	iy = a.drawLabeledInput(screen, a.defaultOriginInput[1], iy)
 
 	return iy + 4
 }

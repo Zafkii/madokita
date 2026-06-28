@@ -106,11 +106,6 @@ func (a *EditorApp) flushInputsToData() {
 		anim.Loop = strings.EqualFold(a.loopInput.Text, "true")
 	}
 
-	a.proj.AssetName = a.assetNameInput.Text
-	a.proj.AssetKey = a.assetKeyInput.Text
-	a.proj.DefaultOriginX = a.defaultOriginInput[0].NumericValue()
-	a.proj.DefaultOriginY = a.defaultOriginInput[1].NumericValue()
-
 	if a.panelMode == panelModeHurtbox && a.hurtboxTable.SelectedIdx >= 0 {
 		hbp := a.hurtboxList()
 		if hbp != nil && a.hurtboxTable.SelectedIdx < len(*hbp) {
@@ -220,17 +215,6 @@ func (a *EditorApp) focusedInput() *ui.TextInput {
 	if a.baseRotInput.Focused {
 		return a.baseRotInput
 	}
-	if a.assetNameInput.Focused {
-		return a.assetNameInput
-	}
-	if a.assetKeyInput.Focused {
-		return a.assetKeyInput
-	}
-	for i := range a.defaultOriginInput {
-		if a.defaultOriginInput[i].Focused {
-			return a.defaultOriginInput[i]
-		}
-	}
 	if a.loopInput.Focused {
 		return a.loopInput
 	}
@@ -250,9 +234,6 @@ func (a *EditorApp) allInputs() []*ui.TextInput {
 	all = append(all, a.props[:]...)
 	all = append(all, a.originInputs[:]...)
 	all = append(all, a.baseRotInput)
-	all = append(all, a.assetNameInput)
-	all = append(all, a.assetKeyInput)
-	all = append(all, a.defaultOriginInput[:]...)
 	all = append(all, a.loopInput)
 	all = append(all, a.atkTimingInputs[:]...)
 	all = append(all, a.fpsInput)
