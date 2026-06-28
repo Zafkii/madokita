@@ -4,4 +4,4 @@
 *.out
 /tmp/
 !tmp/.gitkeep
-editor
+/editor
