@@ -68,6 +68,10 @@ type Attack struct {
 	Animations     map[string]AttackAnimDef
 }
 
+func Anim(fps float64, loop bool, frames ...Frame) MovementAnimDef {
+	return MovementAnimDef{FPS: fps, Loop: loop, Frames: frames}
+}
+
 func F(spriteFrame int, hurtboxes ...FrameHurtbox) Frame {
 	return Frame{
 		SpriteFrames: []int{spriteFrame},
