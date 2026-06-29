@@ -73,7 +73,7 @@ var Dark = Palette{
 	TextMuted:    color.RGBA{130, 140, 160, 255},
 	LabelColor:   color.RGBA{255, 218, 85, 255},
 	ButtonText:   color.RGBA{235, 235, 245, 255},
-	BtnTextHover: color.RGBA{255, 212, 40, 255},
+	BtnTextHover: color.RGBA{0, 0, 0, 255},
 
 	// Buttons
 	BtnGreen:    color.RGBA{21, 114, 44, 255},
@@ -81,17 +81,17 @@ var Dark = Palette{
 	BtnBlue:     color.RGBA{47, 96, 120, 255},
 	BtnOrange:   color.RGBA{210, 135, 50, 255},
 	BtnDisabled: color.RGBA{68, 68, 85, 255},
-	BtnHover:    color.RGBA{60, 70, 110, 255},
+	BtnHover:    color.RGBA{255, 200, 0, 87},
 
 	// Dropdown
-	DropdownBG:                color.RGBA{35, 40, 70, 255},
+	DropdownBG:                color.RGBA{49, 67, 168, 255},
 	DropdownBorder:            color.RGBA{65, 65, 85, 255},
 	DropdownText:              color.RGBA{255, 255, 255, 255},
 	DropdownPopupBG:           color.RGBA{42, 48, 80, 255},
 	DropdownPopupBorder:       color.RGBA{65, 65, 85, 255},
 	DropdownPopupText:         color.RGBA{255, 255, 255, 255},
-	DropdownPopupHover:        color.RGBA{55, 68, 110, 255},
-	DropdownPopupSelectedBG:   color.RGBA{255, 212, 40, 255},
+	DropdownPopupHover:        color.RGBA{255, 218, 85, 60},
+	DropdownPopupSelectedBG:   color.RGBA{255, 212, 40, 163},
 	DropdownPopupSelectedText: color.RGBA{30, 30, 45, 255},
 
 	// Inputs
