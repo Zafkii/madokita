@@ -96,6 +96,12 @@ func (d *Dropdown) Draw(screen *ebiten.Image) {
 		text = d.Options[d.Selected]
 	}
 	d.drawButtonText(screen, p, x, text)
+
+	arrowClr := p.DropdownText
+	if d.buttonHovered && d.Enabled {
+		arrowClr = p.BtnTextHover
+	}
+	DrawText(screen, "▼", x+d.W-12, d.Y+2, 1, arrowClr)
 }
 
 func (d *Dropdown) drawButtonText(screen *ebiten.Image, p theme.Palette, x int, text string) {

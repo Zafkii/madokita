@@ -280,8 +280,9 @@ func (a *EditorApp) drawSelectedElementProps(screen *ebiten.Image, p theme.Palet
 		iy = a.drawLabeledInput(screen, a.props[i], iy)
 	}
 
-	if a.isAttackMode() && a.animTable.SelectedIdx >= 0 {
+	if a.isAttackMode() {
 		iy = a.drawLabeledDropdown(screen, a.phaseDropdown, iy)
+		a.phaseDropdown.DrawPopup(screen)
 	}
 
 	return iy + 4
