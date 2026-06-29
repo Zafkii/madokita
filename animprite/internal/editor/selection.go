@@ -44,10 +44,15 @@ func (a *EditorApp) syncAnimFrameSelection() {
 	a.prevSelectedAnimFrameIdx = frameIdx
 	if animIdx >= 0 && frameIdx >= 0 {
 		a.panelMode = panelModeAnimFrame
-		frame := a.proj.Animations[animIdx].Frames[frameIdx]
-		entry := a.frameSpriteEntry(&frame, a.spriteEditIdx)
-		if entry == nil && len(frame.Sprites) > 0 {
+		frame := &a.proj.Animations[animIdx].Frames[frameIdx]
+		if len(frame.Sprites) == 0 {
+			frame.Sprites = a.defaultFrameSprites()
+		}
+		entry := a.frameSpriteEntry(frame, a.spriteEditIdx)
+		if entry == nil {
 			entry = &frame.Sprites[0]
+			a.spriteEditIdx = frame.Sprites[0].SpriteIdx
+			a.frameSpriteDropdown.Selected = entry.SpriteIdx + 1
 		}
 		if entry != nil {
 			a.proj.Sprites[entry.SpriteIdx].CurrentIdx = entry.SpriteFrameIdx
