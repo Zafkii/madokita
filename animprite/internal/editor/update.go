@@ -117,14 +117,16 @@ func (a *EditorApp) flushInputsToData() {
 			hb.Rotation = a.props[4].NumericValue()
 		}
 	} else if a.panelMode == panelModeAnimFrame {
-		if entry := a.currentFrameSpriteEntry(); entry != nil {
-			entry.OffsetX = a.props[0].NumericValue()
-			entry.OffsetY = a.props[1].NumericValue()
-			entry.Rotation = a.props[2].NumericValue()
-			entry.ScaleX = a.props[3].NumericValue()
-			entry.ScaleY = a.props[4].NumericValue()
-			entry.OriginX = a.originInputs[0].NumericValue()
-			entry.OriginY = a.originInputs[1].NumericValue()
+		if !a.prev.previewPlaying {
+			if entry := a.currentFrameSpriteEntry(); entry != nil {
+				entry.OffsetX = a.props[0].NumericValue()
+				entry.OffsetY = a.props[1].NumericValue()
+				entry.Rotation = a.props[2].NumericValue()
+				entry.ScaleX = a.props[3].NumericValue()
+				entry.ScaleY = a.props[4].NumericValue()
+				entry.OriginX = a.originInputs[0].NumericValue()
+				entry.OriginY = a.originInputs[1].NumericValue()
+			}
 		}
 	} else if sel >= 0 && sel < len(a.proj.Sprites) {
 		row := &a.proj.Sprites[sel]
