@@ -71,22 +71,10 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 	dx := float64(mx - a.prevMouseX)
 	dy := float64(my - a.prevMouseY)
 	ctrl := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
-	alt := ebiten.IsKeyPressed(ebiten.KeyAlt)
+	shift := ebiten.IsKeyPressed(ebiten.KeyShift)
+	offset := ctrl && shift
 
-	if ctrl && a.canvas.Selection.Visible {
-		if justPressed {
-			if h := a.canvas.HandleHitTest(mx, my); h >= 0 {
-				a.saveSnapshot()
-				a.scaleHandle = h
-				a.initScaleOrig(h)
-			}
-		}
-		if a.scaleHandle >= 0 {
-			a.applyHandleScale(mx, my)
-		} else {
-			a.canvas.Cam.Pan(dx, dy)
-		}
-	} else if alt {
+	if offset {
 		if justPressed {
 			a.saveSnapshot()
 		}
@@ -122,6 +110,19 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 			row.OffsetY = math.Round(row.OffsetY + dy/a.canvas.Cam.Zoom)
 			a.props[0].SetNumeric(row.OffsetX)
 			a.props[1].SetNumeric(row.OffsetY)
+		}
+	} else if ctrl && a.canvas.Selection.Visible {
+		if justPressed {
+			if h := a.canvas.HandleHitTest(mx, my); h >= 0 {
+				a.saveSnapshot()
+				a.scaleHandle = h
+				a.initScaleOrig(h)
+			}
+		}
+		if a.scaleHandle >= 0 {
+			a.applyHandleScale(mx, my)
+		} else {
+			a.canvas.Cam.Pan(dx, dy)
 		}
 	} else {
 		a.canvas.Cam.Pan(dx, dy)
