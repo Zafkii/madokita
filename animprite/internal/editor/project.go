@@ -55,6 +55,7 @@ func (a *EditorApp) rebuildFromProj() {
 	a.prevSelectedSpriteIdx = -1
 	a.prevSelectedAnimIdx = -1
 	a.prevSelectedAnimFrameIdx = -1
+	a.spriteEditIdx = 0
 	a.syncAnimFrameSelection()
 	a.syncSpriteSelection()
 	a.syncMovementInputs()

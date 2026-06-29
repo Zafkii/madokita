@@ -9,7 +9,7 @@ const (
 	PhaseArmed
 )
 
-type AnimationFrame struct {
+type FrameSpriteEntry struct {
 	SpriteIdx      int
 	SpriteFrameIdx int
 	OffsetX        float64
@@ -20,7 +20,11 @@ type AnimationFrame struct {
 	OriginX        float64
 	OriginY        float64
 	Hurtboxes      []HurtboxRow
-	Phase          FramePhase
+}
+
+type AnimationFrame struct {
+	Sprites []FrameSpriteEntry
+	Phase   FramePhase
 }
 
 type AnimationRow struct {

@@ -28,6 +28,11 @@ func (a *EditorApp) handleCanvasWheel(mx, my int, wy float64, ctrl, shift bool) 
 					a.props[2].SetNumeric(hb.Width)
 					a.props[3].SetNumeric(hb.Height)
 				}
+			} else if entry := a.currentFrameSpriteEntry(); entry != nil {
+				entry.ScaleX = math.Round((entry.ScaleX+wy*0.05)*100) / 100
+				entry.ScaleY = math.Round((entry.ScaleY+wy*0.05)*100) / 100
+				a.props[3].SetNumeric(entry.ScaleX)
+				a.props[4].SetNumeric(entry.ScaleY)
 			} else if sel := a.spriteTable.SelectedIdx; sel >= 0 && sel < len(a.proj.Sprites) {
 				row := &a.proj.Sprites[sel]
 				row.ScaleX = math.Round((row.ScaleX+wy*0.05)*100) / 100
@@ -43,6 +48,9 @@ func (a *EditorApp) handleCanvasWheel(mx, my int, wy float64, ctrl, shift bool) 
 					hb.Rotation = math.Round((hb.Rotation+wy)*100) / 100
 					a.props[4].SetNumeric(hb.Rotation)
 				}
+			} else if entry := a.currentFrameSpriteEntry(); entry != nil {
+				entry.Rotation += wy
+				a.props[2].SetNumeric(entry.Rotation)
 			} else if sel := a.spriteTable.SelectedIdx; sel >= 0 && sel < len(a.proj.Sprites) {
 				row := &a.proj.Sprites[sel]
 				row.Rotation += wy
@@ -81,17 +89,18 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 		if hbIdx := a.hurtboxTable.SelectedIdx; hbIdx >= 0 {
 			hbp := a.hurtboxList()
 			if hbp != nil && hbIdx < len(*hbp) {
-				sel := a.spriteTable.SelectedIdx
 				sx, sy := 1.0, 1.0
-				if sel >= 0 && sel < len(a.proj.Sprites) {
+				rot := 0.0
+				if entry := a.currentFrameSpriteEntry(); entry != nil {
+					sx = entry.ScaleX
+					sy = entry.ScaleY
+					rot = entry.Rotation * math.Pi / 180
+				} else if sel := a.spriteTable.SelectedIdx; sel >= 0 && sel < len(a.proj.Sprites) {
 					sx = a.proj.Sprites[sel].ScaleX
 					sy = a.proj.Sprites[sel].ScaleY
-				}
-				hb := &(*hbp)[hbIdx]
-				rot := 0.0
-				if sel >= 0 && sel < len(a.proj.Sprites) {
 					rot = a.proj.Sprites[sel].Rotation * math.Pi / 180
 				}
+				hb := &(*hbp)[hbIdx]
 				cos := math.Cos(rot)
 				sin := math.Sin(rot)
 				wdx := dx / a.canvas.Cam.Zoom
@@ -104,6 +113,11 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 				a.props[1].SetNumeric(hb.Y)
 				a.syncHurtboxBtns()
 			}
+		} else if entry := a.currentFrameSpriteEntry(); entry != nil {
+			entry.OffsetX = math.Round(entry.OffsetX + dx/a.canvas.Cam.Zoom)
+			entry.OffsetY = math.Round(entry.OffsetY + dy/a.canvas.Cam.Zoom)
+			a.props[0].SetNumeric(entry.OffsetX)
+			a.props[1].SetNumeric(entry.OffsetY)
 		} else if sel := a.spriteTable.SelectedIdx; sel >= 0 && sel < len(a.proj.Sprites) {
 			row := &a.proj.Sprites[sel]
 			row.OffsetX = math.Round(row.OffsetX + dx/a.canvas.Cam.Zoom)

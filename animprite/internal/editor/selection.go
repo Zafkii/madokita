@@ -13,10 +13,14 @@ func (a *EditorApp) syncAnimFrameSelection() {
 		pAnim := &a.proj.Animations[a.prevSelectedAnimIdx]
 		if a.prevSelectedAnimFrameIdx >= 0 && a.prevSelectedAnimFrameIdx < len(pAnim.Frames) {
 			pf := &pAnim.Frames[a.prevSelectedAnimFrameIdx]
+			entry := a.frameSpriteEntry(pf, a.spriteEditIdx)
+			if entry == nil && len(pf.Sprites) > 0 {
+				entry = &pf.Sprites[0]
+			}
 			switch a.panelMode {
 			case panelModeHurtbox:
-				if a.hurtboxTable.SelectedIdx >= 0 && a.hurtboxTable.SelectedIdx < len(pf.Hurtboxes) {
-					hb := &pf.Hurtboxes[a.hurtboxTable.SelectedIdx]
+				if entry != nil && a.hurtboxTable.SelectedIdx >= 0 && a.hurtboxTable.SelectedIdx < len(entry.Hurtboxes) {
+					hb := &entry.Hurtboxes[a.hurtboxTable.SelectedIdx]
 					hb.X = a.props[0].NumericValue()
 					hb.Y = a.props[1].NumericValue()
 					hb.Width = a.props[2].NumericValue()
@@ -24,13 +28,15 @@ func (a *EditorApp) syncAnimFrameSelection() {
 					hb.Rotation = a.props[4].NumericValue()
 				}
 			case panelModeAnimFrame:
-				pf.OffsetX = a.props[0].NumericValue()
-				pf.OffsetY = a.props[1].NumericValue()
-				pf.Rotation = a.props[2].NumericValue()
-				pf.ScaleX = a.props[3].NumericValue()
-				pf.ScaleY = a.props[4].NumericValue()
-				pf.OriginX = a.originInputs[0].NumericValue()
-				pf.OriginY = a.originInputs[1].NumericValue()
+				if entry != nil {
+					entry.OffsetX = a.props[0].NumericValue()
+					entry.OffsetY = a.props[1].NumericValue()
+					entry.Rotation = a.props[2].NumericValue()
+					entry.ScaleX = a.props[3].NumericValue()
+					entry.ScaleY = a.props[4].NumericValue()
+					entry.OriginX = a.originInputs[0].NumericValue()
+					entry.OriginY = a.originInputs[1].NumericValue()
+				}
 			}
 		}
 	}
@@ -39,18 +45,22 @@ func (a *EditorApp) syncAnimFrameSelection() {
 	if animIdx >= 0 && frameIdx >= 0 {
 		a.panelMode = panelModeAnimFrame
 		frame := a.proj.Animations[animIdx].Frames[frameIdx]
-		if frame.SpriteIdx >= 0 && frame.SpriteIdx < len(a.proj.Sprites) {
-			a.proj.Sprites[frame.SpriteIdx].CurrentIdx = frame.SpriteFrameIdx
+		entry := a.frameSpriteEntry(&frame, a.spriteEditIdx)
+		if entry == nil && len(frame.Sprites) > 0 {
+			entry = &frame.Sprites[0]
 		}
-		a.frameSpriteDropdown.Selected = frame.SpriteIdx + 1
-		a.phaseDropdown.Selected = int(frame.Phase)
-		a.props[0].SetNumeric(frame.OffsetX)
-		a.props[1].SetNumeric(frame.OffsetY)
-		a.props[2].SetNumeric(frame.Rotation)
-		a.props[3].SetNumeric(frame.ScaleX)
-		a.props[4].SetNumeric(frame.ScaleY)
-		a.originInputs[0].SetNumeric(frame.OriginX)
-		a.originInputs[1].SetNumeric(frame.OriginY)
+		if entry != nil {
+			a.proj.Sprites[entry.SpriteIdx].CurrentIdx = entry.SpriteFrameIdx
+			a.frameSpriteDropdown.Selected = entry.SpriteIdx + 1
+			a.phaseDropdown.Selected = int(frame.Phase)
+			a.props[0].SetNumeric(entry.OffsetX)
+			a.props[1].SetNumeric(entry.OffsetY)
+			a.props[2].SetNumeric(entry.Rotation)
+			a.props[3].SetNumeric(entry.ScaleX)
+			a.props[4].SetNumeric(entry.ScaleY)
+			a.originInputs[0].SetNumeric(entry.OriginX)
+			a.originInputs[1].SetNumeric(entry.OriginY)
+		}
 		a.syncHurtboxBtns()
 		a.syncLayout()
 		a.syncMovementInputs()
@@ -65,13 +75,19 @@ func (a *EditorApp) syncSpriteSelection() {
 		if ai := a.prevSelectedAnimIdx; ai >= 0 && ai < len(a.proj.Animations) {
 			if afi := a.prevSelectedAnimFrameIdx; afi >= 0 && afi < len(a.proj.Animations[ai].Frames) {
 				pf := &a.proj.Animations[ai].Frames[afi]
-				pf.OffsetX = a.props[0].NumericValue()
-				pf.OffsetY = a.props[1].NumericValue()
-				pf.Rotation = a.props[2].NumericValue()
-				pf.ScaleX = a.props[3].NumericValue()
-				pf.ScaleY = a.props[4].NumericValue()
-				pf.OriginX = a.originInputs[0].NumericValue()
-				pf.OriginY = a.originInputs[1].NumericValue()
+				entry := a.frameSpriteEntry(pf, a.spriteEditIdx)
+				if entry == nil && len(pf.Sprites) > 0 {
+					entry = &pf.Sprites[0]
+				}
+				if entry != nil {
+					entry.OffsetX = a.props[0].NumericValue()
+					entry.OffsetY = a.props[1].NumericValue()
+					entry.Rotation = a.props[2].NumericValue()
+					entry.ScaleX = a.props[3].NumericValue()
+					entry.ScaleY = a.props[4].NumericValue()
+					entry.OriginX = a.originInputs[0].NumericValue()
+					entry.OriginY = a.originInputs[1].NumericValue()
+				}
 			}
 		}
 	} else if a.panelMode == panelModeSprite {
@@ -108,21 +124,18 @@ func (a *EditorApp) syncHurtboxSelection() {
 	}
 	a.prevSelectedHurtboxIdx = a.hurtboxTable.SelectedIdx
 
+	entry := a.currentFrameSpriteEntry()
+
 	if a.hurtboxTable.SelectedIdx >= 0 {
 		if a.panelMode == panelModeAnimFrame {
-			animIdx := a.animTable.SelectedIdx
-			if animIdx >= 0 && animIdx < len(a.proj.Animations) {
-				frameIdx := a.proj.Animations[animIdx].CurrentIdx
-				if frameIdx >= 0 && frameIdx < len(a.proj.Animations[animIdx].Frames) {
-					frame := &a.proj.Animations[animIdx].Frames[frameIdx]
-					frame.OffsetX = a.props[0].NumericValue()
-					frame.OffsetY = a.props[1].NumericValue()
-					frame.Rotation = a.props[2].NumericValue()
-					frame.ScaleX = a.props[3].NumericValue()
-					frame.ScaleY = a.props[4].NumericValue()
-					frame.OriginX = a.originInputs[0].NumericValue()
-					frame.OriginY = a.originInputs[1].NumericValue()
-				}
+			if entry != nil {
+				entry.OffsetX = a.props[0].NumericValue()
+				entry.OffsetY = a.props[1].NumericValue()
+				entry.Rotation = a.props[2].NumericValue()
+				entry.ScaleX = a.props[3].NumericValue()
+				entry.ScaleY = a.props[4].NumericValue()
+				entry.OriginX = a.originInputs[0].NumericValue()
+				entry.OriginY = a.originInputs[1].NumericValue()
 			}
 		}
 		a.panelMode = panelModeHurtbox

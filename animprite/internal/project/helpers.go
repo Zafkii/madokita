@@ -15,7 +15,12 @@ func DeepCopy(src *ProjectData) ProjectData {
 		dst.Animations[i].Frames = make([]AnimationFrame, len(src.Animations[i].Frames))
 		for j := range src.Animations[i].Frames {
 			dst.Animations[i].Frames[j] = src.Animations[i].Frames[j]
-			dst.Animations[i].Frames[j].Hurtboxes = append([]HurtboxRow(nil), src.Animations[i].Frames[j].Hurtboxes...)
+			srcF := src.Animations[i].Frames[j]
+			dst.Animations[i].Frames[j].Sprites = make([]FrameSpriteEntry, len(srcF.Sprites))
+			copy(dst.Animations[i].Frames[j].Sprites, srcF.Sprites)
+			for k := range srcF.Sprites {
+				dst.Animations[i].Frames[j].Sprites[k].Hurtboxes = append([]HurtboxRow(nil), srcF.Sprites[k].Hurtboxes...)
+			}
 		}
 	}
 	copy(dst.Sprites, src.Sprites)

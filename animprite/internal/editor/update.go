@@ -117,18 +117,14 @@ func (a *EditorApp) flushInputsToData() {
 			hb.Rotation = a.props[4].NumericValue()
 		}
 	} else if a.panelMode == panelModeAnimFrame {
-		if ai := a.animTable.SelectedIdx; ai >= 0 && ai < len(a.proj.Animations) {
-			anim := &a.proj.Animations[ai]
-			if fi := anim.CurrentIdx; fi >= 0 && fi < len(anim.Frames) {
-				frame := &anim.Frames[fi]
-				frame.OffsetX = a.props[0].NumericValue()
-				frame.OffsetY = a.props[1].NumericValue()
-				frame.Rotation = a.props[2].NumericValue()
-				frame.ScaleX = a.props[3].NumericValue()
-				frame.ScaleY = a.props[4].NumericValue()
-				frame.OriginX = a.originInputs[0].NumericValue()
-				frame.OriginY = a.originInputs[1].NumericValue()
-			}
+		if entry := a.currentFrameSpriteEntry(); entry != nil {
+			entry.OffsetX = a.props[0].NumericValue()
+			entry.OffsetY = a.props[1].NumericValue()
+			entry.Rotation = a.props[2].NumericValue()
+			entry.ScaleX = a.props[3].NumericValue()
+			entry.ScaleY = a.props[4].NumericValue()
+			entry.OriginX = a.originInputs[0].NumericValue()
+			entry.OriginY = a.originInputs[1].NumericValue()
 		}
 	} else if sel >= 0 && sel < len(a.proj.Sprites) {
 		row := &a.proj.Sprites[sel]

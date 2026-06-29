@@ -31,15 +31,30 @@ func ExportMovement(path string, proj *project.ProjectData) error {
 		}
 		fmt.Fprintf(&b, "\t\t%q: Anim(%d, %s,\n", anim.Name, int(anim.FPS), loopStr)
 		for _, frame := range anim.Frames {
-			fmt.Fprintf(&b, "\t\t\tF(%d", frame.SpriteFrameIdx)
-			for _, hb := range frame.Hurtboxes {
-				if hb.Rotation != 0 {
-					fmt.Fprintf(&b, ", HBR(%g, %g, %g, %g, %g)", hb.Width, hb.Height, hb.X, hb.Y, hb.Rotation)
-				} else {
-					fmt.Fprintf(&b, ", HB(%g, %g, %g, %g)", hb.Width, hb.Height, hb.X, hb.Y)
+			b.WriteString("\t\t\tF(\n")
+			for _, entry := range frame.Sprites {
+				nb := len(entry.Hurtboxes)
+				hbStart := ""
+				if nb > 0 {
+					hbStart = ", "
 				}
+				hbParts := make([]string, 0, nb)
+				for _, hb := range entry.Hurtboxes {
+					if hb.Rotation != 0 {
+						hbParts = append(hbParts, fmt.Sprintf("HBR(%g, %g, %g, %g, %g)", hb.Width, hb.Height, hb.X, hb.Y, hb.Rotation))
+					} else {
+						hbParts = append(hbParts, fmt.Sprintf("HB(%g, %g, %g, %g)", hb.Width, hb.Height, hb.X, hb.Y))
+					}
+				}
+				hbStr := strings.Join(hbParts, ", ")
+				fmt.Fprintf(&b, "\t\t\t\tS(%d, %d, %g, %g, %g, %g, %g, %g, %g%s%s),\n",
+					entry.SpriteIdx, entry.SpriteFrameIdx,
+					entry.OffsetX, entry.OffsetY, entry.Rotation,
+					entry.ScaleX, entry.ScaleY,
+					entry.OriginX, entry.OriginY,
+					hbStart, hbStr)
 			}
-			b.WriteString("),\n")
+			b.WriteString("\t\t\t),\n")
 		}
 		b.WriteString("\t\t),\n")
 	}
@@ -59,9 +74,7 @@ func ImportMovement(path string) (*project.ProjectData, error) {
 	var assetName string
 	proj := &project.ProjectData{
 		Animations: []project.AnimationRow{},
-		Sprites: []project.SpriteRow{
-			{Name: "Default Sprite"},
-		},
+		Sprites:    []project.SpriteRow{},
 	}
 
 	for _, decl := range f.Decls {
@@ -105,7 +118,57 @@ func ImportMovement(path string) (*project.ProjectData, error) {
 	}
 	proj.AssetName = assetName
 
+	proj.Sprites = buildSpriteList(proj.Animations)
+	if len(proj.Sprites) == 0 {
+		proj.Sprites = []project.SpriteRow{
+			{Name: "Default Sprite", Width: 256, Height: 256, FrameCount: 1, CurrentIdx: 0, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
+		}
+	}
+
 	return proj, nil
+}
+
+func buildSpriteList(anims []project.AnimationRow) []project.SpriteRow {
+	maxIdx := -1
+	for _, anim := range anims {
+		for _, frame := range anim.Frames {
+			for _, entry := range frame.Sprites {
+				if entry.SpriteIdx > maxIdx {
+					maxIdx = entry.SpriteIdx
+				}
+			}
+		}
+	}
+	if maxIdx < 0 {
+		return nil
+	}
+	sprites := make([]project.SpriteRow, maxIdx+1)
+	for i := range sprites {
+		sprites[i] = project.SpriteRow{
+			Name:       fmt.Sprintf("Sprite %d", i),
+			Width:      256,
+			Height:     256,
+			FrameCount: 1,
+			CurrentIdx: 0,
+			ScaleX:     1,
+			ScaleY:     1,
+			OriginX:    0.5,
+			OriginY:    0.5,
+		}
+	}
+	for _, anim := range anims {
+		for _, frame := range anim.Frames {
+			for _, entry := range frame.Sprites {
+				if entry.SpriteIdx >= 0 && entry.SpriteIdx < len(sprites) {
+					sprites[entry.SpriteIdx].OriginX = entry.OriginX
+					sprites[entry.SpriteIdx].OriginY = entry.OriginY
+					sprites[entry.SpriteIdx].ScaleX = entry.ScaleX
+					sprites[entry.SpriteIdx].ScaleY = entry.ScaleY
+				}
+			}
+		}
+	}
+	return sprites
 }
 
 func parseAnimationsMov(expr ast.Expr) []project.AnimationRow {
@@ -147,18 +210,104 @@ func parseAnimCall(call *ast.CallExpr, anim *project.AnimationRow) {
 		if fn != "F" {
 			continue
 		}
-		frame := project.AnimationFrame{SpriteFrameIdx: 0, Phase: project.PhaseWindup, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5}
-		if len(fc.Args) > 0 {
-			frame.SpriteFrameIdx = intLit(fc.Args[0])
-		}
-		for j := 1; j < len(fc.Args); j++ {
-			hb := parseHurtboxCall(fc.Args[j])
-			if hb != nil {
-				frame.Hurtboxes = append(frame.Hurtboxes, *hb)
+		frame := project.AnimationFrame{}
+		haveS := false
+		for _, arg := range fc.Args {
+			inner, ok := arg.(*ast.CallExpr)
+			if !ok {
+				continue
 			}
+			innerFn := exprString(inner.Fun)
+			switch innerFn {
+			case "S":
+				entry := parseSpriteEntry(inner)
+				haveS = true
+				frame.Sprites = append(frame.Sprites, entry)
+			case "HB", "HBR":
+				if !haveS {
+					entry := project.FrameSpriteEntry{
+						SpriteIdx:      0,
+						SpriteFrameIdx: 0,
+						ScaleX:         1,
+						ScaleY:         1,
+						OriginX:        0.5,
+						OriginY:        0.5,
+					}
+					if len(fc.Args) > 0 {
+						if sf, ok := fc.Args[0].(*ast.BasicLit); ok && sf.Kind == token.INT {
+							entry.SpriteFrameIdx = intLit(fc.Args[0])
+						}
+					}
+					frame.Sprites = append(frame.Sprites, entry)
+					haveS = true
+				}
+				hb := parseHurtboxCall(inner)
+				if hb != nil && len(frame.Sprites) > 0 {
+					last := &frame.Sprites[len(frame.Sprites)-1]
+					last.Hurtboxes = append(last.Hurtboxes, *hb)
+				}
+			}
+		}
+		if !haveS {
+			spriteFrame := 0
+			if len(fc.Args) > 0 {
+				if sf, ok := fc.Args[0].(*ast.BasicLit); ok && sf.Kind == token.INT {
+					spriteFrame = intLit(fc.Args[0])
+				}
+			}
+			frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
+				SpriteIdx:      0,
+				SpriteFrameIdx: spriteFrame,
+				ScaleX:         1,
+				ScaleY:         1,
+				OriginX:        0.5,
+				OriginY:        0.5,
+			})
 		}
 		anim.Frames = append(anim.Frames, frame)
 	}
+}
+
+func parseSpriteEntry(call *ast.CallExpr) project.FrameSpriteEntry {
+	entry := project.FrameSpriteEntry{
+		ScaleX:  1,
+		ScaleY:  1,
+		OriginX: 0.5,
+		OriginY: 0.5,
+	}
+	if len(call.Args) < 2 {
+		return entry
+	}
+	entry.SpriteIdx = intLit(call.Args[0])
+	entry.SpriteFrameIdx = intLit(call.Args[1])
+	if len(call.Args) >= 3 {
+		entry.OffsetX = floatLit(call.Args[2])
+	}
+	if len(call.Args) >= 4 {
+		entry.OffsetY = floatLit(call.Args[3])
+	}
+	if len(call.Args) >= 5 {
+		entry.Rotation = floatLit(call.Args[4])
+	}
+	if len(call.Args) >= 6 {
+		entry.ScaleX = floatLit(call.Args[5])
+	}
+	if len(call.Args) >= 7 {
+		entry.ScaleY = floatLit(call.Args[6])
+	}
+	if len(call.Args) >= 8 {
+		entry.OriginX = floatLit(call.Args[7])
+	}
+	if len(call.Args) >= 9 {
+		entry.OriginY = floatLit(call.Args[8])
+	}
+	for j := 9; j < len(call.Args); j++ {
+		hb := parseHurtboxCall(call.Args[j])
+		if hb != nil {
+			entry.Hurtboxes = append(entry.Hurtboxes, *hb)
+		}
+	}
+	return entry
 }
 
 func parseHurtboxCall(expr ast.Expr) *project.HurtboxRow {

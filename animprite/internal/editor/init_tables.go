@@ -57,7 +57,7 @@ func (a *EditorApp) initTables() {
 		}
 		a.proj.Animations = append(a.proj.Animations, project.AnimationRow{
 			Name: defName, CurrentIdx: 0,
-			Frames: []project.AnimationFrame{{ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5}},
+			Frames: []project.AnimationFrame{{Sprites: a.defaultFrameSprites()}},
 			FPS:    14,
 		})
 		a.syncAnimBtns()
@@ -131,8 +131,9 @@ func (a *EditorApp) initTables() {
 	addSpriteBtn.BtnType = ui.BtnBlue
 	addSpriteBtn.OnClick = func() {
 		a.saveSnapshot()
+		newIdx := len(a.proj.Sprites)
 		a.proj.Sprites = append(a.proj.Sprites, project.SpriteRow{
-			Name:       fmt.Sprintf("sprite %d", len(a.proj.Sprites)+1),
+			Name:       fmt.Sprintf("sprite %d", newIdx+1),
 			File:       "",
 			Width:      256,
 			Height:     256,
@@ -143,6 +144,16 @@ func (a *EditorApp) initTables() {
 			OriginX:    0.5,
 			OriginY:    0.5,
 		})
+		entry := project.FrameSpriteEntry{
+			SpriteIdx: newIdx,
+			OriginX:   0.5, OriginY: 0.5,
+			ScaleX: 1, ScaleY: 1,
+		}
+		for ai := range a.proj.Animations {
+			for fi := range a.proj.Animations[ai].Frames {
+				a.proj.Animations[ai].Frames[fi].Sprites = append(a.proj.Animations[ai].Frames[fi].Sprites, entry)
+			}
+		}
 		a.syncSpriteBtns()
 		a.syncLayout()
 	}
@@ -266,8 +277,11 @@ func (a *EditorApp) initTables() {
 		if anim.CurrentIdx < 0 || anim.CurrentIdx >= len(anim.Frames) {
 			return
 		}
-		frame := &anim.Frames[anim.CurrentIdx]
-		if len(frame.Hurtboxes) > 0 {
+		entry := a.currentFrameSpriteEntry()
+		if entry == nil {
+			return
+		}
+		if len(entry.Hurtboxes) > 0 {
 			return
 		}
 		prevIdx := anim.CurrentIdx - 1
@@ -275,8 +289,12 @@ func (a *EditorApp) initTables() {
 			return
 		}
 		prev := anim.Frames[prevIdx]
-		frame.Hurtboxes = make([]project.HurtboxRow, len(prev.Hurtboxes))
-		copy(frame.Hurtboxes, prev.Hurtboxes)
+		prevEntry := a.frameSpriteEntry(&prev, a.spriteEditIdx)
+		if prevEntry == nil || len(prevEntry.Hurtboxes) == 0 {
+			return
+		}
+		entry.Hurtboxes = make([]project.HurtboxRow, len(prevEntry.Hurtboxes))
+		copy(entry.Hurtboxes, prevEntry.Hurtboxes)
 		a.syncHurtboxBtns()
 		a.syncLayout()
 	}

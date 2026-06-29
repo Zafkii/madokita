@@ -3,8 +3,6 @@ package editor
 import (
 	"math"
 
-	"animprite/internal/project"
-
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -238,20 +236,13 @@ func (a *EditorApp) getSpriteTransformForHurtboxSel() (sx, sy, ox, oy, rotDeg fl
 	ox, oy = 0.0, 0.0
 	rotDeg = 0.0
 
-	var activeFrame *project.AnimationFrame
-	if a.animTable.SelectedIdx >= 0 && a.animTable.SelectedIdx < len(a.proj.Animations) {
-		anim := &a.proj.Animations[a.animTable.SelectedIdx]
-		if anim.CurrentIdx >= 0 && anim.CurrentIdx < len(anim.Frames) {
-			activeFrame = &anim.Frames[anim.CurrentIdx]
-		}
-	}
-
-	if activeFrame != nil {
-		sx = activeFrame.ScaleX
-		sy = activeFrame.ScaleY
-		ox = activeFrame.OffsetX
-		oy = activeFrame.OffsetY
-		rotDeg = activeFrame.Rotation
+	entry := a.currentFrameSpriteEntry()
+	if entry != nil {
+		sx = entry.ScaleX
+		sy = entry.ScaleY
+		ox = entry.OffsetX
+		oy = entry.OffsetY
+		rotDeg = entry.Rotation
 	} else if s := a.spriteTable.SelectedIdx; s >= 0 && s < len(a.proj.Sprites) {
 		sx = a.proj.Sprites[s].ScaleX
 		sy = a.proj.Sprites[s].ScaleY

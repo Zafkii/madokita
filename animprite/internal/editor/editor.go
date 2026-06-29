@@ -122,6 +122,7 @@ type EditorApp struct {
 	prevSelectedAnimFrameIdx int
 	prevSelectedSpriteIdx    int
 	prevSelectedHurtboxIdx   int
+	spriteEditIdx            int
 	hurtboxAnimCtx           int
 	panelMode                rightPanelMode
 	statusMsg                string
@@ -163,6 +164,7 @@ func NewEditorApp() *EditorApp {
 		prevSelectedSpriteIdx:    -1,
 		prevSelectedAnimIdx:      -1,
 		prevSelectedAnimFrameIdx: -1,
+		spriteEditIdx:            0,
 		loadedSprites:            make(map[int]*ebiten.Image),
 		win: windowState{
 			dragMgr: &windrag.DragManager{},
@@ -244,18 +246,21 @@ func NewEditorApp() *EditorApp {
 	app.proj.AssetKey = "my_movement"
 	app.proj.DefaultOriginX = 0.5
 	app.proj.DefaultOriginY = 0.5
+	app.proj.Sprites = []project.SpriteRow{
+		{Name: "Base", File: "base.png", Width: 256, Height: 256, FrameCount: 1, CurrentIdx: 0, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
+	}
+	defaultSprites := []project.FrameSpriteEntry{
+		{SpriteIdx: 0, OriginX: 0.5, OriginY: 0.5, ScaleX: 1, ScaleY: 1},
+	}
 	app.proj.Animations = []project.AnimationRow{
 		{
 			Name: "idle", CurrentIdx: 0, Loop: true,
 			Frames: []project.AnimationFrame{
-				{ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5, SpriteIdx: 0, Phase: project.PhaseWindup},
-				{ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5, SpriteIdx: 0, Phase: project.PhaseWindup},
+				{Sprites: defaultSprites, Phase: project.PhaseWindup},
+				{Sprites: defaultSprites, Phase: project.PhaseWindup},
 			},
 			FPS: 14,
 		},
-	}
-	app.proj.Sprites = []project.SpriteRow{
-		{Name: "Base", File: "base.png", Width: 256, Height: 256, FrameCount: 1, CurrentIdx: 0, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
 	}
 
 	app.initTables()
@@ -327,9 +332,21 @@ func (a *EditorApp) initRightPanelWidgets() {
 			return
 		}
 		frame := &a.proj.Animations[animIdx].Frames[frameIdx]
-		frame.SpriteIdx = idx - 1
-		if idx > 0 && frame.SpriteFrameIdx >= a.proj.Sprites[idx-1].FrameCount {
-			frame.SpriteFrameIdx = 0
+		spriteIdx := idx - 1
+		if spriteIdx < 0 {
+			a.spriteEditIdx = 0
+			return
+		}
+		a.spriteEditIdx = spriteIdx
+		if a.frameSpriteEntry(frame, spriteIdx) == nil {
+			frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
+				SpriteIdx: spriteIdx,
+				SpriteFrameIdx: 0,
+				OriginX:  a.proj.Sprites[spriteIdx].OriginX,
+				OriginY:  a.proj.Sprites[spriteIdx].OriginY,
+				ScaleX:   a.proj.Sprites[spriteIdx].ScaleX,
+				ScaleY:   a.proj.Sprites[spriteIdx].ScaleY,
+			})
 		}
 	}
 
