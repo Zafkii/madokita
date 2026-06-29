@@ -238,6 +238,10 @@ func (a *EditorApp) drawRightPanel(screen *ebiten.Image, p theme.Palette) {
 	op.GeoM.Translate(float64(x), float64(y))
 	screen.DrawImage(a.rp.buf.SubImage(image.Rect(x, y, x+rightPanelW, y+h)).(*ebiten.Image), op)
 
+	if a.isAttackMode() && a.phaseDropdown.IsOpen() {
+		a.phaseDropdown.DrawPopup(screen)
+	}
+
 	if a.rp.contentH > h {
 		sx := x + rightPanelW - 8
 		sw := 4
@@ -282,7 +286,6 @@ func (a *EditorApp) drawSelectedElementProps(screen *ebiten.Image, p theme.Palet
 
 	if a.isAttackMode() {
 		iy = a.drawLabeledDropdown(screen, a.phaseDropdown, iy)
-		a.phaseDropdown.DrawPopup(screen)
 	}
 
 	return iy + 4
