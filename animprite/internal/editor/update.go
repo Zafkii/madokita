@@ -57,14 +57,15 @@ func (a *EditorApp) Update() error {
 
 		a.handleTopPanelMouse(mx, my, justL)
 		a.handleRightPanelMouse(mx, my, justL)
-		a.syncAnimFrameSelection()
-		a.syncSpriteSelection()
-		a.syncHurtboxSelection()
 		_, yoff := ebiten.Wheel()
 		if yoff != 0 {
 			a.handleScrollWheel(mx, my, yoff)
 		}
 	}
+
+	a.syncAnimFrameSelection()
+	a.syncSpriteSelection()
+	a.syncHurtboxSelection()
 
 	if !skipMouse {
 		a.handleDragSelect()
