@@ -249,17 +249,19 @@ func NewEditorApp() *EditorApp {
 	app.proj.Sprites = []project.SpriteRow{
 		{Name: "Base", File: "base.png", Width: 256, Height: 256, FrameCount: 1, CurrentIdx: 0, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
 	}
-	defaultSprites := []project.FrameSpriteEntry{
-		{SpriteIdx: 0, OriginX: 0.5, OriginY: 0.5, ScaleX: 1, ScaleY: 1},
+	makeEntry := func(sx, sy, ox float64) []project.FrameSpriteEntry {
+		return []project.FrameSpriteEntry{
+			{SpriteIdx: 0, OriginX: 0.5, OriginY: 0.5, ScaleX: sx, ScaleY: sy, OffsetX: ox},
+		}
 	}
 	app.proj.Animations = []project.AnimationRow{
 		{
 			Name: "idle", CurrentIdx: 0, Loop: true,
 			Frames: []project.AnimationFrame{
-				{Sprites: defaultSprites, Phase: project.PhaseWindup},
-				{Sprites: defaultSprites, Phase: project.PhaseWindup},
+				{Sprites: makeEntry(1, 1, 0), Phase: project.PhaseWindup},
+				{Sprites: makeEntry(0.5, 0.5, 50), Phase: project.PhaseWindup},
 			},
-			FPS: 14,
+			FPS: 4,
 		},
 	}
 
