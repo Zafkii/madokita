@@ -31,6 +31,7 @@ type Palette struct {
 
 	// Dropdown
 	DropdownBG                color.Color
+	DropdownHoverBG           color.Color
 	DropdownBorder            color.Color
 	DropdownText              color.Color
 	DropdownPopupBG           color.Color
@@ -81,18 +82,19 @@ var Dark = Palette{
 	BtnBlue:     color.RGBA{47, 96, 120, 255},
 	BtnOrange:   color.RGBA{210, 135, 50, 255},
 	BtnDisabled: color.RGBA{68, 68, 85, 255},
-	BtnHover:    color.RGBA{255, 200, 0, 87},
+	BtnHover:    color.RGBA{197, 177, 0, 103},
 
 	// Dropdown
-	DropdownBG:                color.RGBA{49, 67, 168, 255},
+	DropdownBG:                color.RGBA{44, 113, 117, 255},
+	DropdownHoverBG:           color.RGBA{0, 206, 206, 253},
 	DropdownBorder:            color.RGBA{65, 65, 85, 255},
 	DropdownText:              color.RGBA{255, 255, 255, 255},
 	DropdownPopupBG:           color.RGBA{42, 48, 80, 255},
 	DropdownPopupBorder:       color.RGBA{65, 65, 85, 255},
 	DropdownPopupText:         color.RGBA{255, 255, 255, 255},
-	DropdownPopupHover:        color.RGBA{255, 218, 85, 60},
-	DropdownPopupSelectedBG:   color.RGBA{255, 212, 40, 163},
-	DropdownPopupSelectedText: color.RGBA{30, 30, 45, 255},
+	DropdownPopupHover:        color.RGBA{0, 167, 117, 194},
+	DropdownPopupSelectedBG:   color.RGBA{0, 255, 195, 106},
+	DropdownPopupSelectedText: color.RGBA{0, 0, 0, 255},
 
 	// Inputs
 	InputBG:          color.RGBA{26, 26, 46, 255},
@@ -139,6 +141,7 @@ var Light = Palette{
 
 	// Dropdown
 	DropdownBG:                color.RGBA{177, 211, 255, 255},
+	DropdownHoverBG:           color.RGBA{190, 218, 248, 255},
 	DropdownBorder:            color.RGBA{200, 205, 210, 255},
 	DropdownText:              color.RGBA{30, 35, 50, 255},
 	DropdownPopupBG:           color.RGBA{235, 238, 245, 255},

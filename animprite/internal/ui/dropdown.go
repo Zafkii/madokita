@@ -88,7 +88,7 @@ func (d *Dropdown) Draw(screen *ebiten.Image) {
 	FillBorder(screen, x, d.Y, d.W, d.H, p.DropdownBorder)
 
 	if d.buttonHovered && d.Enabled {
-		FillRect(screen, x, d.Y, d.W, d.H, p.BtnHover)
+		FillRect(screen, x, d.Y, d.W, d.H, p.DropdownHoverBG)
 	}
 
 	text := d.DisplayText
