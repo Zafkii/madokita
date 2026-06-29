@@ -49,6 +49,9 @@ func (a *EditorApp) rebuildFromProj() {
 	if a.animTable.SelectedIdx >= len(a.proj.Animations) {
 		a.animTable.SelectedIdx = -1
 	}
+	if a.animTable.SelectedIdx < 0 && len(a.proj.Animations) > 0 {
+		a.animTable.SelectedIdx = 0
+	}
 	a.prevSelectedSpriteIdx = -1
 	a.prevSelectedAnimIdx = -1
 	a.prevSelectedAnimFrameIdx = -1

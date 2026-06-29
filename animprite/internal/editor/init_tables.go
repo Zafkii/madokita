@@ -392,4 +392,8 @@ func (a *EditorApp) initTables() {
 	a.syncSpriteBtns()
 	a.syncHurtboxBtns()
 	a.syncHitboxBtns()
+
+	if len(a.proj.Animations) > 0 {
+		a.animTable.SelectedIdx = 0
+	}
 }
