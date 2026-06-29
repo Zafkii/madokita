@@ -143,6 +143,50 @@ func (a *EditorApp) buildSpriteRenders() {
 }
 
 func (a *EditorApp) buildHurtboxRenders() {
+	var activeFrame *project.AnimationFrame
+	if a.animTable.SelectedIdx >= 0 && a.animTable.SelectedIdx < len(a.proj.Animations) {
+		anim := &a.proj.Animations[a.animTable.SelectedIdx]
+		if anim.CurrentIdx >= 0 && anim.CurrentIdx < len(anim.Frames) {
+			activeFrame = &anim.Frames[anim.CurrentIdx]
+		}
+	}
+
+	currentEntry := a.currentFrameSpriteEntry()
+	selectedHbIdx := a.hurtboxTable.SelectedIdx
+
+	if activeFrame != nil {
+		hbRenders := make([]canvas.HurtboxRender, 0)
+		for _, entry := range activeFrame.Sprites {
+			sx, sy := entry.ScaleX, entry.ScaleY
+			ox, oy := entry.OffsetX, entry.OffsetY
+			spriteRot := entry.Rotation
+			rotRad := spriteRot * math.Pi / 180
+			cos := math.Cos(rotRad)
+			sin := math.Sin(rotRad)
+			isCurrent := currentEntry != nil && entry.SpriteIdx == currentEntry.SpriteIdx
+
+			for i, hb := range entry.Hurtboxes {
+				if hb.Width <= 0 || hb.Height <= 0 {
+					continue
+				}
+				hbRot := (spriteRot + hb.Rotation) * math.Pi / 180
+				wx := (hb.X*sx)*cos - (hb.Y*sy)*sin + ox
+				wy := (hb.X*sx)*sin + (hb.Y*sy)*cos + oy
+				hbRenders = append(hbRenders, canvas.HurtboxRender{
+					OffsetX:     wx,
+					OffsetY:     wy,
+					WorldWidth:  hb.Width * sx,
+					WorldHeight: hb.Height * sy,
+					Rotation:    hbRot,
+					Selected:    isCurrent && i == selectedHbIdx,
+				})
+			}
+		}
+		a.canvas.SetHurtboxRenders(hbRenders)
+		return
+	}
+
+	// Fallback: no active animation frame
 	hbp := a.hurtboxList()
 	if hbp == nil {
 		a.canvas.SetHurtboxRenders(nil)
@@ -184,7 +228,7 @@ func (a *EditorApp) buildHurtboxRenders() {
 			WorldWidth:  hb.Width * sx,
 			WorldHeight: hb.Height * sy,
 			Rotation:    hbRot,
-			Selected:    i == a.hurtboxTable.SelectedIdx,
+			Selected:    i == selectedHbIdx,
 		})
 	}
 	a.canvas.SetHurtboxRenders(hbRenders)
