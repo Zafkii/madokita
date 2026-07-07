@@ -105,11 +105,9 @@ func (a *EditorApp) syncAnimBtns() {
 			if a.proj.Animations[i].CurrentIdx > 0 {
 				a.proj.Animations[i].CurrentIdx--
 			}
-			a.animTable.SelectedIdx = i
+			a.loadAnimFrameProps(i, a.proj.Animations[i].CurrentIdx)
 			a.hurtboxAnimCtx = i
 			a.prevSelectedHurtboxIdx = -1
-			a.prevSelectedAnimIdx = -1
-			a.prevSelectedAnimFrameIdx = -1
 		}
 		a.animFrameNextBtns[i].OnClick = func() {
 			a.flushInputsToData()
@@ -117,11 +115,9 @@ func (a *EditorApp) syncAnimBtns() {
 			if a.proj.Animations[i].CurrentIdx < len(a.proj.Animations[i].Frames)-1 {
 				a.proj.Animations[i].CurrentIdx++
 			}
-			a.animTable.SelectedIdx = i
+			a.loadAnimFrameProps(i, a.proj.Animations[i].CurrentIdx)
 			a.hurtboxAnimCtx = i
 			a.prevSelectedHurtboxIdx = -1
-			a.prevSelectedAnimIdx = -1
-			a.prevSelectedAnimFrameIdx = -1
 		}
 		a.animFrameInputs[i].Max = float64(len(a.proj.Animations[i].Frames))
 		if a.proj.Animations[i].CurrentIdx >= 0 {
@@ -140,11 +136,9 @@ func (a *EditorApp) syncAnimBtns() {
 			}
 			a.proj.Animations[ii].CurrentIdx = v - 1
 			a.animFrameInputs[ii].SetNumeric(float64(v))
-			a.animTable.SelectedIdx = ii
+			a.loadAnimFrameProps(ii, a.proj.Animations[ii].CurrentIdx)
 			a.hurtboxAnimCtx = ii
 			a.prevSelectedHurtboxIdx = -1
-			a.prevSelectedAnimIdx = -1
-			a.prevSelectedAnimFrameIdx = -1
 		}
 	}
 }
