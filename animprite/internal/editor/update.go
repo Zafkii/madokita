@@ -63,10 +63,6 @@ func (a *EditorApp) Update() error {
 		}
 	}
 
-	a.syncAnimFrameSelection()
-	a.syncSpriteSelection()
-	a.syncHurtboxSelection()
-
 	if !skipMouse {
 		a.handleDragSelect()
 	}
@@ -138,6 +134,15 @@ func (a *EditorApp) flushInputsToData() {
 		row.ScaleY = a.props[4].NumericValue()
 		row.OriginX = a.originInputs[0].NumericValue()
 		row.OriginY = a.originInputs[1].NumericValue()
+	}
+
+	switch {
+	case a.hurtboxTable.SelectedIdx >= 0:
+		a.panelMode = panelModeHurtbox
+	case a.animTable.SelectedIdx >= 0:
+		a.panelMode = panelModeAnimFrame
+	case sel >= 0 && sel < len(a.proj.Sprites):
+		a.panelMode = panelModeSprite
 	}
 }
 

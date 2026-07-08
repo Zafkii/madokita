@@ -56,8 +56,12 @@ func (a *EditorApp) rebuildFromProj() {
 	a.prevSelectedAnimIdx = -1
 	a.prevSelectedAnimFrameIdx = -1
 	a.spriteEditIdx = 0
-	a.syncAnimFrameSelection()
-	a.syncSpriteSelection()
+
+	if a.animTable.SelectedIdx >= 0 {
+		a.navigateToAnim(a.animTable.SelectedIdx)
+	} else if a.spriteTable.SelectedIdx >= 0 {
+		a.navigateToSprite(a.spriteTable.SelectedIdx)
+	}
 	a.syncMovementInputs()
 }
 
