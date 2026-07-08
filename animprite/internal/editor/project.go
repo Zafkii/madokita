@@ -37,6 +37,7 @@ func (a *EditorApp) redo() {
 }
 
 func (a *EditorApp) rebuildFromProj() {
+	a.ensureFrameSprites()
 	a.syncAnimBtns()
 	a.syncSpriteBtns()
 	a.syncHurtboxBtns()

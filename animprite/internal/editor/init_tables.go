@@ -130,6 +130,7 @@ func (a *EditorApp) initTables() {
 	addSpriteBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "+ Add", th)
 	addSpriteBtn.BtnType = ui.BtnBlue
 	addSpriteBtn.OnClick = func() {
+		a.flushInputsToData()
 		a.saveSnapshot()
 		newIdx := len(a.proj.Sprites)
 		a.proj.Sprites = append(a.proj.Sprites, project.SpriteRow{
@@ -144,18 +145,15 @@ func (a *EditorApp) initTables() {
 			OriginX:    0.5,
 			OriginY:    0.5,
 		})
-		entry := project.FrameSpriteEntry{
-			SpriteIdx: newIdx,
-			OriginX:   0.5, OriginY: 0.5,
-			ScaleX: 1, ScaleY: 1,
-		}
-		for ai := range a.proj.Animations {
-			for fi := range a.proj.Animations[ai].Frames {
-				a.proj.Animations[ai].Frames[fi].Sprites = append(a.proj.Animations[ai].Frames[fi].Sprites, entry)
-			}
-		}
+		a.ensureFrameSprites()
 		a.syncSpriteBtns()
-		a.syncLayout()
+		if a.animTable.SelectedIdx >= 0 {
+			a.navigateToAnim(a.animTable.SelectedIdx)
+		} else if a.spriteTable.SelectedIdx >= 0 {
+			a.navigateToSprite(a.spriteTable.SelectedIdx)
+		} else {
+			a.syncLayout()
+		}
 	}
 	delSpriteBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
 	delSpriteBtn.BtnType = ui.BtnRed
@@ -197,6 +195,7 @@ func (a *EditorApp) initTables() {
 				frame.Sprites = filtered
 			}
 		}
+		a.ensureFrameSprites()
 
 		a.syncSpriteBtns()
 		if a.animTable.SelectedIdx >= 0 {
