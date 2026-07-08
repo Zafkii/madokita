@@ -202,7 +202,7 @@ func (a *EditorApp) handleRightPanelKeys() {
 	inputs[next].Focused = true
 }
 
-func (a *EditorApp) handleScrollWheel(mx, my int, yoff float64) {
+func (a *EditorApp) handleScrollWheel(mx, my int, yoff float64) bool {
 	vs, ve := a.animTable.VisibleRange()
 	for i := vs; i < ve; i++ {
 		x0 := a.animFramePrevBtns[i].X
@@ -215,7 +215,7 @@ func (a *EditorApp) handleScrollWheel(mx, my int, yoff float64) {
 			} else {
 				a.animFramePrevBtns[i].OnClick()
 			}
-			return
+			return true
 		}
 	}
 	vs, ve = a.spriteTable.VisibleRange()
@@ -230,7 +230,8 @@ func (a *EditorApp) handleScrollWheel(mx, my int, yoff float64) {
 			} else {
 				a.spriteFramePrevBtns[i].OnClick()
 			}
-			return
+			return true
 		}
 	}
+	return false
 }

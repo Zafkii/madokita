@@ -62,6 +62,7 @@ func (a *EditorApp) initTables() {
 		})
 		a.syncAnimBtns()
 		a.syncLayout()
+		a.navigateToAnim(len(a.proj.Animations) - 1)
 	}
 	delAnimBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
 	delAnimBtn.BtnType = ui.BtnRed
@@ -71,6 +72,9 @@ func (a *EditorApp) initTables() {
 			a.proj.Animations = append(a.proj.Animations[:idx], a.proj.Animations[idx+1:]...)
 			a.syncAnimBtns()
 			a.syncLayout()
+			if a.animTable.SelectedIdx >= 0 {
+				a.navigateToAnim(a.animTable.SelectedIdx)
+			}
 		}
 	}
 	a.animTable.AddBtn = addAnimBtn
@@ -266,27 +270,13 @@ func (a *EditorApp) initTables() {
 	addHbBtn.OnClick = func() {
 		a.flushInputsToData()
 		a.saveSnapshot()
-		animIdx := a.animTable.SelectedIdx
-		if animIdx < 0 {
-			animIdx = a.hurtboxAnimCtx
-		}
-		if animIdx < 0 || animIdx >= len(a.proj.Animations) {
+		entry := a.currentFrameSpriteEntry()
+		if entry == nil {
 			return
 		}
-		anim := &a.proj.Animations[animIdx]
-		defaultHb := project.HurtboxRow{Width: 32, Height: 32}
-		for fi := range anim.Frames {
-			for si := range anim.Frames[fi].Sprites {
-				anim.Frames[fi].Sprites[si].Hurtboxes = append(
-					anim.Frames[fi].Sprites[si].Hurtboxes, defaultHb)
-			}
-		}
-		entry := a.currentFrameSpriteEntry()
-		newIdx := 0
-		if entry != nil {
-			newIdx = len(entry.Hurtboxes) - 1
-		}
-		a.navigateToHurtbox(newIdx)
+		entry.Hurtboxes = append(entry.Hurtboxes, project.HurtboxRow{Width: 32, Height: 32})
+		a.syncHurtboxBtns()
+		a.navigateToHurtbox(len(entry.Hurtboxes) - 1)
 	}
 	delHbBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
 	delHbBtn.BtnType = ui.BtnRed
@@ -297,23 +287,19 @@ func (a *EditorApp) initTables() {
 		if idx < 0 {
 			return
 		}
-		animIdx := a.animTable.SelectedIdx
-		if animIdx < 0 {
-			animIdx = a.hurtboxAnimCtx
-		}
-		if animIdx < 0 || animIdx >= len(a.proj.Animations) {
+		entry := a.currentFrameSpriteEntry()
+		if entry == nil || idx >= len(entry.Hurtboxes) {
 			return
 		}
-		anim := &a.proj.Animations[animIdx]
-		for fi := range anim.Frames {
-			for si := range anim.Frames[fi].Sprites {
-				hbs := anim.Frames[fi].Sprites[si].Hurtboxes
-				if idx < len(hbs) {
-					anim.Frames[fi].Sprites[si].Hurtboxes = append(hbs[:idx], hbs[idx+1:]...)
-				}
-			}
+		entry.Hurtboxes = append(entry.Hurtboxes[:idx], entry.Hurtboxes[idx+1:]...)
+		a.syncHurtboxBtns()
+		if idx > 0 {
+			a.navigateToHurtbox(idx - 1)
+		} else if len(entry.Hurtboxes) > 0 {
+			a.navigateToHurtbox(0)
+		} else {
+			a.navigateToHurtbox(-1)
 		}
-		a.navigateToHurtbox(a.hurtboxTable.SelectedIdx)
 	}
 	copyHbBtn := ui.NewButton(0, 0, 110, topPanelBtnH, "\U000F04AE Copy Prev", th)
 	copyHbBtn.OnClick = func() {

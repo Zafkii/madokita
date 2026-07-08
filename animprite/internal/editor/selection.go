@@ -38,8 +38,7 @@ func (a *EditorApp) ensureFrameSprites() {
 	}
 }
 
-func (a *EditorApp) syncAnimFrameSelection() {
-}
+
 
 func (a *EditorApp) loadAnimFrameProps(animIdx, frameIdx int) {
 	if animIdx < 0 || animIdx >= len(a.proj.Animations) {

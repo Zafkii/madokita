@@ -86,6 +86,7 @@ func (a *EditorApp) syncAnimBtns() {
 			a.animTable.SelectedIdx = i
 			a.hurtboxAnimCtx = i
 			a.prevSelectedHurtboxIdx = -1
+			a.loadAnimFrameProps(i, a.proj.Animations[i].CurrentIdx)
 		}
 		a.animRemoveFrameBtns[i].OnClick = func() {
 			a.saveSnapshot()
@@ -98,6 +99,7 @@ func (a *EditorApp) syncAnimBtns() {
 			a.animTable.SelectedIdx = i
 			a.hurtboxAnimCtx = i
 			a.prevSelectedHurtboxIdx = -1
+			a.loadAnimFrameProps(i, a.proj.Animations[i].CurrentIdx)
 		}
 		a.animFramePrevBtns[i].OnClick = func() {
 			a.saveSnapshot()

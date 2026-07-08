@@ -318,7 +318,6 @@ func (a *EditorApp) initRightPanelWidgets() {
 		for fi := startFrame; fi < len(anim.Frames); fi++ {
 			anim.Frames[fi].Phase = project.FramePhase(idx)
 		}
-		a.syncAnimFrameSelection()
 	}
 
 	a.frameSpriteDropdown = ui.NewDropdown(px, 0, rightPanelInner, rightPanelInputH, th)

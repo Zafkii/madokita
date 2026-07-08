@@ -57,10 +57,6 @@ func (a *EditorApp) Update() error {
 
 		a.handleTopPanelMouse(mx, my, justL)
 		a.handleRightPanelMouse(mx, my, justL)
-		_, yoff := ebiten.Wheel()
-		if yoff != 0 {
-			a.handleScrollWheel(mx, my, yoff)
-		}
 	}
 
 	if !skipMouse {

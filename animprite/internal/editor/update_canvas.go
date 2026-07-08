@@ -16,6 +16,7 @@ func (a *EditorApp) handleCanvasWheel(mx, my int, wy float64, ctrl, shift bool) 
 			if hbIdx := a.hurtboxTable.SelectedIdx; hbIdx >= 0 {
 				hbp := a.hurtboxList()
 				if hbp != nil && hbIdx < len(*hbp) {
+					a.panelMode = panelModeHurtbox
 					hb := &(*hbp)[hbIdx]
 					hb.Width = math.Round((hb.Width+wy*0.5)*100) / 100
 					if hb.Width < 1 {
@@ -29,11 +30,13 @@ func (a *EditorApp) handleCanvasWheel(mx, my int, wy float64, ctrl, shift bool) 
 					a.props[3].SetNumeric(hb.Height)
 				}
 			} else if entry := a.currentFrameSpriteEntry(); entry != nil {
+				a.panelMode = panelModeAnimFrame
 				entry.ScaleX = math.Round((entry.ScaleX+wy*0.05)*100) / 100
 				entry.ScaleY = math.Round((entry.ScaleY+wy*0.05)*100) / 100
 				a.props[3].SetNumeric(entry.ScaleX)
 				a.props[4].SetNumeric(entry.ScaleY)
 			} else if sel := a.spriteTable.SelectedIdx; sel >= 0 && sel < len(a.proj.Sprites) {
+				a.panelMode = panelModeSprite
 				row := &a.proj.Sprites[sel]
 				row.ScaleX = math.Round((row.ScaleX+wy*0.05)*100) / 100
 				row.ScaleY = math.Round((row.ScaleY+wy*0.05)*100) / 100
@@ -44,14 +47,17 @@ func (a *EditorApp) handleCanvasWheel(mx, my int, wy float64, ctrl, shift bool) 
 			if hbIdx := a.hurtboxTable.SelectedIdx; hbIdx >= 0 {
 				hbp := a.hurtboxList()
 				if hbp != nil && hbIdx < len(*hbp) {
+					a.panelMode = panelModeHurtbox
 					hb := &(*hbp)[hbIdx]
 					hb.Rotation = math.Round((hb.Rotation+wy)*100) / 100
 					a.props[4].SetNumeric(hb.Rotation)
 				}
 			} else if entry := a.currentFrameSpriteEntry(); entry != nil {
+				a.panelMode = panelModeAnimFrame
 				entry.Rotation += wy
 				a.props[2].SetNumeric(entry.Rotation)
 			} else if sel := a.spriteTable.SelectedIdx; sel >= 0 && sel < len(a.proj.Sprites) {
+				a.panelMode = panelModeSprite
 				row := &a.proj.Sprites[sel]
 				row.Rotation += wy
 				a.props[2].SetNumeric(row.Rotation)
@@ -100,6 +106,7 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 					sy = a.proj.Sprites[sel].ScaleY
 					rot = a.proj.Sprites[sel].Rotation * math.Pi / 180
 				}
+				a.panelMode = panelModeHurtbox
 				hb := &(*hbp)[hbIdx]
 				cos := math.Cos(rot)
 				sin := math.Sin(rot)
@@ -114,11 +121,13 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 				a.syncHurtboxBtns()
 			}
 		} else if entry := a.currentFrameSpriteEntry(); entry != nil {
+			a.panelMode = panelModeAnimFrame
 			entry.OffsetX = math.Round(entry.OffsetX + dx/a.canvas.Cam.Zoom)
 			entry.OffsetY = math.Round(entry.OffsetY + dy/a.canvas.Cam.Zoom)
 			a.props[0].SetNumeric(entry.OffsetX)
 			a.props[1].SetNumeric(entry.OffsetY)
 		} else if sel := a.spriteTable.SelectedIdx; sel >= 0 && sel < len(a.proj.Sprites) {
+			a.panelMode = panelModeSprite
 			row := &a.proj.Sprites[sel]
 			row.OffsetX = math.Round(row.OffsetX + dx/a.canvas.Cam.Zoom)
 			row.OffsetY = math.Round(row.OffsetY + dy/a.canvas.Cam.Zoom)
@@ -178,11 +187,13 @@ func (a *EditorApp) dispatchWheel(mx, my int, wy float64) {
 		a.wheelChanged = false
 	}
 	if my >= ty && my < ty+a.topPanelH {
-		tables := []*ui.Table{a.animTable, a.spriteTable, a.hurtboxTable, a.hitboxTable}
-		for _, tbl := range tables {
-			if tbl.HitTest(mx, my) {
-				tbl.ScrollBy(amt)
-				break
+		if !a.handleScrollWheel(mx, my, wy) {
+			tables := []*ui.Table{a.animTable, a.spriteTable, a.hurtboxTable, a.hitboxTable}
+			for _, tbl := range tables {
+				if tbl.HitTest(mx, my) {
+					tbl.ScrollBy(amt)
+					break
+				}
 			}
 		}
 	} else if mx >= a.win.outsideWidth-rightPanelW && my >= a.rightPanelY() && my < a.rightPanelY()+a.rightPanelH() {
