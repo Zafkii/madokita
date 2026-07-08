@@ -61,12 +61,13 @@ func (a *EditorApp) navigateToHurtbox(hbIdx int) {
 	a.animTable.SelectedIdx = -1
 	a.spriteTable.SelectedIdx = -1
 	a.hitboxTable.SelectedIdx = -1
+	a.syncHurtboxBtns()
 
-	if hbIdx >= 0 {
+	if a.hurtboxTable.SelectedIdx >= 0 {
 		a.panelMode = panelModeHurtbox
 		hbp := a.hurtboxList()
-		if hbp != nil && hbIdx < len(*hbp) {
-			hb := (*hbp)[hbIdx]
+		if hbp != nil && a.hurtboxTable.SelectedIdx < len(*hbp) {
+			hb := (*hbp)[a.hurtboxTable.SelectedIdx]
 			a.props[0].SetLabel("Offset X")
 			a.props[0].SetNumeric(hb.X)
 			a.props[0].Min = -99999
@@ -120,7 +121,6 @@ func (a *EditorApp) navigateToHurtbox(hbIdx int) {
 		}
 	}
 
-	a.prevSelectedHurtboxIdx = hbIdx
-	a.syncHurtboxBtns()
+	a.prevSelectedHurtboxIdx = a.hurtboxTable.SelectedIdx
 	a.syncLayout()
 }

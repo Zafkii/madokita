@@ -237,31 +237,56 @@ func (a *EditorApp) initTables() {
 	addHbBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "+ Add", th)
 	addHbBtn.BtnType = ui.BtnBlue
 	addHbBtn.OnClick = func() {
+		a.flushInputsToData()
 		a.saveSnapshot()
-		hbList := a.hurtboxList()
-		if hbList == nil {
+		animIdx := a.animTable.SelectedIdx
+		if animIdx < 0 {
+			animIdx = a.hurtboxAnimCtx
+		}
+		if animIdx < 0 || animIdx >= len(a.proj.Animations) {
 			return
 		}
-		*hbList = append(*hbList, project.HurtboxRow{Width: 32, Height: 32})
-		a.hurtboxTable.SelectedIdx = len(*hbList) - 1
-		a.animTable.SelectedIdx = -1
-		a.spriteTable.SelectedIdx = -1
-		a.syncHurtboxBtns()
-		a.syncLayout()
+		anim := &a.proj.Animations[animIdx]
+		defaultHb := project.HurtboxRow{Width: 32, Height: 32}
+		for fi := range anim.Frames {
+			for si := range anim.Frames[fi].Sprites {
+				anim.Frames[fi].Sprites[si].Hurtboxes = append(
+					anim.Frames[fi].Sprites[si].Hurtboxes, defaultHb)
+			}
+		}
+		entry := a.currentFrameSpriteEntry()
+		newIdx := 0
+		if entry != nil {
+			newIdx = len(entry.Hurtboxes) - 1
+		}
+		a.navigateToHurtbox(newIdx)
 	}
 	delHbBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
 	delHbBtn.BtnType = ui.BtnRed
 	delHbBtn.OnClick = func() {
+		a.flushInputsToData()
 		a.saveSnapshot()
-		hbList := a.hurtboxList()
-		if hbList == nil {
+		idx := a.hurtboxTable.SelectedIdx
+		if idx < 0 {
 			return
 		}
-		if idx := a.hurtboxTable.SelectedIdx; idx >= 0 && idx < len(*hbList) {
-			*hbList = append((*hbList)[:idx], (*hbList)[idx+1:]...)
-			a.syncHurtboxBtns()
-			a.syncLayout()
+		animIdx := a.animTable.SelectedIdx
+		if animIdx < 0 {
+			animIdx = a.hurtboxAnimCtx
 		}
+		if animIdx < 0 || animIdx >= len(a.proj.Animations) {
+			return
+		}
+		anim := &a.proj.Animations[animIdx]
+		for fi := range anim.Frames {
+			for si := range anim.Frames[fi].Sprites {
+				hbs := anim.Frames[fi].Sprites[si].Hurtboxes
+				if idx < len(hbs) {
+					anim.Frames[fi].Sprites[si].Hurtboxes = append(hbs[:idx], hbs[idx+1:]...)
+				}
+			}
+		}
+		a.navigateToHurtbox(a.hurtboxTable.SelectedIdx)
 	}
 	copyHbBtn := ui.NewButton(0, 0, 110, topPanelBtnH, "\U000F04AE Copy Prev", th)
 	copyHbBtn.OnClick = func() {
