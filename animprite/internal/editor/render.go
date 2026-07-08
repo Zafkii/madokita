@@ -135,6 +135,17 @@ func (a *EditorApp) buildSpriteRenders() {
 		wx := row.OffsetX - row.OriginX*aw
 		wy := row.OffsetY - row.OriginY*ah
 		a.canvas.SetSelectionRect(canvas.SelectionRect{X: wx, Y: wy, W: aw, H: ah, Rotation: row.Rotation * math.Pi / 180, Visible: true})
+	} else if entry := a.currentFrameSpriteEntry(); entry != nil && a.animTable.SelectedIdx >= 0 {
+		if entry.SpriteIdx >= 0 && entry.SpriteIdx < len(a.proj.Sprites) {
+			row := a.proj.Sprites[entry.SpriteIdx]
+			aw := float64(row.Width) * entry.ScaleX
+			ah := float64(row.Height) * entry.ScaleY
+			wx := entry.OffsetX - entry.OriginX*aw
+			wy := entry.OffsetY - entry.OriginY*ah
+			a.canvas.SetSelectionRect(canvas.SelectionRect{X: wx, Y: wy, W: aw, H: ah, Rotation: entry.Rotation * math.Pi / 180, Visible: true})
+		} else {
+			a.canvas.SetSelectionRect(canvas.SelectionRect{Visible: false})
+		}
 	} else {
 		a.canvas.SetSelectionRect(canvas.SelectionRect{Visible: false})
 	}

@@ -81,13 +81,26 @@ func (a *EditorApp) initScaleOrig(h int) {
 			o.pxW = float64(row.Width)
 			o.pxH = float64(row.Height)
 		}
+	case panelModeAnimFrame:
+		if entry := a.currentFrameSpriteEntry(); entry != nil &&
+			entry.SpriteIdx >= 0 && entry.SpriteIdx < len(a.proj.Sprites) {
+			row := a.proj.Sprites[entry.SpriteIdx]
+			o.originX = entry.OriginX
+			o.originY = entry.OriginY
+			o.origOffsetX = entry.OffsetX
+			o.origOffsetY = entry.OffsetY
+			o.origScaleX = entry.ScaleX
+			o.origScaleY = entry.ScaleY
+			o.pxW = float64(row.Width)
+			o.pxH = float64(row.Height)
+		}
 	}
 }
 
 func (a *EditorApp) applyHandleScale(mx, my int) {
 	o := &a.scaleOrig
 	if o.pxW <= 0 || o.pxH <= 0 {
-		if a.panelMode == panelModeSprite {
+		if a.panelMode == panelModeSprite || a.panelMode == panelModeAnimFrame {
 			return
 		}
 	}
@@ -227,6 +240,25 @@ func (a *EditorApp) applyHandleScale(mx, my int) {
 			a.props[1].SetNumeric(row.OffsetY)
 			a.props[3].SetNumeric(row.ScaleX)
 			a.props[4].SetNumeric(row.ScaleY)
+		}
+	case panelModeAnimFrame:
+		if entry := a.currentFrameSpriteEntry(); entry != nil {
+			nsx := math.Round(newW/o.pxW*100) / 100
+			nsy := math.Round(newH/o.pxH*100) / 100
+			if nsx < 0.01 {
+				nsx = 0.01
+			}
+			if nsy < 0.01 {
+				nsy = 0.01
+			}
+			entry.ScaleX = nsx
+			entry.ScaleY = nsy
+			entry.OffsetX = math.Round(newX + o.originX*newW)
+			entry.OffsetY = math.Round(newY + o.originY*newH)
+			a.props[0].SetNumeric(entry.OffsetX)
+			a.props[1].SetNumeric(entry.OffsetY)
+			a.props[3].SetNumeric(entry.ScaleX)
+			a.props[4].SetNumeric(entry.ScaleY)
 		}
 	}
 }
