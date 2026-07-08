@@ -305,6 +305,7 @@ func (a *EditorApp) advancePreview() {
 	dt := 1.0 / tps
 	a.prev.previewAccumulator += dt
 
+	advanced := false
 	for {
 		var frameDur float64
 		if a.isAttackMode() {
@@ -352,5 +353,9 @@ func (a *EditorApp) advancePreview() {
 		} else {
 			anim.CurrentIdx++
 		}
+		advanced = true
+	}
+	if advanced {
+		a.loadAnimFrameProps(animIdx, anim.CurrentIdx)
 	}
 }

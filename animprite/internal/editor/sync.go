@@ -101,6 +101,7 @@ func (a *EditorApp) syncAnimBtns() {
 		}
 		a.animFramePrevBtns[i].OnClick = func() {
 			a.saveSnapshot()
+			a.animTable.SelectedIdx = i
 			if a.proj.Animations[i].CurrentIdx > 0 {
 				a.proj.Animations[i].CurrentIdx--
 			}
@@ -110,6 +111,7 @@ func (a *EditorApp) syncAnimBtns() {
 		}
 		a.animFrameNextBtns[i].OnClick = func() {
 			a.saveSnapshot()
+			a.animTable.SelectedIdx = i
 			if a.proj.Animations[i].CurrentIdx < len(a.proj.Animations[i].Frames)-1 {
 				a.proj.Animations[i].CurrentIdx++
 			}
@@ -188,6 +190,7 @@ func (a *EditorApp) syncSpriteBtns() {
 							entry.SpriteFrameIdx--
 						}
 						a.proj.Sprites[i].CurrentIdx = entry.SpriteFrameIdx
+						a.loadAnimFrameProps(a.animTable.SelectedIdx, anim.CurrentIdx)
 					}
 					return
 				}
@@ -207,6 +210,7 @@ func (a *EditorApp) syncSpriteBtns() {
 							entry.SpriteFrameIdx++
 						}
 						a.proj.Sprites[i].CurrentIdx = entry.SpriteFrameIdx
+						a.loadAnimFrameProps(a.animTable.SelectedIdx, anim.CurrentIdx)
 					}
 					return
 				}
