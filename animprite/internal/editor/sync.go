@@ -100,7 +100,6 @@ func (a *EditorApp) syncAnimBtns() {
 			a.prevSelectedHurtboxIdx = -1
 		}
 		a.animFramePrevBtns[i].OnClick = func() {
-			a.flushInputsToData()
 			a.saveSnapshot()
 			if a.proj.Animations[i].CurrentIdx > 0 {
 				a.proj.Animations[i].CurrentIdx--
@@ -110,7 +109,6 @@ func (a *EditorApp) syncAnimBtns() {
 			a.prevSelectedHurtboxIdx = -1
 		}
 		a.animFrameNextBtns[i].OnClick = func() {
-			a.flushInputsToData()
 			a.saveSnapshot()
 			if a.proj.Animations[i].CurrentIdx < len(a.proj.Animations[i].Frames)-1 {
 				a.proj.Animations[i].CurrentIdx++
@@ -125,7 +123,6 @@ func (a *EditorApp) syncAnimBtns() {
 		}
 		ii := i
 		a.animFrameInputs[i].OnEnter = func() {
-			a.flushInputsToData()
 			v := a.animFrameInputs[ii].IntValue()
 			total := len(a.proj.Animations[ii].Frames)
 			if v < 1 {

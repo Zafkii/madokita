@@ -91,16 +91,12 @@ func (a *EditorApp) handleTopPanelMouse(mx, my int, justL bool) {
 	}
 
 	if idx := a.animTable.HitRow(mx, my); idx >= 0 {
-		a.flushInputsToData()
 		a.navigateToAnim(idx)
 	} else if idx := a.spriteTable.HitRow(mx, my); idx >= 0 {
-		a.flushInputsToData()
 		a.navigateToSprite(idx)
 	} else if idx := a.hurtboxTable.HitRow(mx, my); idx >= 0 {
-		a.flushInputsToData()
 		a.navigateToHurtbox(idx)
 	} else if idx := a.hitboxTable.HitRow(mx, my); idx >= 0 {
-		a.flushInputsToData()
 		a.navigateToHitbox(idx)
 	}
 }
