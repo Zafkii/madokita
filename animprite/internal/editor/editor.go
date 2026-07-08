@@ -342,14 +342,18 @@ func (a *EditorApp) initRightPanelWidgets() {
 		a.spriteEditIdx = spriteIdx
 		if a.frameSpriteEntry(frame, spriteIdx) == nil {
 			frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
-				SpriteIdx: spriteIdx,
+				SpriteIdx:      spriteIdx,
 				SpriteFrameIdx: 0,
-				OriginX:  a.proj.Sprites[spriteIdx].OriginX,
-				OriginY:  a.proj.Sprites[spriteIdx].OriginY,
-				ScaleX:   a.proj.Sprites[spriteIdx].ScaleX,
-				ScaleY:   a.proj.Sprites[spriteIdx].ScaleY,
+				OffsetX:        a.proj.Sprites[spriteIdx].OffsetX,
+				OffsetY:        a.proj.Sprites[spriteIdx].OffsetY,
+				Rotation:       a.proj.Sprites[spriteIdx].Rotation,
+				OriginX:        a.proj.Sprites[spriteIdx].OriginX,
+				OriginY:        a.proj.Sprites[spriteIdx].OriginY,
+				ScaleX:         a.proj.Sprites[spriteIdx].ScaleX,
+				ScaleY:         a.proj.Sprites[spriteIdx].ScaleY,
 			})
 		}
+		a.loadAnimFrameProps(animIdx, frameIdx)
 	}
 
 	a.originInputs[0] = newNum("Origin X", 0.5, 0, 1, 0.01)

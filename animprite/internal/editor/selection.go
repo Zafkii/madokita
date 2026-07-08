@@ -22,11 +22,15 @@ func (a *EditorApp) ensureFrameSprites() {
 				if !seen[si] {
 					s := a.proj.Sprites[si]
 					frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
-						SpriteIdx: si,
-						OriginX:   s.OriginX,
-						OriginY:   s.OriginY,
-						ScaleX:    s.ScaleX,
-						ScaleY:    s.ScaleY,
+						SpriteIdx:      si,
+						SpriteFrameIdx: 0,
+						OffsetX:        s.OffsetX,
+						OffsetY:        s.OffsetY,
+						Rotation:       s.Rotation,
+						OriginX:        s.OriginX,
+						OriginY:        s.OriginY,
+						ScaleX:         s.ScaleX,
+						ScaleY:         s.ScaleY,
 					})
 				}
 			}
