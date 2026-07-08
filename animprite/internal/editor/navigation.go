@@ -20,7 +20,6 @@ func (a *EditorApp) navigateToAnim(animIdx int) {
 
 func (a *EditorApp) navigateToSprite(spriteIdx int) {
 	a.spriteTable.SelectedIdx = spriteIdx
-	a.animTable.SelectedIdx = -1
 	a.hurtboxTable.SelectedIdx = -1
 	a.hitboxTable.SelectedIdx = -1
 
@@ -58,9 +57,6 @@ func (a *EditorApp) navigateToSprite(spriteIdx int) {
 
 func (a *EditorApp) navigateToHurtbox(hbIdx int) {
 	a.hurtboxTable.SelectedIdx = hbIdx
-	a.animTable.SelectedIdx = -1
-	a.spriteTable.SelectedIdx = -1
-	a.hitboxTable.SelectedIdx = -1
 	a.syncHurtboxBtns()
 
 	if a.hurtboxTable.SelectedIdx >= 0 {
@@ -127,9 +123,6 @@ func (a *EditorApp) navigateToHurtbox(hbIdx int) {
 
 func (a *EditorApp) navigateToHitbox(hbIdx int) {
 	a.hitboxTable.SelectedIdx = hbIdx
-	a.animTable.SelectedIdx = -1
-	a.spriteTable.SelectedIdx = -1
-	a.hurtboxTable.SelectedIdx = -1
 
 	if hbIdx >= 0 && hbIdx < len(a.proj.HitDefs) {
 		a.panelMode = panelModeHitbox

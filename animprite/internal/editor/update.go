@@ -135,17 +135,6 @@ func (a *EditorApp) flushInputsToData() {
 		row.OriginX = a.originInputs[0].NumericValue()
 		row.OriginY = a.originInputs[1].NumericValue()
 	}
-
-	switch {
-	case a.hurtboxTable.SelectedIdx >= 0:
-		a.panelMode = panelModeHurtbox
-	case a.hitboxTable.SelectedIdx >= 0:
-		a.panelMode = panelModeHitbox
-	case a.animTable.SelectedIdx >= 0:
-		a.panelMode = panelModeAnimFrame
-	case sel >= 0 && sel < len(a.proj.Sprites):
-		a.panelMode = panelModeSprite
-	}
 }
 
 func (a *EditorApp) handleInputUpdate() {

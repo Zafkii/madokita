@@ -135,6 +135,7 @@ func (a *EditorApp) syncAnimBtns() {
 			}
 			a.proj.Animations[ii].CurrentIdx = v - 1
 			a.animFrameInputs[ii].SetNumeric(float64(v))
+			a.animTable.SelectedIdx = ii
 			a.loadAnimFrameProps(ii, a.proj.Animations[ii].CurrentIdx)
 			a.hurtboxAnimCtx = ii
 			a.prevSelectedHurtboxIdx = -1
