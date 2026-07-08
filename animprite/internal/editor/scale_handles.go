@@ -100,7 +100,7 @@ func (a *EditorApp) initScaleOrig(h int) {
 func (a *EditorApp) applyHandleScale(mx, my int) {
 	o := &a.scaleOrig
 	if o.pxW <= 0 || o.pxH <= 0 {
-		if a.panelMode == panelModeSprite || a.panelMode == panelModeAnimFrame {
+		if a.panelMode == panelModeSprite || a.panelMode == panelModeAnimFrame || a.panelMode == panelModeHitbox {
 			return
 		}
 	}

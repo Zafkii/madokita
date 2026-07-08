@@ -124,3 +124,31 @@ func (a *EditorApp) navigateToHurtbox(hbIdx int) {
 	a.prevSelectedHurtboxIdx = a.hurtboxTable.SelectedIdx
 	a.syncLayout()
 }
+
+func (a *EditorApp) navigateToHitbox(hbIdx int) {
+	a.hitboxTable.SelectedIdx = hbIdx
+	a.animTable.SelectedIdx = -1
+	a.spriteTable.SelectedIdx = -1
+	a.hurtboxTable.SelectedIdx = -1
+
+	if hbIdx >= 0 && hbIdx < len(a.proj.HitDefs) {
+		a.panelMode = panelModeHitbox
+		hb := a.proj.HitDefs[hbIdx]
+		a.props[0].SetLabel("Width")
+		a.props[0].SetNumeric(hb.Width)
+		a.props[0].Min = 0
+		a.props[0].Step = 1
+		a.props[1].SetLabel("Height")
+		a.props[1].SetNumeric(hb.Height)
+		a.props[1].Min = 0
+		a.props[1].Step = 1
+		a.props[2].SetLabel("")
+		a.props[2].SetNumeric(0)
+		a.props[3].SetLabel("")
+		a.props[3].SetNumeric(0)
+		a.props[4].SetLabel("")
+		a.props[4].SetNumeric(0)
+	}
+
+	a.syncLayout()
+}

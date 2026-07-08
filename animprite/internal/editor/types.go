@@ -13,6 +13,7 @@ const (
 	panelModeSprite rightPanelMode = iota
 	panelModeHurtbox
 	panelModeAnimFrame
+	panelModeHitbox
 )
 
 type titleBarBtn int

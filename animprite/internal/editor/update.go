@@ -139,6 +139,8 @@ func (a *EditorApp) flushInputsToData() {
 	switch {
 	case a.hurtboxTable.SelectedIdx >= 0:
 		a.panelMode = panelModeHurtbox
+	case a.hitboxTable.SelectedIdx >= 0:
+		a.panelMode = panelModeHitbox
 	case a.animTable.SelectedIdx >= 0:
 		a.panelMode = panelModeAnimFrame
 	case sel >= 0 && sel < len(a.proj.Sprites):
@@ -267,6 +269,15 @@ func (a *EditorApp) previewY() int {
 	return iy
 }
 
+func (a *EditorApp) refreshPanelAfterPreview() {
+	if a.animTable.SelectedIdx >= 0 && a.animTable.SelectedIdx < len(a.proj.Animations) {
+		anim := &a.proj.Animations[a.animTable.SelectedIdx]
+		if anim.CurrentIdx >= 0 && anim.CurrentIdx < len(anim.Frames) {
+			a.loadAnimFrameProps(a.animTable.SelectedIdx, anim.CurrentIdx)
+		}
+	}
+}
+
 func (a *EditorApp) advancePreview() {
 	if !a.prev.previewPlaying {
 		return
@@ -335,6 +346,7 @@ func (a *EditorApp) advancePreview() {
 				anim.CurrentIdx = len(anim.Frames) - 1
 				a.prev.previewPlaying = false
 				a.prev.previewAccumulator = 0
+				a.refreshPanelAfterPreview()
 				return
 			}
 		} else {

@@ -101,10 +101,7 @@ func (a *EditorApp) handleTopPanelMouse(mx, my int, justL bool) {
 		a.navigateToHurtbox(idx)
 	} else if idx := a.hitboxTable.HitRow(mx, my); idx >= 0 {
 		a.flushInputsToData()
-		a.hitboxTable.SelectedIdx = idx
-		a.animTable.SelectedIdx = -1
-		a.spriteTable.SelectedIdx = -1
-		a.hurtboxTable.SelectedIdx = -1
+		a.navigateToHitbox(idx)
 	}
 }
 
@@ -148,9 +145,12 @@ func (a *EditorApp) handleRightPanelMouse(mx, my int, justL bool) {
 		my >= a.prev.previewPlusY && my <= a.prev.previewPlusY+btnSize
 
 	if justL {
-		if mx >= a.prev.previewPlayX && mx <= a.prev.previewPlayX+28 &&
+		if 		mx >= a.prev.previewPlayX && mx <= a.prev.previewPlayX+28 &&
 			my >= a.prev.previewPlayY && my <= a.prev.previewPlayY+btnH {
 			a.prev.previewPlaying = !a.prev.previewPlaying
+			if !a.prev.previewPlaying {
+				a.refreshPanelAfterPreview()
+			}
 		}
 
 		if chk && mx >= a.prev.previewChkX && mx <= a.prev.previewChkX+a.prev.previewChkW &&

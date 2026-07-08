@@ -223,7 +223,7 @@ func (a *EditorApp) drawRightPanel(screen *ebiten.Image, p theme.Palette) {
 	iy := y + 4 - a.rp.scroll
 
 	iy = a.drawSelectedElementProps(a.rp.buf, p, px, iy)
-	if a.hurtboxTable.SelectedIdx < 0 {
+	if a.hurtboxTable.SelectedIdx < 0 && a.hitboxTable.SelectedIdx < 0 {
 		iy = a.drawBaseSpriteProps(a.rp.buf, p, px, iy)
 	}
 	if a.animTable.SelectedIdx >= 0 {
