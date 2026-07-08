@@ -160,22 +160,50 @@ func (a *EditorApp) initTables() {
 	delSpriteBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
 	delSpriteBtn.BtnType = ui.BtnRed
 	delSpriteBtn.OnClick = func() {
+		a.flushInputsToData()
 		a.saveSnapshot()
-		if idx := a.spriteTable.SelectedIdx; idx >= 0 && idx < len(a.proj.Sprites) {
-			if old, ok := a.loadedSprites[idx]; ok {
-				old.Deallocate()
-				delete(a.loadedSprites, idx)
+		idx := a.spriteTable.SelectedIdx
+		if idx < 0 || idx >= len(a.proj.Sprites) {
+			return
+		}
+		if old, ok := a.loadedSprites[idx]; ok {
+			old.Deallocate()
+			delete(a.loadedSprites, idx)
+		}
+		for i := idx + 1; i < len(a.proj.Sprites); i++ {
+			if img, ok := a.loadedSprites[i]; ok {
+				a.loadedSprites[i-1] = img
+			} else {
+				delete(a.loadedSprites, i-1)
 			}
-			for i := idx + 1; i < len(a.proj.Sprites); i++ {
-				if img, ok := a.loadedSprites[i]; ok {
-					a.loadedSprites[i-1] = img
-				} else {
-					delete(a.loadedSprites, i-1)
+			delete(a.loadedSprites, i)
+		}
+		a.proj.Sprites = append(a.proj.Sprites[:idx], a.proj.Sprites[idx+1:]...)
+
+		// Fix FrameSpriteEntry references in all frames
+		for ai := range a.proj.Animations {
+			for fi := range a.proj.Animations[ai].Frames {
+				frame := &a.proj.Animations[ai].Frames[fi]
+				filtered := frame.Sprites[:0]
+				for _, entry := range frame.Sprites {
+					if entry.SpriteIdx == idx {
+						continue
+					}
+					if entry.SpriteIdx > idx {
+						entry.SpriteIdx--
+					}
+					filtered = append(filtered, entry)
 				}
-				delete(a.loadedSprites, i)
+				frame.Sprites = filtered
 			}
-			a.proj.Sprites = append(a.proj.Sprites[:idx], a.proj.Sprites[idx+1:]...)
-			a.syncSpriteBtns()
+		}
+
+		a.syncSpriteBtns()
+		if a.animTable.SelectedIdx >= 0 {
+			a.navigateToAnim(a.animTable.SelectedIdx)
+		} else if a.spriteTable.SelectedIdx >= 0 {
+			a.navigateToSprite(a.spriteTable.SelectedIdx)
+		} else {
 			a.syncLayout()
 		}
 	}
