@@ -268,6 +268,7 @@ func NewEditorApp() *EditorApp {
 	app.initTables()
 	app.initRightPanelWidgets()
 	app.syncLayout()
+	app.navigateToAnim(0)
 
 	app.prevSelectedHurtboxIdx = -1
 
