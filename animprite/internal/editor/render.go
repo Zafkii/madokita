@@ -24,82 +24,106 @@ func (a *EditorApp) buildSpriteRenders() {
 		for _, entry := range activeFrame.Sprites {
 			idx := entry.SpriteIdx
 			img, ok := a.loadedSprites[idx]
-			if !ok || img == nil {
-				continue
-			}
 			row := &a.proj.Sprites[idx]
-			fw := row.Width
-			fh := row.Height
-			if fw <= 0 {
-				fw = img.Bounds().Dx()
+			pw, ph := float64(row.Width), float64(row.Height)
+			if ok && img != nil {
+				fw := row.Width
+				fh := row.Height
+				if fw <= 0 {
+					fw = img.Bounds().Dx()
+				}
+				if fh <= 0 {
+					fh = img.Bounds().Dy()
+				}
+				cols := img.Bounds().Dx() / fw
+				if cols < 1 {
+					cols = 1
+				}
+				frameIdx := entry.SpriteFrameIdx
+				if frameIdx >= row.FrameCount {
+					frameIdx = row.FrameCount - 1
+				}
+				if frameIdx < 0 {
+					frameIdx = 0
+				}
+				fx := (frameIdx % cols) * fw
+				fy := (frameIdx / cols) * fh
+				frameImg := img.SubImage(image.Rect(fx, fy, fx+fw, fy+fh)).(*ebiten.Image)
+				renders = append(renders, canvas.SpriteRender{
+					Image:    frameImg,
+					OffsetX:  entry.OffsetX,
+					OffsetY:  entry.OffsetY,
+					Rotation: entry.Rotation * math.Pi / 180,
+					ScaleX:   entry.ScaleX,
+					ScaleY:   entry.ScaleY,
+					OriginX:  entry.OriginX,
+					OriginY:  entry.OriginY,
+				})
+			} else {
+				renders = append(renders, canvas.SpriteRender{
+					OffsetX:      entry.OffsetX,
+					OffsetY:      entry.OffsetY,
+					Rotation:     entry.Rotation * math.Pi / 180,
+					ScaleX:       entry.ScaleX,
+					ScaleY:       entry.ScaleY,
+					OriginX:      entry.OriginX,
+					OriginY:      entry.OriginY,
+					PlaceholderW: pw,
+					PlaceholderH: ph,
+				})
 			}
-			if fh <= 0 {
-				fh = img.Bounds().Dy()
-			}
-			cols := img.Bounds().Dx() / fw
-			if cols < 1 {
-				cols = 1
-			}
-			frameIdx := entry.SpriteFrameIdx
-			if frameIdx >= row.FrameCount {
-				frameIdx = row.FrameCount - 1
-			}
-			if frameIdx < 0 {
-				frameIdx = 0
-			}
-			fx := (frameIdx % cols) * fw
-			fy := (frameIdx / cols) * fh
-			frameImg := img.SubImage(image.Rect(fx, fy, fx+fw, fy+fh)).(*ebiten.Image)
-			renders = append(renders, canvas.SpriteRender{
-				Image:    frameImg,
-				OffsetX:  entry.OffsetX,
-				OffsetY:  entry.OffsetY,
-				Rotation: entry.Rotation * math.Pi / 180,
-				ScaleX:   entry.ScaleX,
-				ScaleY:   entry.ScaleY,
-				OriginX:  entry.OriginX,
-				OriginY:  entry.OriginY,
-			})
 		}
 	} else {
 		for idx := range a.proj.Sprites {
 			img, ok := a.loadedSprites[idx]
-			if !ok || img == nil {
-				continue
-			}
 			row := a.proj.Sprites[idx]
-			fw := row.Width
-			fh := row.Height
-			if fw <= 0 {
-				fw = img.Bounds().Dx()
+			pw, ph := float64(row.Width), float64(row.Height)
+			if ok && img != nil {
+				fw := row.Width
+				fh := row.Height
+				if fw <= 0 {
+					fw = img.Bounds().Dx()
+				}
+				if fh <= 0 {
+					fh = img.Bounds().Dy()
+				}
+				cols := img.Bounds().Dx() / fw
+				if cols < 1 {
+					cols = 1
+				}
+				frameIdx := row.CurrentIdx
+				if frameIdx >= row.FrameCount {
+					frameIdx = row.FrameCount - 1
+				}
+				if frameIdx < 0 {
+					frameIdx = 0
+				}
+				fx := (frameIdx % cols) * fw
+				fy := (frameIdx / cols) * fh
+				frameImg := img.SubImage(image.Rect(fx, fy, fx+fw, fy+fh)).(*ebiten.Image)
+				renders = append(renders, canvas.SpriteRender{
+					Image:    frameImg,
+					OffsetX:  row.OffsetX,
+					OffsetY:  row.OffsetY,
+					Rotation: row.Rotation * math.Pi / 180,
+					ScaleX:   row.ScaleX,
+					ScaleY:   row.ScaleY,
+					OriginX:  row.OriginX,
+					OriginY:  row.OriginY,
+				})
+			} else {
+				renders = append(renders, canvas.SpriteRender{
+					OffsetX:      row.OffsetX,
+					OffsetY:      row.OffsetY,
+					Rotation:     row.Rotation * math.Pi / 180,
+					ScaleX:       row.ScaleX,
+					ScaleY:       row.ScaleY,
+					OriginX:      row.OriginX,
+					OriginY:      row.OriginY,
+					PlaceholderW: pw,
+					PlaceholderH: ph,
+				})
 			}
-			if fh <= 0 {
-				fh = img.Bounds().Dy()
-			}
-			cols := img.Bounds().Dx() / fw
-			if cols < 1 {
-				cols = 1
-			}
-			frameIdx := row.CurrentIdx
-			if frameIdx >= row.FrameCount {
-				frameIdx = row.FrameCount - 1
-			}
-			if frameIdx < 0 {
-				frameIdx = 0
-			}
-			fx := (frameIdx % cols) * fw
-			fy := (frameIdx / cols) * fh
-			frameImg := img.SubImage(image.Rect(fx, fy, fx+fw, fy+fh)).(*ebiten.Image)
-			renders = append(renders, canvas.SpriteRender{
-				Image:    frameImg,
-				OffsetX:  row.OffsetX,
-				OffsetY:  row.OffsetY,
-				Rotation: row.Rotation * math.Pi / 180,
-				ScaleX:   row.ScaleX,
-				ScaleY:   row.ScaleY,
-				OriginX:  row.OriginX,
-				OriginY:  row.OriginY,
-			})
 		}
 	}
 

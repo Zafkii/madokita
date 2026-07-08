@@ -13,14 +13,16 @@ import (
 )
 
 type SpriteRender struct {
-	Image    *ebiten.Image
-	OffsetX  float64
-	OffsetY  float64
-	ScaleX   float64
-	ScaleY   float64
-	Rotation float64
-	OriginX  float64
-	OriginY  float64
+	Image        *ebiten.Image
+	OffsetX      float64
+	OffsetY      float64
+	ScaleX       float64
+	ScaleY       float64
+	Rotation     float64
+	OriginX      float64
+	OriginY      float64
+	PlaceholderW float64
+	PlaceholderH float64
 }
 
 type SelectionRect struct {
@@ -167,23 +169,96 @@ func (c *Canvas) drawBoundary(screen *ebiten.Image, cam *camera.Camera, p theme.
 
 func (c *Canvas) drawSprites(screen *ebiten.Image, cam *camera.Camera) {
 	for _, s := range c.spriteRenders {
-		if s.Image == nil {
+		if s.Image != nil {
+			w := float64(s.Image.Bounds().Dx())
+			h := float64(s.Image.Bounds().Dy())
+			ox := w * s.OriginX
+			oy := h * s.OriginY
+
+			op := &ebiten.DrawImageOptions{}
+			op.GeoM.Translate(-ox, -oy)
+			op.GeoM.Scale(s.ScaleX, s.ScaleY)
+			op.GeoM.Rotate(s.Rotation)
+			op.GeoM.Translate(s.OffsetX, s.OffsetY)
+			op.GeoM.Scale(cam.Zoom, cam.Zoom)
+			op.GeoM.Translate(cam.Width/2+cam.X, cam.Height/2+cam.Y)
+
+			screen.DrawImage(s.Image, op)
 			continue
 		}
-		w := float64(s.Image.Bounds().Dx())
-		h := float64(s.Image.Bounds().Dy())
-		ox := w * s.OriginX
-		oy := h * s.OriginY
+		if s.PlaceholderW <= 0 || s.PlaceholderH <= 0 {
+			continue
+		}
+		c.drawPlaceholderSprite(screen, cam, s)
+	}
+}
 
-		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(-ox, -oy)
-		op.GeoM.Scale(s.ScaleX, s.ScaleY)
-		op.GeoM.Rotate(s.Rotation)
-		op.GeoM.Translate(s.OffsetX, s.OffsetY)
-		op.GeoM.Scale(cam.Zoom, cam.Zoom)
-		op.GeoM.Translate(cam.Width/2+cam.X, cam.Height/2+cam.Y)
+func (c *Canvas) drawPlaceholderSprite(screen *ebiten.Image, cam *camera.Camera, s SpriteRender) {
+	w := s.PlaceholderW * s.ScaleX
+	h := s.PlaceholderH * s.ScaleY
+	ox := s.PlaceholderW * s.OriginX * s.ScaleX
+	oy := s.PlaceholderH * s.OriginY * s.ScaleY
+	cos := math.Cos(s.Rotation)
+	sin := math.Sin(s.Rotation)
 
-		screen.DrawImage(s.Image, op)
+	// 4 corners relative to center
+	hw := w / 2
+	hh := h / 2
+	local := [4][2]float64{
+		{-hw, -hh},
+		{hw, -hh},
+		{hw, hh},
+		{-hw, hh},
+	}
+
+	// Adjust: these corners assume center is at (cx, cy), but origin may offset the
+	// visual center. The visual center is at (cx + ox*cos - oy*sin, cy + ox*sin + oy*cos)
+	// where ox/oy is the origin offset from top-left. This means the rect center in
+	// world space is at (cx - ox*cos + oy*sin, cy - ox*sin - oy*cos) + (hw, hh)/2...
+	// Simpler: just use the same transform as drawSelection which uses X,Y as top-left
+	// and rotates around center.
+
+	// World-space top-left corner before rotation
+	tlx := s.OffsetX - ox
+	tly := s.OffsetY - oy
+
+	// Compute rect center
+	rcx := tlx + w/2
+	rcy := tly + h/2
+
+	// 4 corners (relative to center), rotate around center
+	var pts [4][2]float64
+	for i, p := range local {
+		wx := rcx + p[0]*cos - p[1]*sin
+		wy := rcy + p[0]*sin + p[1]*cos
+		pts[i][0], pts[i][1] = cam.WorldToCanvas(wx, wy)
+	}
+
+	// Fill — semi-transparent using drawTriangles
+	fillClr := color.RGBA{100, 100, 200, 60}
+	fillA := float32(fillClr.A) / 255
+	verts := [4]ebiten.Vertex{}
+	for i, p := range pts {
+		verts[i] = ebiten.Vertex{
+			DstX:   float32(p[0]),
+			DstY:   float32(p[1]),
+			SrcX:   0,
+			SrcY:   0,
+			ColorR: float32(fillClr.R) / 255 * fillA,
+			ColorG: float32(fillClr.G) / 255 * fillA,
+			ColorB: float32(fillClr.B) / 255 * fillA,
+			ColorA: fillA,
+		}
+	}
+	indices := []uint16{0, 1, 2, 1, 3, 2}
+	screen.DrawTriangles(verts[:], indices, c.whitePixel, nil)
+
+	// Dashed outline
+	clr := color.RGBA{120, 120, 200, 255}
+	for i := 0; i < 4; i++ {
+		n := (i + 1) % 4
+		drawDashedLine(screen, float32(pts[i][0]), float32(pts[i][1]),
+			float32(pts[n][0]), float32(pts[n][1]), 4, 4, clr)
 	}
 }
 
