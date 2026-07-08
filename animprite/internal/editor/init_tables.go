@@ -151,13 +151,7 @@ func (a *EditorApp) initTables() {
 		})
 		a.ensureFrameSprites()
 		a.syncSpriteBtns()
-		if a.animTable.SelectedIdx >= 0 {
-			a.navigateToAnim(a.animTable.SelectedIdx)
-		} else if a.spriteTable.SelectedIdx >= 0 {
-			a.navigateToSprite(a.spriteTable.SelectedIdx)
-		} else {
-			a.syncLayout()
-		}
+		a.navigateToSprite(newIdx)
 	}
 	delSpriteBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
 	delSpriteBtn.BtnType = ui.BtnRed

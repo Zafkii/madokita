@@ -20,6 +20,7 @@ func (a *EditorApp) navigateToAnim(animIdx int) {
 
 func (a *EditorApp) navigateToSprite(spriteIdx int) {
 	a.spriteTable.SelectedIdx = spriteIdx
+	a.spriteEditIdx = spriteIdx
 	a.hurtboxTable.SelectedIdx = -1
 	a.hitboxTable.SelectedIdx = -1
 
