@@ -291,6 +291,7 @@ func (a *EditorApp) advancePreview() {
 	if animIdx != a.prev.previewAnimIdx {
 		a.prev.previewAnimIdx = animIdx
 		a.prev.previewAccumulator = 0
+		a.prev.armedElapsed = 0
 	}
 
 	tps := ebiten.ActualTPS()
@@ -303,8 +304,10 @@ func (a *EditorApp) advancePreview() {
 	advanced := false
 	for {
 		var frameDur float64
+		var framePhase project.FramePhase
 		if a.isAttackMode() {
 			frame := anim.Frames[anim.CurrentIdx]
+			framePhase = frame.Phase
 			switch frame.Phase {
 			case project.PhaseWindup:
 				frameDur = anim.Windup
@@ -313,7 +316,10 @@ func (a *EditorApp) advancePreview() {
 			case project.PhaseRecover:
 				frameDur = anim.Recover
 			case project.PhaseArmed:
-				frameDur = anim.Armed
+				if anim.ArmedFPS <= 0 {
+					return
+				}
+				frameDur = 1.0 / anim.ArmedFPS
 			default:
 				frameDur = anim.Windup
 			}
@@ -335,9 +341,30 @@ func (a *EditorApp) advancePreview() {
 		}
 		a.prev.previewAccumulator -= frameDur
 
+		if a.isAttackMode() && framePhase == project.PhaseArmed {
+			a.prev.armedElapsed += frameDur
+		}
+
 		if anim.CurrentIdx+1 >= len(anim.Frames) {
-			if a.prev.loopChecked {
+			armedDone := a.isAttackMode() && framePhase == project.PhaseArmed &&
+				a.prev.armedElapsed >= anim.Armed/1000.0
+			if armedDone {
+				if a.prev.loopChecked {
+					anim.CurrentIdx = 0
+					a.prev.armedElapsed = 0
+				} else {
+					anim.CurrentIdx = len(anim.Frames) - 1
+					a.prev.previewPlaying = false
+					a.prev.previewAccumulator = 0
+					a.prev.armedElapsed = 0
+					a.refreshPanelAfterPreview()
+					return
+				}
+			} else if a.isAttackMode() && framePhase == project.PhaseArmed {
+				anim.CurrentIdx = a.firstArmedFrameIdx(anim)
+			} else if a.prev.loopChecked {
 				anim.CurrentIdx = 0
+				a.prev.armedElapsed = 0
 			} else {
 				anim.CurrentIdx = len(anim.Frames) - 1
 				a.prev.previewPlaying = false
@@ -353,4 +380,13 @@ func (a *EditorApp) advancePreview() {
 	if advanced {
 		a.loadAnimFrameProps(animIdx, anim.CurrentIdx)
 	}
+}
+
+func (a *EditorApp) firstArmedFrameIdx(anim *project.AnimationRow) int {
+	for i, f := range anim.Frames {
+		if f.Phase == project.PhaseArmed {
+			return i
+		}
+	}
+	return 0
 }

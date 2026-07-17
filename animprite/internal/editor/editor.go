@@ -47,6 +47,7 @@ type previewState struct {
 
 	previewAccumulator float64
 	previewAnimIdx     int
+	armedElapsed       float64
 
 	previewBtnH                                        int
 	previewRow2Y                                       int

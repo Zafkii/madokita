@@ -532,5 +532,11 @@ func (a *EditorApp) syncMovementInputs() {
 		if anim.Loop {
 			a.loopInput.Text = "true"
 		}
+		a.fpsInput.SetNumeric(anim.FPS)
+		a.atkTimingInputs[0].SetNumeric(anim.Windup)
+		a.atkTimingInputs[1].SetNumeric(anim.Active)
+		a.atkTimingInputs[2].SetNumeric(anim.Recover)
+		a.atkTimingInputs[3].SetNumeric(anim.Armed)
+		a.atkTimingInputs[4].SetNumeric(anim.ArmedFPS)
 	}
 }
