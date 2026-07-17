@@ -82,6 +82,30 @@ func F(spriteFrame int, hurtboxes ...FrameHurtbox) Frame {
 	}
 }
 
+func AttackF(spriteFrame int, phase AttackPhase) AttackFrame {
+	p := phase
+	return AttackFrame{
+		SpriteFrames: []int{spriteFrame},
+		OffsetX:      []float64{0},
+		OffsetY:      []float64{0},
+		Rotation:     []float64{0},
+		ScaleX:       []float64{1},
+		ScaleY:       []float64{1},
+		Phase:        &p,
+	}
+}
+
+func AttackAnim(fps float64, loop bool, windup, active, recover float64, windupFrames, activeFrames, recoverFrames int, frames ...AttackFrame) AttackAnimDef {
+	return AttackAnimDef{
+		FPS: fps, Loop: loop,
+		Windup: windup, ActiveTime: active, Recover: recover,
+		WindupFrames: windupFrames, ActiveFrames: activeFrames, RecoverFrames: recoverFrames,
+		Frames: frames,
+	}
+}
+
+func phasePtr(p AttackPhase) *AttackPhase { return &p }
+
 func HB(w, h, ox, oy float64) FrameHurtbox {
 	return FrameHurtbox{
 		W: w, H: h, OffsetX: ox, OffsetY: oy,

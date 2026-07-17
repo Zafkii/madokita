@@ -319,7 +319,7 @@ func (a *EditorApp) advancePreview() {
 				if anim.ArmedFPS <= 0 {
 					return
 				}
-				frameDur = 1.0 / anim.ArmedFPS
+				frameDur = 1000.0 / anim.ArmedFPS
 			default:
 				frameDur = anim.Windup
 			}
