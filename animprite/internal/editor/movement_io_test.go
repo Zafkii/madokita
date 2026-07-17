@@ -24,11 +24,11 @@ func TestMovementRoundTrip(t *testing.T) {
 							{
 								SpriteIdx: 0, SpriteFrameIdx: 0,
 								ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5,
-								Hurtboxes: []project.HurtboxRow{
-									{Width: 95, Height: 61, X: 1.5, Y: -32.5},
-									{Width: 54, Height: 130, X: 4, Y: 62},
-								},
 							},
+						},
+						Hurtboxes: []project.HurtboxRow{
+							{Width: 95, Height: 61, X: 1.5, Y: -32.5},
+							{Width: 54, Height: 130, X: 4, Y: 62},
 						},
 					},
 					{
@@ -37,10 +37,10 @@ func TestMovementRoundTrip(t *testing.T) {
 							{
 								SpriteIdx: 0, SpriteFrameIdx: 1,
 								ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5,
-								Hurtboxes: []project.HurtboxRow{
-									{Width: 100, Height: 57, X: 1, Y: -32.5, Rotation: 45},
-								},
 							},
+						},
+						Hurtboxes: []project.HurtboxRow{
+							{Width: 100, Height: 57, X: 1, Y: -32.5, Rotation: 45},
 						},
 					},
 				},
@@ -120,26 +120,26 @@ func TestMovementRoundTrip(t *testing.T) {
 				if gotS.SpriteFrameIdx != wantS.SpriteFrameIdx {
 					t.Errorf("anim[%d].frame[%d].sprite[%d].SpriteFrameIdx: got %d, want %d", i, j, si, gotS.SpriteFrameIdx, wantS.SpriteFrameIdx)
 				}
-				if len(gotS.Hurtboxes) != len(wantS.Hurtboxes) {
-					t.Fatalf("anim[%d].frame[%d].sprite[%d] hb count: got %d, want %d", i, j, si, len(gotS.Hurtboxes), len(wantS.Hurtboxes))
+			}
+			if len(gotF.Hurtboxes) != len(wantF.Hurtboxes) {
+				t.Fatalf("anim[%d].frame[%d] hb count: got %d, want %d", i, j, len(gotF.Hurtboxes), len(wantF.Hurtboxes))
+			}
+			for k, wantHB := range wantF.Hurtboxes {
+				gotHB := gotF.Hurtboxes[k]
+				if gotHB.Width != wantHB.Width {
+					t.Errorf("anim[%d].frame[%d].hb[%d].Width: got %v, want %v", i, j, k, gotHB.Width, wantHB.Width)
 				}
-				for k, wantHB := range wantS.Hurtboxes {
-					gotHB := gotS.Hurtboxes[k]
-					if gotHB.Width != wantHB.Width {
-						t.Errorf("anim[%d].frame[%d].sprite[%d].hb[%d].Width: got %v, want %v", i, j, si, k, gotHB.Width, wantHB.Width)
-					}
-					if gotHB.Height != wantHB.Height {
-						t.Errorf("anim[%d].frame[%d].sprite[%d].hb[%d].Height: got %v, want %v", i, j, si, k, gotHB.Height, wantHB.Height)
-					}
-					if gotHB.X != wantHB.X {
-						t.Errorf("anim[%d].frame[%d].sprite[%d].hb[%d].X: got %v, want %v", i, j, si, k, gotHB.X, wantHB.X)
-					}
-					if gotHB.Y != wantHB.Y {
-						t.Errorf("anim[%d].frame[%d].sprite[%d].hb[%d].Y: got %v, want %v", i, j, si, k, gotHB.Y, wantHB.Y)
-					}
-					if gotHB.Rotation != wantHB.Rotation {
-						t.Errorf("anim[%d].frame[%d].sprite[%d].hb[%d].Rotation: got %v, want %v", i, j, si, k, gotHB.Rotation, wantHB.Rotation)
-					}
+				if gotHB.Height != wantHB.Height {
+					t.Errorf("anim[%d].frame[%d].hb[%d].Height: got %v, want %v", i, j, k, gotHB.Height, wantHB.Height)
+				}
+				if gotHB.X != wantHB.X {
+					t.Errorf("anim[%d].frame[%d].hb[%d].X: got %v, want %v", i, j, k, gotHB.X, wantHB.X)
+				}
+				if gotHB.Y != wantHB.Y {
+					t.Errorf("anim[%d].frame[%d].hb[%d].Y: got %v, want %v", i, j, k, gotHB.Y, wantHB.Y)
+				}
+				if gotHB.Rotation != wantHB.Rotation {
+					t.Errorf("anim[%d].frame[%d].hb[%d].Rotation: got %v, want %v", i, j, k, gotHB.Rotation, wantHB.Rotation)
 				}
 			}
 		}

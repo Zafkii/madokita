@@ -204,36 +204,30 @@ func (a *EditorApp) buildHurtboxRenders() {
 		}
 	}
 
-	currentEntry := a.currentFrameSpriteEntry()
 	selectedHbIdx := a.hurtboxTable.SelectedIdx
 
 	if activeFrame != nil {
-		hbRenders := make([]canvas.HurtboxRender, 0)
-		for _, entry := range activeFrame.Sprites {
-			sx, sy := entry.ScaleX, entry.ScaleY
-			ox, oy := entry.OffsetX, entry.OffsetY
-			spriteRot := entry.Rotation
-			rotRad := spriteRot * math.Pi / 180
-			cos := math.Cos(rotRad)
-			sin := math.Sin(rotRad)
-			isCurrent := currentEntry != nil && entry.SpriteIdx == currentEntry.SpriteIdx
+		sx, sy, ox, oy, spriteRot := a.spriteTransformForFrame(activeFrame)
+		rotRad := spriteRot * math.Pi / 180
+		cos := math.Cos(rotRad)
+		sin := math.Sin(rotRad)
 
-			for i, hb := range entry.Hurtboxes {
-				if hb.Width <= 0 || hb.Height <= 0 {
-					continue
-				}
-				hbRot := (spriteRot + hb.Rotation) * math.Pi / 180
-				wx := (hb.X*sx)*cos - (hb.Y*sy)*sin + ox
-				wy := (hb.X*sx)*sin + (hb.Y*sy)*cos + oy
-				hbRenders = append(hbRenders, canvas.HurtboxRender{
-					OffsetX:     wx,
-					OffsetY:     wy,
-					WorldWidth:  hb.Width * sx,
-					WorldHeight: hb.Height * sy,
-					Rotation:    hbRot,
-					Selected:    isCurrent && i == selectedHbIdx,
-				})
+		hbRenders := make([]canvas.HurtboxRender, 0, len(activeFrame.Hurtboxes))
+		for i, hb := range activeFrame.Hurtboxes {
+			if hb.Width <= 0 || hb.Height <= 0 {
+				continue
 			}
+			hbRot := (spriteRot + hb.Rotation) * math.Pi / 180
+			wx := (hb.X*sx)*cos - (hb.Y*sy)*sin + ox
+			wy := (hb.X*sx)*sin + (hb.Y*sy)*cos + oy
+			hbRenders = append(hbRenders, canvas.HurtboxRender{
+				OffsetX:     wx,
+				OffsetY:     wy,
+				WorldWidth:  hb.Width * sx,
+				WorldHeight: hb.Height * sy,
+				Rotation:    hbRot,
+				Selected:    i == selectedHbIdx,
+			})
 		}
 		a.canvas.SetHurtboxRenders(hbRenders)
 		return
@@ -247,22 +241,7 @@ func (a *EditorApp) buildHurtboxRenders() {
 	}
 	hbList := *hbp
 
-	entry := a.currentFrameSpriteEntry()
-	sx, sy, ox, oy, spriteRot := 1.0, 1.0, 0.0, 0.0, 0.0
-	if entry != nil {
-		sx = entry.ScaleX
-		sy = entry.ScaleY
-		ox = entry.OffsetX
-		oy = entry.OffsetY
-		spriteRot = entry.Rotation
-	} else if len(a.proj.Sprites) > 0 {
-		row := a.proj.Sprites[0]
-		sx = row.ScaleX
-		sy = row.ScaleY
-		ox = row.OffsetX
-		oy = row.OffsetY
-		spriteRot = row.Rotation
-	}
+	sx, sy, ox, oy, spriteRot := a.getSpriteTransformForHurtboxSel()
 
 	hbRenders := make([]canvas.HurtboxRender, 0, len(hbList))
 	rotRad := spriteRot * math.Pi / 180
@@ -285,4 +264,20 @@ func (a *EditorApp) buildHurtboxRenders() {
 		})
 	}
 	a.canvas.SetHurtboxRenders(hbRenders)
+}
+
+func (a *EditorApp) spriteTransformForFrame(frame *project.AnimationFrame) (sx, sy, ox, oy, rotDeg float64) {
+	sx, sy = 1.0, 1.0
+	if len(frame.Sprites) > 0 {
+		e := &frame.Sprites[0]
+		sx, sy = e.ScaleX, e.ScaleY
+		ox, oy = e.OffsetX, e.OffsetY
+		rotDeg = e.Rotation
+	} else if len(a.proj.Sprites) > 0 {
+		row := a.proj.Sprites[0]
+		sx, sy = row.ScaleX, row.ScaleY
+		ox, oy = row.OffsetX, row.OffsetY
+		rotDeg = row.Rotation
+	}
+	return
 }

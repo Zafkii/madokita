@@ -107,17 +107,8 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 		if hbIdx := a.hurtboxTable.SelectedIdx; hbIdx >= 0 {
 			hbp := a.hurtboxList()
 			if hbp != nil && hbIdx < len(*hbp) {
-				sx, sy := 1.0, 1.0
-				rot := 0.0
-				if entry := a.currentFrameSpriteEntry(); entry != nil {
-					sx = entry.ScaleX
-					sy = entry.ScaleY
-					rot = entry.Rotation * math.Pi / 180
-				} else if sel := a.spriteTable.SelectedIdx; sel >= 0 && sel < len(a.proj.Sprites) {
-					sx = a.proj.Sprites[sel].ScaleX
-					sy = a.proj.Sprites[sel].ScaleY
-					rot = a.proj.Sprites[sel].Rotation * math.Pi / 180
-				}
+				sx, sy, _, _, rotDeg := a.getSpriteTransformForHurtboxSel()
+				rot := rotDeg * math.Pi / 180
 				a.panelMode = panelModeHurtbox
 				hb := &(*hbp)[hbIdx]
 				cos := math.Cos(rot)

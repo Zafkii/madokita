@@ -268,14 +268,11 @@ func (a *EditorApp) getSpriteTransformForHurtboxSel() (sx, sy, ox, oy, rotDeg fl
 	ox, oy = 0.0, 0.0
 	rotDeg = 0.0
 
-	entry := a.currentFrameSpriteEntry()
-	if entry != nil {
-		sx = entry.ScaleX
-		sy = entry.ScaleY
-		ox = entry.OffsetX
-		oy = entry.OffsetY
-		rotDeg = entry.Rotation
-	} else if s := a.spriteTable.SelectedIdx; s >= 0 && s < len(a.proj.Sprites) {
+	frame := a.currentFrame()
+	if frame != nil {
+		return a.spriteTransformForFrame(frame)
+	}
+	if s := a.spriteTable.SelectedIdx; s >= 0 && s < len(a.proj.Sprites) {
 		sx = a.proj.Sprites[s].ScaleX
 		sy = a.proj.Sprites[s].ScaleY
 		ox = a.proj.Sprites[s].OffsetX

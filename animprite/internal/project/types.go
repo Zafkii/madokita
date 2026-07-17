@@ -19,12 +19,12 @@ type FrameSpriteEntry struct {
 	ScaleY         float64
 	OriginX        float64
 	OriginY        float64
-	Hurtboxes      []HurtboxRow
 }
 
 type AnimationFrame struct {
-	Sprites []FrameSpriteEntry
-	Phase   FramePhase
+	Sprites   []FrameSpriteEntry
+	Phase     FramePhase
+	Hurtboxes []HurtboxRow
 }
 
 type AnimationRow struct {

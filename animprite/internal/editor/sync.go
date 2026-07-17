@@ -76,9 +76,9 @@ func (a *EditorApp) syncAnimBtns() {
 				frame.Sprites = make([]project.FrameSpriteEntry, len(prev.Sprites))
 				for si := range prev.Sprites {
 					frame.Sprites[si] = prev.Sprites[si]
-					frame.Sprites[si].Hurtboxes = make([]project.HurtboxRow, len(prev.Sprites[si].Hurtboxes))
-					copy(frame.Sprites[si].Hurtboxes, prev.Sprites[si].Hurtboxes)
 				}
+				frame.Hurtboxes = make([]project.HurtboxRow, len(prev.Hurtboxes))
+				copy(frame.Hurtboxes, prev.Hurtboxes)
 				frame.Phase = prev.Phase
 			}
 			a.proj.Animations[i].Frames = append(a.proj.Animations[i].Frames, frame)
@@ -298,12 +298,24 @@ func (a *EditorApp) defaultFrameSprites() []project.FrameSpriteEntry {
 	return entries
 }
 
-func (a *EditorApp) hurtboxList() *[]project.HurtboxRow {
-	entry := a.currentFrameSpriteEntry()
-	if entry == nil {
+func (a *EditorApp) currentFrame() *project.AnimationFrame {
+	animIdx := a.animTable.SelectedIdx
+	if animIdx < 0 || animIdx >= len(a.proj.Animations) {
 		return nil
 	}
-	return &entry.Hurtboxes
+	anim := &a.proj.Animations[animIdx]
+	if anim.CurrentIdx < 0 || anim.CurrentIdx >= len(anim.Frames) {
+		return nil
+	}
+	return &anim.Frames[anim.CurrentIdx]
+}
+
+func (a *EditorApp) hurtboxList() *[]project.HurtboxRow {
+	frame := a.currentFrame()
+	if frame == nil {
+		return nil
+	}
+	return &frame.Hurtboxes
 }
 
 func (a *EditorApp) syncHurtboxBtns() {

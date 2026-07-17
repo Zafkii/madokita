@@ -264,13 +264,13 @@ func (a *EditorApp) initTables() {
 	addHbBtn.OnClick = func() {
 		a.flushInputsToData()
 		a.saveSnapshot()
-		entry := a.currentFrameSpriteEntry()
-		if entry == nil {
+		frame := a.currentFrame()
+		if frame == nil {
 			return
 		}
-		entry.Hurtboxes = append(entry.Hurtboxes, project.HurtboxRow{Width: 32, Height: 32})
+		frame.Hurtboxes = append(frame.Hurtboxes, project.HurtboxRow{Width: 32, Height: 32})
 		a.syncHurtboxBtns()
-		a.navigateToHurtbox(len(entry.Hurtboxes) - 1)
+		a.navigateToHurtbox(len(frame.Hurtboxes) - 1)
 	}
 	delHbBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
 	delHbBtn.BtnType = ui.BtnRed
@@ -281,15 +281,15 @@ func (a *EditorApp) initTables() {
 		if idx < 0 {
 			return
 		}
-		entry := a.currentFrameSpriteEntry()
-		if entry == nil || idx >= len(entry.Hurtboxes) {
+		frame := a.currentFrame()
+		if frame == nil || idx >= len(frame.Hurtboxes) {
 			return
 		}
-		entry.Hurtboxes = append(entry.Hurtboxes[:idx], entry.Hurtboxes[idx+1:]...)
+		frame.Hurtboxes = append(frame.Hurtboxes[:idx], frame.Hurtboxes[idx+1:]...)
 		a.syncHurtboxBtns()
 		if idx > 0 {
 			a.navigateToHurtbox(idx - 1)
-		} else if len(entry.Hurtboxes) > 0 {
+		} else if len(frame.Hurtboxes) > 0 {
 			a.navigateToHurtbox(0)
 		} else {
 			a.navigateToHurtbox(-1)
@@ -298,35 +298,28 @@ func (a *EditorApp) initTables() {
 	copyHbBtn := ui.NewButton(0, 0, 110, topPanelBtnH, "\U000F04AE Copy Prev", th)
 	copyHbBtn.OnClick = func() {
 		a.saveSnapshot()
-		animIdx := a.animTable.SelectedIdx
-		if animIdx < 0 {
-			animIdx = a.hurtboxAnimCtx
+		frame := a.currentFrame()
+		if frame == nil {
+			return
 		}
+		if len(frame.Hurtboxes) > 0 {
+			return
+		}
+		animIdx := a.animTable.SelectedIdx
 		if animIdx < 0 || animIdx >= len(a.proj.Animations) {
 			return
 		}
 		anim := &a.proj.Animations[animIdx]
-		if anim.CurrentIdx < 0 || anim.CurrentIdx >= len(anim.Frames) {
-			return
-		}
-		entry := a.currentFrameSpriteEntry()
-		if entry == nil {
-			return
-		}
-		if len(entry.Hurtboxes) > 0 {
-			return
-		}
 		prevIdx := anim.CurrentIdx - 1
 		if prevIdx < 0 || prevIdx >= len(anim.Frames) {
 			return
 		}
 		prev := anim.Frames[prevIdx]
-		prevEntry := a.frameSpriteEntry(&prev, a.spriteEditIdx)
-		if prevEntry == nil || len(prevEntry.Hurtboxes) == 0 {
+		if len(prev.Hurtboxes) == 0 {
 			return
 		}
-		entry.Hurtboxes = make([]project.HurtboxRow, len(prevEntry.Hurtboxes))
-		copy(entry.Hurtboxes, prevEntry.Hurtboxes)
+		frame.Hurtboxes = make([]project.HurtboxRow, len(prev.Hurtboxes))
+		copy(frame.Hurtboxes, prev.Hurtboxes)
 		a.syncHurtboxBtns()
 		a.syncLayout()
 	}
