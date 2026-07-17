@@ -25,6 +25,24 @@ func (a *EditorApp) buildSpriteRenders() {
 			idx := entry.SpriteIdx
 			img, ok := a.loadedSprites[idx]
 			row := &a.proj.Sprites[idx]
+
+			ox := entry.OffsetX
+			oy := entry.OffsetY
+			rot := entry.Rotation
+			sx := entry.ScaleX
+			sy := entry.ScaleY
+			orx := entry.OriginX
+			ory := entry.OriginY
+			if a.panelMode == panelModeSprite && a.spriteTable.SelectedIdx == idx {
+				ox = row.OffsetX
+				oy = row.OffsetY
+				rot = row.Rotation
+				sx = row.ScaleX
+				sy = row.ScaleY
+				orx = row.OriginX
+				ory = row.OriginY
+			}
+
 			pw, ph := float64(row.Width), float64(row.Height)
 			if ok && img != nil {
 				fw := row.Width
@@ -51,23 +69,23 @@ func (a *EditorApp) buildSpriteRenders() {
 				frameImg := img.SubImage(image.Rect(fx, fy, fx+fw, fy+fh)).(*ebiten.Image)
 				renders = append(renders, canvas.SpriteRender{
 					Image:    frameImg,
-					OffsetX:  entry.OffsetX,
-					OffsetY:  entry.OffsetY,
-					Rotation: entry.Rotation * math.Pi / 180,
-					ScaleX:   entry.ScaleX,
-					ScaleY:   entry.ScaleY,
-					OriginX:  entry.OriginX,
-					OriginY:  entry.OriginY,
+					OffsetX:  ox,
+					OffsetY:  oy,
+					Rotation: rot * math.Pi / 180,
+					ScaleX:   sx,
+					ScaleY:   sy,
+					OriginX:  orx,
+					OriginY:  ory,
 				})
 			} else {
 				renders = append(renders, canvas.SpriteRender{
-					OffsetX:      entry.OffsetX,
-					OffsetY:      entry.OffsetY,
-					Rotation:     entry.Rotation * math.Pi / 180,
-					ScaleX:       entry.ScaleX,
-					ScaleY:       entry.ScaleY,
-					OriginX:      entry.OriginX,
-					OriginY:      entry.OriginY,
+					OffsetX:      ox,
+					OffsetY:      oy,
+					Rotation:     rot * math.Pi / 180,
+					ScaleX:       sx,
+					ScaleY:       sy,
+					OriginX:      orx,
+					OriginY:      ory,
 					PlaceholderW: pw,
 					PlaceholderH: ph,
 				})

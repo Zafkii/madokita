@@ -130,6 +130,16 @@ func (a *EditorApp) flushInputsToData() {
 		row.ScaleY = a.props[4].NumericValue()
 		row.OriginX = a.originInputs[0].NumericValue()
 		row.OriginY = a.originInputs[1].NumericValue()
+
+		if entry := a.currentFrameSpriteEntry(); entry != nil && entry.SpriteIdx == sel {
+			entry.OffsetX = row.OffsetX
+			entry.OffsetY = row.OffsetY
+			entry.Rotation = row.Rotation
+			entry.ScaleX = row.ScaleX
+			entry.ScaleY = row.ScaleY
+			entry.OriginX = row.OriginX
+			entry.OriginY = row.OriginY
+		}
 	}
 }
 

@@ -29,6 +29,13 @@ func (a *EditorApp) handleCanvasWheel(mx, my int, wy float64, ctrl, shift bool) 
 					a.props[2].SetNumeric(hb.Width)
 					a.props[3].SetNumeric(hb.Height)
 				}
+		} else if a.panelMode == panelModeSprite && a.spriteTable.SelectedIdx >= 0 {
+				a.panelMode = panelModeSprite
+				row := &a.proj.Sprites[a.spriteTable.SelectedIdx]
+				row.ScaleX = math.Round((row.ScaleX+wy*0.05)*100) / 100
+				row.ScaleY = math.Round((row.ScaleY+wy*0.05)*100) / 100
+				a.props[3].SetNumeric(row.ScaleX)
+				a.props[4].SetNumeric(row.ScaleY)
 			} else if entry := a.currentFrameSpriteEntry(); entry != nil {
 				a.panelMode = panelModeAnimFrame
 				entry.ScaleX = math.Round((entry.ScaleX+wy*0.05)*100) / 100
@@ -52,6 +59,11 @@ func (a *EditorApp) handleCanvasWheel(mx, my int, wy float64, ctrl, shift bool) 
 					hb.Rotation = math.Round((hb.Rotation+wy)*100) / 100
 					a.props[4].SetNumeric(hb.Rotation)
 				}
+			} else if a.panelMode == panelModeSprite && a.spriteTable.SelectedIdx >= 0 {
+				a.panelMode = panelModeSprite
+				row := &a.proj.Sprites[a.spriteTable.SelectedIdx]
+				row.Rotation += wy
+				a.props[2].SetNumeric(row.Rotation)
 			} else if entry := a.currentFrameSpriteEntry(); entry != nil {
 				a.panelMode = panelModeAnimFrame
 				entry.Rotation += wy
@@ -120,6 +132,13 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 				a.props[1].SetNumeric(hb.Y)
 				a.syncHurtboxBtns()
 			}
+		} else if a.panelMode == panelModeSprite && a.spriteTable.SelectedIdx >= 0 {
+			a.panelMode = panelModeSprite
+			row := &a.proj.Sprites[a.spriteTable.SelectedIdx]
+			row.OffsetX = math.Round(row.OffsetX + dx/a.canvas.Cam.Zoom)
+			row.OffsetY = math.Round(row.OffsetY + dy/a.canvas.Cam.Zoom)
+			a.props[0].SetNumeric(row.OffsetX)
+			a.props[1].SetNumeric(row.OffsetY)
 		} else if entry := a.currentFrameSpriteEntry(); entry != nil {
 			a.panelMode = panelModeAnimFrame
 			entry.OffsetX = math.Round(entry.OffsetX + dx/a.canvas.Cam.Zoom)
