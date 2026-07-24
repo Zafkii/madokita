@@ -138,6 +138,8 @@ type EditorApp struct {
 	scaleHandle int
 	scaleOrig   scaleOrigData
 
+	currentFilePath string
+
 	undoStack    []project.ProjectData
 	redoStack    []project.ProjectData
 	wheelChanged bool
@@ -237,27 +239,18 @@ func NewEditorApp() *EditorApp {
 			app.setStatus("Save error: " + saveErr.Error())
 			return
 		}
+		app.currentFilePath = path
 		app.setStatus("Saved: " + path)
 	}
 
 	app.openBtn.OnClick = func() {
-		title := "Open Movement"
-		if app.mode == modeAttack {
-			title = "Open Attack"
-		}
-		path, err := filedialog.OpenFile(title, "Go Files\000*.go\000All Files\000*.*")
+		path, err := filedialog.OpenFile("Open File", "Go Files\000*.go\000All Files\000*.*")
 		if err != nil {
 			app.setStatus("Open cancelled")
 			return
 		}
-		var openErr error
-		if app.mode == modeAttack {
-			openErr = app.openAttackFile(path)
-		} else {
-			openErr = app.openMovementFile(path)
-		}
-		if openErr != nil {
-			app.setStatus("Open error: " + openErr.Error())
+		if err := app.openFile(path); err != nil {
+			app.setStatus("Open error: " + err.Error())
 			return
 		}
 		app.setStatus("Opened: " + path)

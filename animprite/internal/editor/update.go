@@ -25,6 +25,24 @@ func (a *EditorApp) Update() error {
 		if inpututil.IsKeyJustPressed(ebiten.KeyY) {
 			a.redo()
 		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyS) {
+			a.flushInputsToData()
+			if a.currentFilePath != "" {
+				var saveErr error
+				if a.mode == modeAttack {
+					saveErr = a.saveAttackFile(a.currentFilePath)
+				} else {
+					saveErr = a.saveMovementFile(a.currentFilePath)
+				}
+				if saveErr != nil {
+					a.setStatus("Save error: " + saveErr.Error())
+				} else {
+					a.setStatus("Saved: " + a.currentFilePath)
+				}
+			} else {
+				a.saveBtn.OnClick()
+			}
+		}
 	}
 
 	a.hoveredFilePath = ""
