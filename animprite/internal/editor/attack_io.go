@@ -44,7 +44,7 @@ func ExportAttack(path string, proj *project.ProjectData) error {
 			if s.OffsetX == 0 && s.OffsetY == 0 && s.Rotation == 0 && s.ScaleX == 1 && s.ScaleY == 1 {
 				fmt.Fprintf(&b, "\t\t\tAttackF(%d, %s),\n", s.SpriteFrameIdx, phaseStr)
 			} else {
-				b.WriteString("\t\t\t{\n")
+				b.WriteString("\t\t\tAttackFrame{\n")
 				fmt.Fprintf(&b, "\t\t\t\tSpriteFrames: []int{%d},\n", s.SpriteFrameIdx)
 				fmt.Fprintf(&b, "\t\t\t\tOffsetX:      []float64{%g},\n", s.OffsetX)
 				fmt.Fprintf(&b, "\t\t\t\tOffsetY:      []float64{%g},\n", s.OffsetY)
@@ -55,7 +55,7 @@ func ExportAttack(path string, proj *project.ProjectData) error {
 				b.WriteString("\t\t\t},\n")
 			}
 		} else {
-			b.WriteString("\t\t\t{\n")
+			b.WriteString("\t\t\tAttackFrame{\n")
 			b.WriteString("\t\t\t\tSpriteFrames: []int{")
 			for i, s := range frame.Sprites {
 				if i > 0 {
