@@ -74,10 +74,10 @@ func (b *sceneBootstrap) Initialize() error {
 	return nil
 }
 func (b *sceneBootstrap) Start() error {
-	if err := ui.SetFontFromTTF(fonts.NotoSansRegularTTF, 13); err != nil {
+	if err := ui.SetFontFromTTF(fonts.PxPlusIBMVGA8x14TTF, 13); err != nil {
 		return fmt.Errorf("loading UI font: %w", err)
 	}
-	if err := ui.SetTitleFontFromTTF(fonts.NotoSansRegularTTF); err != nil {
+	if err := ui.SetTitleFontFromTTF(fonts.PxPlusIBMVGA8x14TTF); err != nil {
 		return fmt.Errorf("loading title font: %w", err)
 	}
 

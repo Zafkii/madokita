@@ -57,7 +57,7 @@ madokita/
 │   │   ├── camera/    # Pan/zoom camera (world↔canvas transforms)
 │   │   ├── canvas/    # Viewport with grid, origin crosshair, boundary
 │   │   ├── filedialog/ # Native file open/save dialogs (win32/linux)
-│   │   ├── fonts/     # Embedded NotoSansNerdFont TTF
+│   │   ├── fonts/     # Embedded PxPlus IBM VGA 8x14
 │   │   ├── project/   # Domain model: AnimationRow, SpriteRow, ProjectData, DeepCopy (zero Ebitengine dep)
 │   │   ├── theme/     # Dark/Light palette system (29 color fields)
 │   │   ├── ui/        # Editor UI widgets (Button, Dropdown, TextInput, Slider, Table)
