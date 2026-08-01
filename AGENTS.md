@@ -143,10 +143,11 @@ type System interface {
 
 ## Animation System (`internal/animation/`)
 
-- **Animator**: frame-based playback with FPS timing
-- **Types**: `Frame`, `Movement`, `Attack`, `MovementAnimDef`, `AttackAnimDef`
-- Frame phases: windup/active/recover/idle (for attacks)
-- **MultiSpriteAnimator**: N-sprite playback support
+- **Animator**: frame-based playback with FPS timing (`NewAnimator(def)`)
+- **Types**: `Frame`, `FrameSprite`, `Movement`, `Attack`, `MovementAnimDef`, `AttackAnimDef`, `SpriteSheetDef`
+- Each `Frame` composes **N sprites** (`Sprites []FrameSprite`) + M hurtboxes (`Hurtboxes []FrameHurtbox`)
+- Frame phases: windup/active/recover/armed (for attacks)
+- `Movement`/`Attack` declare their images in `Sprites []SpriteSheetDef` (File relative to `assets/`, FrameW/H/Count); bootstrap converts them via `assets.LoadCharacter` and the player fetches frames with `GetFrame(charKey, sheetIdx, frameIdx)`
 
 ---
 
@@ -204,15 +205,15 @@ type System interface {
 | **Open/Save project files**                         | ❌ Pending        |
 | **Undo/Redo**                                       | ❌ Pending        |
 
-## Per-Frame Sprite Frame Selection
+## Per-Frame Sprite Composition
 
-Each `AnimationFrame` stores both `SpriteIdx` (which sprite resource) and `SpriteFrameIdx` (which sub-frame of the spritesheet). The ◀▶ buttons in the sprite table, when the right panel is in animation frame mode, write to the active `AnimationFrame` instead of the global `SpriteRow.CurrentIdx`. New animation frames inherit `SpriteFrameIdx` from the previous frame.
+Each `AnimationFrame` stores `Sprites []FrameSpriteEntry` — one entry per sprite resource rendered in that frame. Each `FrameSpriteEntry` has `SpriteIdx` (which sprite resource) and `SpriteFrameIdx` (which sub-frame of that spritesheet) plus its own Offset/Rotation/Scale/Origin. The ◀▶ buttons in the sprite table, when the right panel is in animation frame mode, write to the matching `FrameSpriteEntry` of the active frame instead of the global `SpriteRow.CurrentIdx`. New animation frames inherit all sprite entries (and hurtboxes) from the previous frame.
 
-When switching frames via `loadCurrentFrameProps()`, `SpriteRow.CurrentIdx` is synced from `AnimationFrame.SpriteFrameIdx` so the sprite table display matches.
+When switching frames via `loadAnimFrameProps()`, `SpriteRow.CurrentIdx` is synced from the frame's entry so the sprite table display matches.
 
-**Structs**: `AnimationFrame.SpriteFrameIdx` (`internal/project/types.go`), `AnimationFrame.SpriteIdx` (`internal/project/types.go`)
+**Structs**: `AnimationFrame.Sprites []FrameSpriteEntry` (`internal/project/types.go`), `FrameSpriteEntry` (`internal/project/types.go`)
 
-**Files**: `internal/project/types.go` (field), `app.go` (nav buttons, new-frame inheritance), `draw.go` (render), `update.go` (sync on frame load)
+**Files**: `internal/project/types.go` (fields), `sync.go` (◀▶ buttons via `frameSpriteEntry()`), `selection.go` (frame load, `ensureFrameSprites`), `render.go` (canvas render of all entries)
 
 ## Table Exclusive Selection
 
@@ -237,9 +238,12 @@ var SayakaMovement = Movement{
     AssetKey:       "sayaka_movement",
     DefaultOriginX: 0.506,
     DefaultOriginY: 0.586,
+    Sprites: []SpriteSheetDef{
+        {File: "sprites/players/sayaka_miki/sayaka_miki.png", FrameW: 256, FrameH: 256, FrameCount: 25},
+    },
     Animations: map[string]MovementAnimDef{
         "idle": Anim(3, true,
-            F(0, HB(95, 61, 1.5, -32.5), HB(54, 130, 4, 62)),
+            F(S(0, 0, 0, 0, 0, 1, 1, 0.506, 0.586), HB(95, 61, 1.5, -32.5), HB(54, 130, 4, 62)),
         ),
     },
 }
@@ -248,14 +252,19 @@ var SayakaMovement = Movement{
 | Constructor | Args | Purpose |
 |-------------|------|---------|
 | `Anim(fps, loop, frames...)` | FPS, loop flag, variadic frames | Wraps `MovementAnimDef` |
-| `F(spriteFrame, hurtboxes...)` | Single sprite index, variadic hurtboxes | Wraps `Frame` (offset/rotation default to 0) |
+| `F(parts ...any)` | Mixed `S()` sprites and `HB()`/`HBR()` hurtboxes, any order | Wraps `Frame` |
+| `S(spriteIdx, spriteFrameIdx, rest ...float64)` | Sheet index, sub-frame index, then offsetX, offsetY, rotation, scaleX, scaleY, originX, originY | Wraps `FrameSprite` (defaults: 0, 0, 0, 1, 1, 0.5, 0.5) |
 | `HB(w, h, ox, oy)` | Width, Height, OffsetX, OffsetY | Wraps `FrameHurtbox` (scale=1, rot=0, mult=1) |
 | `HBR(w, h, ox, oy, rot)` | + Rotation for angled hurtboxes | Same with custom rotation |
+| `AttackF(s, phase)` | Single `S()` sprite + phase | Wraps single-sprite `AttackFrame` |
+| `AttackAnim(fps, loop, wu, atk, rc, wuF, atkF, rcF, frames...)` | FPS, loop, phase timings + frame counts, variadic frames | Wraps `AttackAnimDef` |
+| `PhasePtr(p)` | Phase constant | Pointer helper for `AttackFrame` literals |
 
 **Rules:**
-- Always use dot-import in movement data files (zero logic, pure data)
-- Never use struct literals — always the constructors
+- Always use dot-import in movement/attack data files (zero logic, pure data)
+- Never use struct literals — always the constructors (the `Sprites: []SpriteSheetDef{...}` block is the only allowed literal)
 - Keep everything inline (no extracted vars), each frame is one `F(...)` call
+- Multi-sprite frames: one `S(...)` per image rendered in that frame
 
 ## Key Patterns & Conventions
 

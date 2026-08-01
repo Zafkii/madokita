@@ -2,7 +2,7 @@
 
 ## Overview
 
-Frame-based 2D sprite animation system with phase timing support for fighting game attacks (windup/active/recover) and movement animations.
+Frame-based 2D sprite animation system with phase timing support for fighting game attacks (windup/active/recover) and movement animations. Every frame composes **N sprites** (separate images drawn together — base body + weapon + halo) and M hurtboxes.
 
 ## Core Types
 
@@ -11,7 +11,7 @@ Two type systems coexist with different responsibilities:
 | Package | Purpose |
 |---------|---------|
 | `internal/project/` | Editor domain model — data definitions, zero Ebitengine deps |
-| `internal/animation/` | Runtime playback — Animator, MultiSpriteAnimator |
+| `internal/animation/` | Runtime playback — Animator, Frame/FrameSprite, constructors |
 
 ### Editor Domain Model (`internal/project/types.go`)
 
@@ -25,9 +25,9 @@ const (
     PhaseArmed
 )
 
-type AnimationFrame struct {
-    SpriteIdx      int
-    SpriteFrameIdx int
+type FrameSpriteEntry struct {
+    SpriteIdx      int     // which sprite (image) of the project
+    SpriteFrameIdx int     // which sub-frame of that sprite's sheet
     OffsetX        float64
     OffsetY        float64
     Rotation       float64
@@ -35,8 +35,12 @@ type AnimationFrame struct {
     ScaleY         float64
     OriginX        float64
     OriginY        float64
-    Hurtboxes      []HurtboxRow
-    Phase          FramePhase
+}
+
+type AnimationFrame struct {
+    Sprites   []FrameSpriteEntry
+    Hurtboxes []HurtboxRow
+    Phase     FramePhase
 }
 
 type AnimationRow struct {
@@ -71,32 +75,31 @@ type SpriteRow struct {
 }
 
 type HurtboxRow struct {
-    X          float64
-    Y          float64
-    Width      float64
-    Height     float64
-    Rotation   float64
-    Damage     float64
-    Multiplier float64
-}
-
-type HitboxRow struct {
-    Width  float64
-    Height float64
+    X        float64
+    Y        float64
+    Width    float64
+    Height   float64
+    Rotation float64
+    DmgMult  float64
 }
 
 type ProjectData struct {
-    Animations []AnimationRow
-    Sprites    []SpriteRow
-    HitDefs    []HitboxRow
+    AssetName      string
+    AssetKey       string
+    DefaultOriginX float64
+    DefaultOriginY float64
+    Animations     []AnimationRow
+    Sprites        []SpriteRow
+    HitDefs        []HitboxRow
 }
 ```
 
 ### Runtime Playback (`internal/animation/`)
 
-- **Animator**: frame-based playback with FPS timing
-- **Types**: `Frame`, `Movement`, `Attack`, `MovementAnimDef`, `AttackAnimDef`
-- Used by `entity/player/player.go` and `entity/enemy/enemy.go`
+- **Animator**: frame-based playback with FPS timing (`NewAnimator(def)`)
+- **`FrameSprite`**: one sprite instance inside a frame — sheet index + sub-frame index plus its own transform (offset/rotation/scale/origin)
+- **`Frame`**: `Sprites []FrameSprite` + `Hurtboxes []FrameHurtbox` — N sprites and M hurtboxes per frame
+- Used by `entity/player/player.go` and `internal/debug/overlay.go`
 
 ## Animator
 
@@ -105,11 +108,33 @@ type ProjectData struct {
 - `Animator` struct plays frame-based animations
 - FPS-based timing: advances frame each `1/FPS` seconds
 - Supports phase progression for attacks: windup → active → recover → idle
-- Used by `entity/player/player.go` and `entity/enemy/enemy.go`
+- Used by `entity/player/player.go` and `internal/debug/overlay.go`
 
-## Multi-Sprite Animation
+## Multi-Sprite Rendering
 
-- `MultiSpriteAnimator` supports N-sprite playback (for multi-part characters or effects)
+`entity/player/player.go`:
+
+- `SetupAnim(def *animation.Movement, am *assets.AssetManager)` — the player holds the AssetManager; there is no pre-sliced frame array anymore
+- `Draw()` iterates `frame.Sprites` and draws `am.GetFrame(def.AssetKey, s.SpriteIdx, s.SpriteFrameIdx)` with the entry's own transform
+- **Origin per sprite**: when the entry's sheet exists in `def.Sprites`, origin = `s.OriginX * sheet.FrameW` / `s.OriginY * sheet.FrameH`; otherwise falls back to `DefaultOriginX/Y * FrameSize`
+- **Footprint**: `footHeight()` uses sheet 0's `FrameH` (fallback `FrameSize` = 256) and `DefaultOriginY`
+
+## Asset Loading
+
+`Movement`/`Attack` declare their images in `Sprites []SpriteSheetDef`:
+
+```go
+type SpriteSheetDef struct {
+    File       string // relative to assets/
+    FrameW     int
+    FrameH     int
+    FrameCount int
+}
+```
+
+`cmd/game/bootstrap.go` converts them to `assets.CharacterSheets` and calls `assetMgr.LoadCharacter(...)`; the player fetches frames with `GetFrame(charKey, sheetIdx, frameIdx)`. `assets.SliceFrames` cuts sheets into tiles (the old hand-rolled `loadFramesFromPNG` in bootstrap is gone).
+
+**Convention**: `File` is relative to `assets/` (same as `StageDef.Images`), e.g. `sprites/players/sayaka_miki/sayaka_miki.png`.
 
 ## Movement Data Files
 
@@ -122,15 +147,18 @@ Available constructors (defined in `internal/animation/types.go`):
 | Constructor | Signature | Purpose |
 |-------------|-----------|---------|
 | `Anim` | `(fps float64, loop bool, frames ...Frame)` | Builds `MovementAnimDef` |
-| `F` | `(spriteFrame int, hurtboxes ...FrameHurtbox)` | Builds `Frame` (offset/rotation default 0) |
+| `F` | `(parts ...any)` | Builds `Frame`; accepts `S()` entries and `HB()`/`HBR()` hurtboxes mixed, in any order |
+| `S` | `(spriteIdx, spriteFrameIdx int, rest ...float64)` | Builds `FrameSprite`; rest = offsetX, offsetY, rotation, scaleX, scaleY, originX, originY (defaults: 0, 0, 0, 1, 1, 0.5, 0.5) |
 | `HB` | `(w, h, ox, oy float64)` | Builds `FrameHurtbox` with defaults (scale=1, rot=0, mult=1) |
 | `HBR` | `(w, h, ox, oy, rot float64)` | Builds `FrameHurtbox` with custom rotation |
+| `AttackF` | `(s FrameSprite, phase AttackPhase)` | Builds single-sprite `AttackFrame` |
+| `PhasePtr` | `(p AttackPhase) *AttackPhase` | Pointer helper for `AttackFrame` literals (must be public — exported files live in other packages) |
 
 **Rules**:
 - MUST use dot-import — movement files are pure data, no logic
-- MUST use constructors, never struct literals
+- MUST use constructors, never struct literals (the `Sprites []SpriteSheetDef` block is the only allowed literal)
 - SHOULD keep frames inline (one `F(...)` per line)
-- MAY define shared `[]FrameHurtbox` vars only when the same set repeats across many frames AND hurts readability less than repetition
+- MAY define shared vars only when the same set repeats across many frames AND hurts readability less than repetition
 
 **Example (`sayaka.go`):**
 
@@ -143,23 +171,32 @@ var SayakaMovement = Movement{
     AssetKey:       "sayaka_movement",
     DefaultOriginX: 0.506,
     DefaultOriginY: 0.586,
+    Sprites: []SpriteSheetDef{
+        {File: "sprites/players/sayaka_miki/sayaka_miki.png", FrameW: 256, FrameH: 256, FrameCount: 25},
+    },
     Animations: map[string]MovementAnimDef{
         "walk": Anim(10, true,
-            F(4, HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
-            F(5, HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
-            F(6, HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
-            F(7, HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
+            F(S(0, 4, 0, 0, 0, 1, 1, 0.506, 0.586), HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
+            F(S(0, 5, 0, 0, 0, 1, 1, 0.506, 0.586), HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
         ),
     },
 }
 ```
+
+Multi-sprite frame (base + weapon rendered together):
+
+```go
+F(S(0, 4, 0, 0, 0, 1, 1, 0.506, 0.586), S(1, 0, 30, -10, 0, 1, 1, 0.5, 0.5), HB(100, 57, 1, -32.5)),
+```
+
+The animprite editor generates exactly this format (`S` with all 9 args) and imports it back — edit data in the editor, never by hand.
 
 ## Character Registry
 
 `internal/data/registry.go`
 
 - Global `Registry` map: maps string names to `CharacterData`
-- `CharacterData` contains: MovementAnimDefs, AttackAnimDefs, hurtboxes, attack configs, effects
+- `CharacterData` contains: `Animations []animation.Movement`, `Attack *animation.Attack`, `Hurtboxes []combat.HurtboxConfig`, `AttackConfigs []combat.AttackConfig`, `AdditionalTextures`, `Effects`
 - Also holds `StageData` (background, enemies, base speed)
 
 ## Rendering Caveats
@@ -177,12 +214,14 @@ This means the **order of method calls** is critical:
 **Correct order for sprite rendering in `entity/player/player.go`:**
 
 ```go
-op.GeoM.Translate(-originX, -originY)    // origin → scaled
-op.GeoM.Translate(ox, oy)                // per-frame offset → scaled
-// optional: op.GeoM.Rotate(rot)
-op.GeoM.Scale(sx*Scale*flip, sy*Scale)   // scales everything above
+op.GeoM.Translate(-originX, -originY)    // entry origin → scaled
+op.GeoM.Translate(s.OffsetX, s.OffsetY)  // per-entry offset → scaled
+// optional: op.GeoM.Rotate(s.Rotation)
+op.GeoM.Scale(s.ScaleX*p.Scale*flip, s.ScaleY*p.Scale)   // scales everything above
 op.GeoM.Translate(p.X, p.Y)              // world → NOT scaled
 op.GeoM.Translate(-cameraX, 0)           // camera → NOT scaled
 ```
+
+`originX/Y` are per-sprite (`s.OriginX * sheet.FrameW`), not global.
 
 **Do NOT reorder** to the mathematically conventional chain (`S → R → T` from left to right). It will break because the origin subtraction and per-frame offset would end up unscaled while the world position would get incorrectly scaled.
