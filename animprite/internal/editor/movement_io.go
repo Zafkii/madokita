@@ -22,6 +22,12 @@ func ExportMovement(path string, proj *project.ProjectData) error {
 	fmt.Fprintf(&b, "\tAssetKey:       %q,\n", proj.AssetKey)
 	fmt.Fprintf(&b, "\tDefaultOriginX: %g,\n", proj.DefaultOriginX)
 	fmt.Fprintf(&b, "\tDefaultOriginY: %g,\n", proj.DefaultOriginY)
+	b.WriteString("\tSprites: []SpriteSheetDef{\n")
+	for _, s := range proj.Sprites {
+		fmt.Fprintf(&b, "\t\t{File: %q, FrameW: %d, FrameH: %d, FrameCount: %d},\n",
+			s.File, s.Width, s.Height, s.FrameCount)
+	}
+	b.WriteString("\t},\n")
 	b.WriteString("\tAnimations: map[string]MovementAnimDef{\n")
 
 	for _, anim := range proj.Animations {
@@ -98,6 +104,8 @@ func ImportMovement(path string) (*project.ProjectData, error) {
 					proj.DefaultOriginX = floatLit(kv.Value)
 				case "DefaultOriginY":
 					proj.DefaultOriginY = floatLit(kv.Value)
+				case "Sprites":
+					proj.Sprites = parseSpriteSheets(kv.Value)
 				case "Animations":
 					proj.Animations = parseAnimationsMov(kv.Value)
 				}
@@ -110,7 +118,11 @@ func ImportMovement(path string) (*project.ProjectData, error) {
 	}
 	proj.AssetName = assetName
 
-	proj.Sprites = buildSpriteList(proj.Animations)
+	if len(proj.Sprites) > 0 {
+		applySpriteEntryProps(proj.Sprites, proj.Animations)
+	} else {
+		proj.Sprites = buildSpriteList(proj.Animations)
+	}
 	if len(proj.Sprites) == 0 {
 		proj.Sprites = []project.SpriteRow{
 			{Name: "Default Sprite", Width: 256, Height: 256, FrameCount: 1, CurrentIdx: 0, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
@@ -118,6 +130,40 @@ func ImportMovement(path string) (*project.ProjectData, error) {
 	}
 
 	return proj, nil
+}
+
+func parseSpriteSheets(expr ast.Expr) []project.SpriteRow {
+	cl, ok := expr.(*ast.CompositeLit)
+	if !ok {
+		return nil
+	}
+	var rows []project.SpriteRow
+	for _, elt := range cl.Elts {
+		lit, ok := elt.(*ast.CompositeLit)
+		if !ok {
+			continue
+		}
+		row := project.SpriteRow{ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5}
+		for _, kv := range lit.Elts {
+			kve, ok := kv.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			switch exprString(kve.Key) {
+			case "File":
+				row.File = stringLit(kve.Value)
+			case "FrameW":
+				row.Width = intLit(kve.Value)
+			case "FrameH":
+				row.Height = intLit(kve.Value)
+			case "FrameCount":
+				row.FrameCount = intLit(kve.Value)
+			}
+		}
+		row.Name = fmt.Sprintf("Sprite %d", len(rows))
+		rows = append(rows, row)
+	}
+	return rows
 }
 
 func buildSpriteList(anims []project.AnimationRow) []project.SpriteRow {
@@ -148,6 +194,11 @@ func buildSpriteList(anims []project.AnimationRow) []project.SpriteRow {
 			OriginY:    0.5,
 		}
 	}
+	applySpriteEntryProps(sprites, anims)
+	return sprites
+}
+
+func applySpriteEntryProps(sprites []project.SpriteRow, anims []project.AnimationRow) {
 	for _, anim := range anims {
 		for _, frame := range anim.Frames {
 			for _, entry := range frame.Sprites {
@@ -160,7 +211,6 @@ func buildSpriteList(anims []project.AnimationRow) []project.SpriteRow {
 			}
 		}
 	}
-	return sprites
 }
 
 func parseAnimationsMov(expr ast.Expr) []project.AnimationRow {

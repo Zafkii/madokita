@@ -2,11 +2,7 @@ package main
 
 import (
 	"fmt"
-	"image"
-	_ "image/png"
 	"os"
-
-	"github.com/hajimehoshi/ebiten/v2"
 
 	"madokita/internal/assets"
 	"madokita/internal/audio"
@@ -107,10 +103,23 @@ func (b *sceneBootstrap) setupGameScene() error {
 		return err
 	}
 
-	frames := loadFramesFromPNG("assets/sprites/players/sayaka_miki/sayaka_miki.png", 256, 256, 25)
+	def := &movements.SayakaMovement
+	sheets := make([]assets.AssetEntry, 0, len(def.Sprites))
+	for _, s := range def.Sprites {
+		sheets = append(sheets, assets.AssetEntry{
+			Key:        def.AssetKey,
+			Path:       s.File,
+			FrameW:     s.FrameW,
+			FrameH:     s.FrameH,
+			FrameCount: s.FrameCount,
+		})
+	}
+	if err := b.assetMgr.LoadCharacter(&assets.CharacterSheets{Key: def.AssetKey, Sheets: sheets}); err != nil {
+		return err
+	}
 
 	p := player.New(0, 0, newPlayerActor(), b.inputMgr, b.eventBus)
-	p.SetupAnim(&movements.SayakaMovement, frames)
+	p.SetupAnim(def, b.assetMgr)
 	p.PlayAnim("idle")
 	p.State.IsControlled = true
 
@@ -143,34 +152,6 @@ func (b *sceneBootstrap) setupMenuAssets() error {
 	}
 
 	return nil
-}
-
-func loadFramesFromPNG(path string, frameW, frameH, count int) []*ebiten.Image {
-	f, err := os.Open(path)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	src, _, err := image.Decode(f)
-	if err != nil {
-		panic(err)
-	}
-
-	bounds := src.Bounds()
-	sheetW := bounds.Dx()
-	cols := sheetW / frameW
-
-	frames := make([]*ebiten.Image, 0, count)
-	for i := 0; i < count; i++ {
-		x := (i % cols) * frameW
-		y := (i / cols) * frameH
-		tile := src.(interface {
-			SubImage(r image.Rectangle) image.Image
-		}).SubImage(image.Rect(x, y, x+frameW, y+frameH))
-		frames = append(frames, ebiten.NewImageFromImage(tile))
-	}
-	return frames
 }
 
 func (b *sceneBootstrap) Ready() error    { return nil }

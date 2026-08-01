@@ -21,6 +21,12 @@ func ExportAttack(path string, proj *project.ProjectData) error {
 	fmt.Fprintf(&b, "\tAssetKey:       %q,\n", proj.AssetKey)
 	fmt.Fprintf(&b, "\tDefaultOriginX: %g,\n", proj.DefaultOriginX)
 	fmt.Fprintf(&b, "\tDefaultOriginY: %g,\n", proj.DefaultOriginY)
+	b.WriteString("\tSprites: []SpriteSheetDef{\n")
+	for _, s := range proj.Sprites {
+		fmt.Fprintf(&b, "\t\t{File: %q, FrameW: %d, FrameH: %d, FrameCount: %d},\n",
+			s.File, s.Width, s.Height, s.FrameCount)
+	}
+	b.WriteString("\t},\n")
 	b.WriteString("\tAnimations: map[string]AttackAnimDef{\n")
 
 	for _, anim := range proj.Animations {
@@ -41,72 +47,27 @@ func ExportAttack(path string, proj *project.ProjectData) error {
 
 			if len(frame.Sprites) == 1 {
 				s := frame.Sprites[0]
-			if s.OffsetX == 0 && s.OffsetY == 0 && s.Rotation == 0 && s.ScaleX == 1 && s.ScaleY == 1 {
-				fmt.Fprintf(&b, "\t\t\tAttackF(%d, %s),\n", s.SpriteFrameIdx, phaseStr)
+				if s.OffsetX == 0 && s.OffsetY == 0 && s.Rotation == 0 && s.ScaleX == 1 && s.ScaleY == 1 {
+					fmt.Fprintf(&b, "\t\t\tAttackF(S(%d, %d), %s),\n", s.SpriteIdx, s.SpriteFrameIdx, phaseStr)
+				} else {
+					fmt.Fprintf(&b, "\t\t\tAttackF(S(%d, %d, %g, %g, %g, %g, %g, %g, %g), %s),\n",
+						s.SpriteIdx, s.SpriteFrameIdx,
+						s.OffsetX, s.OffsetY, s.Rotation, s.ScaleX, s.ScaleY,
+						s.OriginX, s.OriginY, phaseStr)
+				}
 			} else {
 				b.WriteString("\t\t\tAttackFrame{\n")
-				fmt.Fprintf(&b, "\t\t\t\tSpriteFrames: []int{%d},\n", s.SpriteFrameIdx)
-				fmt.Fprintf(&b, "\t\t\t\tOffsetX:      []float64{%g},\n", s.OffsetX)
-				fmt.Fprintf(&b, "\t\t\t\tOffsetY:      []float64{%g},\n", s.OffsetY)
-				fmt.Fprintf(&b, "\t\t\t\tRotation:     []float64{%g},\n", s.Rotation)
-				fmt.Fprintf(&b, "\t\t\t\tScaleX:       []float64{%g},\n", s.ScaleX)
-				fmt.Fprintf(&b, "\t\t\t\tScaleY:       []float64{%g},\n", s.ScaleY)
-				fmt.Fprintf(&b, "\t\t\t\tPhase:        phasePtr(%s),\n", phaseStr)
+				b.WriteString("\t\t\t\tSprites: []FrameSprite{\n")
+				for _, s := range frame.Sprites {
+					fmt.Fprintf(&b, "\t\t\t\t\tS(%d, %d, %g, %g, %g, %g, %g, %g, %g),\n",
+						s.SpriteIdx, s.SpriteFrameIdx,
+						s.OffsetX, s.OffsetY, s.Rotation, s.ScaleX, s.ScaleY,
+						s.OriginX, s.OriginY)
+				}
+				b.WriteString("\t\t\t\t},\n")
+				fmt.Fprintf(&b, "\t\t\t\tPhase:        PhasePtr(%s),\n", phaseStr)
 				b.WriteString("\t\t\t},\n")
 			}
-		} else {
-			b.WriteString("\t\t\tAttackFrame{\n")
-			b.WriteString("\t\t\t\tSpriteFrames: []int{")
-			for i, s := range frame.Sprites {
-				if i > 0 {
-					b.WriteString(", ")
-				}
-				fmt.Fprintf(&b, "%d", s.SpriteFrameIdx)
-			}
-			b.WriteString("},\n")
-			b.WriteString("\t\t\t\tOffsetX: []float64{")
-			for i, s := range frame.Sprites {
-				if i > 0 {
-					b.WriteString(", ")
-				}
-				fmt.Fprintf(&b, "%g", s.OffsetX)
-			}
-			b.WriteString("},\n")
-			b.WriteString("\t\t\t\tOffsetY: []float64{")
-			for i, s := range frame.Sprites {
-				if i > 0 {
-					b.WriteString(", ")
-				}
-				fmt.Fprintf(&b, "%g", s.OffsetY)
-			}
-			b.WriteString("},\n")
-			b.WriteString("\t\t\t\tRotation: []float64{")
-			for i, s := range frame.Sprites {
-				if i > 0 {
-					b.WriteString(", ")
-				}
-				fmt.Fprintf(&b, "%g", s.Rotation)
-			}
-			b.WriteString("},\n")
-			b.WriteString("\t\t\t\tScaleX: []float64{")
-			for i, s := range frame.Sprites {
-				if i > 0 {
-					b.WriteString(", ")
-				}
-				fmt.Fprintf(&b, "%g", s.ScaleX)
-			}
-			b.WriteString("},\n")
-			b.WriteString("\t\t\t\tScaleY: []float64{")
-			for i, s := range frame.Sprites {
-				if i > 0 {
-					b.WriteString(", ")
-				}
-				fmt.Fprintf(&b, "%g", s.ScaleY)
-			}
-			b.WriteString("},\n")
-			fmt.Fprintf(&b, "\t\t\t\tPhase:        phasePtr(%s),\n", phaseStr)
-			b.WriteString("\t\t\t},\n")
-		}
 		}
 
 		b.WriteString("\t\t),\n")
@@ -189,6 +150,8 @@ func ImportAttack(path string) (*project.ProjectData, error) {
 					proj.DefaultOriginX = floatLit(kv.Value)
 				case "DefaultOriginY":
 					proj.DefaultOriginY = floatLit(kv.Value)
+				case "Sprites":
+					proj.Sprites = parseSpriteSheets(kv.Value)
 				case "Animations":
 					proj.Animations = parseAttackAnimations(kv.Value)
 				}
@@ -201,7 +164,11 @@ func ImportAttack(path string) (*project.ProjectData, error) {
 	}
 	proj.AssetName = assetName
 
-	proj.Sprites = buildSpriteList(proj.Animations)
+	if len(proj.Sprites) > 0 {
+		applySpriteEntryProps(proj.Sprites, proj.Animations)
+	} else {
+		proj.Sprites = buildSpriteList(proj.Animations)
+	}
 	if len(proj.Sprites) == 0 {
 		proj.Sprites = []project.SpriteRow{
 			{Name: "Default Sprite", Width: 256, Height: 256, FrameCount: 1, CurrentIdx: 0, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
@@ -276,20 +243,23 @@ func parseAttackFFrame(call *ast.CallExpr) project.AnimationFrame {
 	if len(call.Args) < 2 {
 		return frame
 	}
-	spriteFrame := intLit(call.Args[0])
 	phaseIdent, ok := call.Args[1].(*ast.Ident)
 	if !ok {
 		return frame
 	}
 	frame.Phase = phaseFromIdent(phaseIdent.Name)
-	frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
-		SpriteIdx:      0,
-		SpriteFrameIdx: spriteFrame,
-		ScaleX:         1,
-		ScaleY:         1,
-		OriginX:        0.5,
-		OriginY:        0.5,
-	})
+	if inner, ok := call.Args[0].(*ast.CallExpr); ok && exprString(inner.Fun) == "S" {
+		frame.Sprites = append(frame.Sprites, parseSpriteEntry(inner))
+	} else {
+		frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
+			SpriteIdx:      0,
+			SpriteFrameIdx: intLit(call.Args[0]),
+			ScaleX:         1,
+			ScaleY:         1,
+			OriginX:        0.5,
+			OriginY:        0.5,
+		})
+	}
 	return frame
 }
 
@@ -302,6 +272,14 @@ func parseAttackStructFrame(cl *ast.CompositeLit) project.AnimationFrame {
 		}
 		key := exprString(kv.Key)
 		switch key {
+		case "Sprites":
+			if cl2, ok := kv.Value.(*ast.CompositeLit); ok {
+				for _, e := range cl2.Elts {
+					if inner, ok := e.(*ast.CallExpr); ok && exprString(inner.Fun) == "S" {
+						frame.Sprites = append(frame.Sprites, parseSpriteEntry(inner))
+					}
+				}
+			}
 		case "SpriteFrames":
 			if cl2, ok := kv.Value.(*ast.CompositeLit); ok {
 				for _, e := range cl2.Elts {

@@ -1,19 +1,33 @@
 package animation
 
 type FrameHurtbox struct {
-	W, H, OffsetX, OffsetY     float64
-	ScaleX, ScaleY, Rotation   float64
-	DamageMultiplier           float64
+	W, H, OffsetX, OffsetY   float64
+	ScaleX, ScaleY, Rotation float64
+	DamageMultiplier         float64
+}
+
+type SpriteSheetDef struct {
+	File       string
+	FrameW     int
+	FrameH     int
+	FrameCount int
+}
+
+type FrameSprite struct {
+	SpriteIdx      int
+	SpriteFrameIdx int
+	OffsetX        float64
+	OffsetY        float64
+	Rotation       float64
+	ScaleX         float64
+	ScaleY         float64
+	OriginX        float64
+	OriginY        float64
 }
 
 type Frame struct {
-	SpriteFrames []int
-	OffsetX      []float64
-	OffsetY      []float64
-	Rotation     []float64
-	ScaleX       []float64
-	ScaleY       []float64
-	Hurtboxes    []FrameHurtbox
+	Sprites   []FrameSprite
+	Hurtboxes []FrameHurtbox
 }
 
 type MovementAnimDef struct {
@@ -26,6 +40,7 @@ type Movement struct {
 	AssetKey       string
 	DefaultOriginX float64
 	DefaultOriginY float64
+	Sprites        []SpriteSheetDef
 	Animations     map[string]MovementAnimDef
 }
 
@@ -40,13 +55,8 @@ const (
 )
 
 type AttackFrame struct {
-	SpriteFrames []int
-	OffsetX      []float64
-	OffsetY      []float64
-	Rotation     []float64
-	ScaleX       []float64
-	ScaleY       []float64
-	Phase        *AttackPhase
+	Sprites []FrameSprite
+	Phase   *AttackPhase
 }
 
 type AttackAnimDef struct {
@@ -65,6 +75,7 @@ type Attack struct {
 	AssetKey       string
 	DefaultOriginX float64
 	DefaultOriginY float64
+	Sprites        []SpriteSheetDef
 	Animations     map[string]AttackAnimDef
 }
 
@@ -72,26 +83,57 @@ func Anim(fps float64, loop bool, frames ...Frame) MovementAnimDef {
 	return MovementAnimDef{FPS: fps, Loop: loop, Frames: frames}
 }
 
-func F(spriteFrame int, hurtboxes ...FrameHurtbox) Frame {
-	return Frame{
-		SpriteFrames: []int{spriteFrame},
-		OffsetX:      []float64{0},
-		OffsetY:      []float64{0},
-		Rotation:     []float64{0},
-		Hurtboxes:    hurtboxes,
+func S(spriteIdx, spriteFrameIdx int, rest ...float64) FrameSprite {
+	e := FrameSprite{
+		SpriteIdx:      spriteIdx,
+		SpriteFrameIdx: spriteFrameIdx,
+		ScaleX:         1,
+		ScaleY:         1,
+		OriginX:        0.5,
+		OriginY:        0.5,
 	}
+	if len(rest) > 0 {
+		e.OffsetX = rest[0]
+	}
+	if len(rest) > 1 {
+		e.OffsetY = rest[1]
+	}
+	if len(rest) > 2 {
+		e.Rotation = rest[2]
+	}
+	if len(rest) > 3 {
+		e.ScaleX = rest[3]
+	}
+	if len(rest) > 4 {
+		e.ScaleY = rest[4]
+	}
+	if len(rest) > 5 {
+		e.OriginX = rest[5]
+	}
+	if len(rest) > 6 {
+		e.OriginY = rest[6]
+	}
+	return e
 }
 
-func AttackF(spriteFrame int, phase AttackPhase) AttackFrame {
+func F(parts ...any) Frame {
+	f := Frame{}
+	for _, p := range parts {
+		switch v := p.(type) {
+		case FrameSprite:
+			f.Sprites = append(f.Sprites, v)
+		case FrameHurtbox:
+			f.Hurtboxes = append(f.Hurtboxes, v)
+		}
+	}
+	return f
+}
+
+func AttackF(s FrameSprite, phase AttackPhase) AttackFrame {
 	p := phase
 	return AttackFrame{
-		SpriteFrames: []int{spriteFrame},
-		OffsetX:      []float64{0},
-		OffsetY:      []float64{0},
-		Rotation:     []float64{0},
-		ScaleX:       []float64{1},
-		ScaleY:       []float64{1},
-		Phase:        &p,
+		Sprites: []FrameSprite{s},
+		Phase:   &p,
 	}
 }
 
@@ -104,7 +146,7 @@ func AttackAnim(fps float64, loop bool, windup, active, recover float64, windupF
 	}
 }
 
-func phasePtr(p AttackPhase) *AttackPhase { return &p }
+func PhasePtr(p AttackPhase) *AttackPhase { return &p }
 
 func HB(w, h, ox, oy float64) FrameHurtbox {
 	return FrameHurtbox{

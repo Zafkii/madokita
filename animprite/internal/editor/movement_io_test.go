@@ -14,6 +14,10 @@ func TestMovementRoundTrip(t *testing.T) {
 		AssetKey:        "test_movement",
 		DefaultOriginX:  0.506,
 		DefaultOriginY:  0.586,
+		Sprites: []project.SpriteRow{
+			{Name: "Sprite 0", File: "sprites/players/sayaka_miki/sayaka_miki.png", Width: 256, Height: 256, FrameCount: 25},
+			{Name: "Sprite 1", File: "sprites/players/sayaka_miki/weapon.png", Width: 128, Height: 128, FrameCount: 4},
+		},
 		Animations: []project.AnimationRow{
 			{
 				Name: "idle", FPS: 3, Loop: true,
@@ -91,6 +95,24 @@ func TestMovementRoundTrip(t *testing.T) {
 	}
 	if got.DefaultOriginY != orig.DefaultOriginY {
 		t.Errorf("DefaultOriginY: got %v, want %v", got.DefaultOriginY, orig.DefaultOriginY)
+	}
+	if len(got.Sprites) != len(orig.Sprites) {
+		t.Fatalf("sprite count: got %d, want %d", len(got.Sprites), len(orig.Sprites))
+	}
+	for i, wantS := range orig.Sprites {
+		gotS := got.Sprites[i]
+		if gotS.File != wantS.File {
+			t.Errorf("sprites[%d].File: got %q, want %q", i, gotS.File, wantS.File)
+		}
+		if gotS.Width != wantS.Width {
+			t.Errorf("sprites[%d].Width: got %d, want %d", i, gotS.Width, wantS.Width)
+		}
+		if gotS.Height != wantS.Height {
+			t.Errorf("sprites[%d].Height: got %d, want %d", i, gotS.Height, wantS.Height)
+		}
+		if gotS.FrameCount != wantS.FrameCount {
+			t.Errorf("sprites[%d].FrameCount: got %d, want %d", i, gotS.FrameCount, wantS.FrameCount)
+		}
 	}
 	if len(got.Animations) != len(orig.Animations) {
 		t.Fatalf("anim count: got %d, want %d", len(got.Animations), len(orig.Animations))

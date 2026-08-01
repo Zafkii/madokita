@@ -3,6 +3,7 @@ package player
 import (
 	"math"
 	"madokita/internal/animation"
+	"madokita/internal/assets"
 	"madokita/internal/combat"
 	math2 "madokita/internal/math"
 	"madokita/internal/event"
@@ -56,12 +57,11 @@ type Player struct {
 	TargetX, TargetY float64
 	HasTarget        bool
 
-	Frames       []*ebiten.Image
 	AnimDef      *animation.Movement
 	Scale        float64
 	StageGroundY float64
 
-	sprite *ebiten.Image
+	assetMgr *assets.AssetManager
 }
 
 func New(x, y float64, actor *combat.Actor, inputMgr *input.Manager, bus *event.Bus) *Player {
@@ -128,7 +128,7 @@ func (p *Player) Update(dt time.Duration) {
 		p.Movement.yVelocity += p.Movement.gravity * dtSec
 		p.Y += p.Movement.yVelocity * dtSec
 
-		footOffset := float64(FrameSize) * (1 - p.AnimDef.DefaultOriginY) * p.Scale
+		footOffset := p.footHeight() * p.Scale
 		if p.Y+footOffset >= p.StageGroundY {
 			p.Y = p.StageGroundY - footOffset
 			p.Movement.yVelocity = 0
@@ -174,10 +174,21 @@ func (p *Player) SetTarget(x, y float64) {
 	p.HasTarget = true
 }
 
-func (p *Player) SetupAnim(def *animation.Movement, frames []*ebiten.Image) {
+func (p *Player) SetupAnim(def *animation.Movement, am *assets.AssetManager) {
 	p.AnimDef = def
-	p.Frames = frames
-	p.Animations.Animator = animation.NewAnimator(*def, len(frames))
+	p.assetMgr = am
+	p.Animations.Animator = animation.NewAnimator(*def)
+}
+
+func (p *Player) footHeight() float64 {
+	h := float64(FrameSize)
+	if p.AnimDef == nil {
+		return h * 0.5
+	}
+	if len(p.AnimDef.Sprites) > 0 && p.AnimDef.Sprites[0].FrameH > 0 {
+		h = float64(p.AnimDef.Sprites[0].FrameH)
+	}
+	return h * (1 - p.AnimDef.DefaultOriginY)
 }
 
 func (p *Player) PlayAnim(name string) bool {
@@ -194,11 +205,7 @@ func (p *Player) PlayAnim(name string) bool {
 func (p *Player) Spawn(x, stageGroundY float64) {
 	p.X = x
 	p.StageGroundY = stageGroundY
-	originY := float64(0.5)
-	if p.AnimDef != nil {
-		originY = p.AnimDef.DefaultOriginY
-	}
-	footOffset := float64(FrameSize) * (1 - originY) * p.Scale
+	footOffset := p.footHeight() * p.Scale
 	p.Y = stageGroundY - footOffset
 	p.Movement.yVelocity = 0
 	p.Movement.IsGrounded = true
@@ -212,51 +219,38 @@ func (p *Player) Draw(screen *ebiten.Image, cameraX float64) {
 	if frame == nil {
 		return
 	}
-	for i := range frame.SpriteFrames {
-		sf := frame.SpriteFrames[i]
-		if sf < 0 || sf >= len(p.Frames) {
+	for i := range frame.Sprites {
+		s := &frame.Sprites[i]
+		if p.assetMgr == nil || p.AnimDef == nil {
 			continue
 		}
-
-		ox := float64(0)
-		oy := float64(0)
-		rot := float64(0)
-		sx := float64(1)
-		sy := float64(1)
-
-		if i < len(frame.OffsetX) {
-			ox = frame.OffsetX[i]
-		}
-		if i < len(frame.OffsetY) {
-			oy = frame.OffsetY[i]
-		}
-		if i < len(frame.Rotation) {
-			rot = frame.Rotation[i]
-		}
-		if i < len(frame.ScaleX) {
-			sx = frame.ScaleX[i]
-		}
-		if i < len(frame.ScaleY) {
-			sy = frame.ScaleY[i]
+		img := p.assetMgr.GetFrame(p.AnimDef.AssetKey, s.SpriteIdx, s.SpriteFrameIdx)
+		if img == nil {
+			continue
 		}
 
 		originX := p.AnimDef.DefaultOriginX * FrameSize
 		originY := p.AnimDef.DefaultOriginY * FrameSize
+		if s.SpriteIdx >= 0 && s.SpriteIdx < len(p.AnimDef.Sprites) {
+			sheet := p.AnimDef.Sprites[s.SpriteIdx]
+			originX = s.OriginX * float64(sheet.FrameW)
+			originY = s.OriginY * float64(sheet.FrameH)
+		}
 
 		op := &ebiten.DrawImageOptions{}
 		op.GeoM.Translate(-originX, -originY)
-		op.GeoM.Translate(ox, oy)
-		if rot != 0 {
-			op.GeoM.Rotate(rot * math.Pi / 180)
+		op.GeoM.Translate(s.OffsetX, s.OffsetY)
+		if s.Rotation != 0 {
+			op.GeoM.Rotate(s.Rotation * math.Pi / 180)
 		}
 		flip := float64(1)
 		if p.FlipX {
 			flip = -1
 		}
-		op.GeoM.Scale(sx*p.Scale*flip, sy*p.Scale)
+		op.GeoM.Scale(s.ScaleX*p.Scale*flip, s.ScaleY*p.Scale)
 		op.GeoM.Translate(p.X, p.Y)
 		op.GeoM.Translate(-cameraX, 0)
-		screen.DrawImage(p.Frames[sf], op)
+		screen.DrawImage(img, op)
 	}
 }
 

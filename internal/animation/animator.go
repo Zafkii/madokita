@@ -14,7 +14,6 @@ const (
 
 type Animator struct {
 	def         Movement
-	sprites     int
 	frame       int
 	timer       float64
 	playing     bool
@@ -22,10 +21,9 @@ type Animator struct {
 	currentAnim string
 }
 
-func NewAnimator(def Movement, spriteCount int) *Animator {
+func NewAnimator(def Movement) *Animator {
 	return &Animator{
-		def:     def,
-		sprites: spriteCount,
+		def: def,
 	}
 }
 
