@@ -139,6 +139,21 @@ type System interface {
 | `team.go`                  | Team enum (Player/Ally/Enemy/Neutral), IsHostile()                           |
 | `ai.go`                    | AIController: idle/approach/attack/retreat/staggered/dead states             |
 
+### Attack Commitment (player)
+
+The player is locked by phases, derived from `AttackAnimator.Phase()` in `Player.updateAttacking()`:
+
+| Phase    | Move | Re-attack |
+| -------- | ---- | --------- |
+| Windup   | ✗    | ✗         |
+| Active   | ✗    | ✗         |
+| Recover  | ✓    | ✗         |
+| Armed    | ✓    | ✓ (cancels the pose) |
+
+- `IsAttacking` = attack animation playing (drives `Draw`); `IsMovementLocked`/`IsAnimationLocked` drive input, set on `TryAttack` and per-phase in `updateAttacking`
+- Moving during the armed pose cancels the attack (like the reference TS `cancelGuard`); the armed pose is NOT called "guard" — that concept is reserved for future parries
+- `Controller.Start()` has no cooldown gate: the commitment phases pace attacks
+
 ---
 
 ## Animation System (`internal/animation/`)

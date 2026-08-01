@@ -18,6 +18,7 @@ const FrameSize = 256
 type State struct {
 	IsControlled      bool
 	IsAttacking       bool
+	IsMovementLocked  bool
 	IsAnimationLocked bool
 	IsStaggered       bool
 	IsDead            bool
@@ -99,84 +100,71 @@ func (p *Player) Update(dt time.Duration) {
 		return
 	}
 
-	if p.State.IsAnimationLocked {
-		p.updateAnimationLocked(dtSec)
-		return
-	}
-
 	if p.State.IsAttacking {
 		p.updateAttacking(dtSec)
-		return
 	}
 
-	if p.Input != nil && p.Input.IsJustPressed(input.ActionAttack) && p.defaultAttackID != "" {
+	if p.Input != nil && p.Input.IsJustPressed(input.ActionAttack) && p.defaultAttackID != "" && !p.State.IsAnimationLocked {
 		if p.TryAttack(p.defaultAttackID) {
 			return
 		}
 	}
 
 	moving := false
-	if p.Input.IsPressed(input.ActionMoveLeft) {
-		p.X -= p.Movement.speed * dtSec
-		p.FlipX = true
-		moving = true
-	} else if p.Input.IsPressed(input.ActionMoveRight) {
-		p.X += p.Movement.speed * dtSec
-		p.FlipX = false
-		moving = true
-	}
-
-	if p.X < 0 {
-		p.X = 0
-	}
-
-	wantsJump := p.Input.IsPressed(input.ActionJump) && p.Movement.IsGrounded
-	if wantsJump {
-		p.Movement.yVelocity = p.Movement.jumpVelocity
-		p.Movement.IsGrounded = false
-	}
-
-	if !p.Movement.IsGrounded {
-		p.Movement.yVelocity += p.Movement.gravity * dtSec
-		p.Y += p.Movement.yVelocity * dtSec
-
-		footOffset := p.footHeight() * p.Scale
-		if p.Y+footOffset >= p.StageGroundY {
-			p.Y = p.StageGroundY - footOffset
-			p.Movement.yVelocity = 0
-			p.Movement.IsGrounded = true
+	if !p.State.IsMovementLocked {
+		if p.Input.IsPressed(input.ActionMoveLeft) {
+			p.X -= p.Movement.speed * dtSec
+			p.FlipX = true
+			moving = true
+		} else if p.Input.IsPressed(input.ActionMoveRight) {
+			p.X += p.Movement.speed * dtSec
+			p.FlipX = false
+			moving = true
 		}
-	}
 
-	desiredAnim := "idle"
-	if !p.Movement.IsGrounded {
-		desiredAnim = "jump"
-	} else if moving {
-		desiredAnim = "walk"
-	}
+		if p.X < 0 {
+			p.X = 0
+		}
 
-	if p.Animations.Animator != nil {
-		if p.Animations.currentAnim != desiredAnim {
-			if p.Animations.Animator.PlayAnimation(desiredAnim) {
-				p.Animations.currentAnim = desiredAnim
+		wantsJump := p.Input.IsPressed(input.ActionJump) && p.Movement.IsGrounded
+		if wantsJump {
+			p.Movement.yVelocity = p.Movement.jumpVelocity
+			p.Movement.IsGrounded = false
+		}
+
+		if !p.Movement.IsGrounded {
+			p.Movement.yVelocity += p.Movement.gravity * dtSec
+			p.Y += p.Movement.yVelocity * dtSec
+
+			footOffset := p.footHeight() * p.Scale
+			if p.Y+footOffset >= p.StageGroundY {
+				p.Y = p.StageGroundY - footOffset
+				p.Movement.yVelocity = 0
+				p.Movement.IsGrounded = true
 			}
 		}
-		p.Animations.Animator.Update(dtSec)
+	}
+
+	if !p.State.IsAttacking {
+		desiredAnim := "idle"
+		if !p.Movement.IsGrounded {
+			desiredAnim = "jump"
+		} else if moving {
+			desiredAnim = "walk"
+		}
+
+		if p.Animations.Animator != nil {
+			if p.Animations.currentAnim != desiredAnim {
+				if p.Animations.Animator.PlayAnimation(desiredAnim) {
+					p.Animations.currentAnim = desiredAnim
+				}
+			}
+			p.Animations.Animator.Update(dtSec)
+		}
 	}
 
 	if p.Actor != nil {
 		p.Actor.Update(dt)
-	}
-}
-
-func (p *Player) updateAnimationLocked(dtSec float64) {
-	if p.HasTarget {
-		p.Tracker.Update(
-			math2.Vec2{X: p.X, Y: p.Y},
-			math2.Vec2{X: p.TargetX, Y: p.TargetY},
-			&p.FlipX,
-			float64(dtSec),
-		)
 	}
 }
 
@@ -217,10 +205,12 @@ func (p *Player) SetupCombat(def *animation.Attack, configs []combat.AttackConfi
 }
 
 // TryAttack starts the given attack if the player is free and the controller
-// allows it (stamina, cooldown). The AttackAnimator drives the phases; the
-// controller follows via SyncPhase so hitbox activation matches the frames.
+// allows it (stamina). The AttackAnimator drives the phases; the controller
+// follows via SyncPhase so hitbox activation matches the frames. Movement is
+// locked during windup+active, and new attacks unlock once recover ends (the
+// armed pose is free and cancelable).
 func (p *Player) TryAttack(id string) bool {
-	if p.State.IsAttacking || p.State.IsAnimationLocked || p.State.IsStaggered || p.State.IsDead {
+	if p.State.IsAnimationLocked || p.State.IsStaggered || p.State.IsDead {
 		return false
 	}
 	if p.attackAnim == nil {
@@ -243,6 +233,8 @@ func (p *Player) TryAttack(id string) bool {
 	}
 	p.Combat.currentID = id
 	p.State.IsAttacking = true
+	p.State.IsMovementLocked = true
+	p.State.IsAnimationLocked = true
 	return true
 }
 
@@ -251,10 +243,46 @@ func (p *Player) updateAttacking(dtSec float64) {
 		p.State.IsAttacking = false
 		return
 	}
+
+	if p.HasTarget {
+		p.Tracker.Update(
+			math2.Vec2{X: p.X, Y: p.Y},
+			math2.Vec2{X: p.TargetX, Y: p.TargetY},
+			&p.FlipX,
+			dtSec,
+		)
+	}
+
 	p.attackAnim.Update(dtSec)
 
 	if controller, ok := p.Combat.controllers[p.Combat.currentID]; ok {
 		controller.SyncPhase(mapAnimToCombatPhase(p.attackAnim.Phase()))
+	}
+
+	// Commitment by phase: immobile while windup+active, free to move during
+	// recover, free to act again once the armed pose begins.
+	switch p.attackAnim.Phase() {
+	case animation.PhaseRecover:
+		p.State.IsMovementLocked = false
+		p.State.IsAnimationLocked = true
+	case animation.PhaseArmed:
+		p.State.IsMovementLocked = false
+		p.State.IsAnimationLocked = false
+	default:
+		p.State.IsMovementLocked = true
+		p.State.IsAnimationLocked = true
+	}
+
+	// Moving cancels the leftover armed pose (like the reference TS cancelGuard).
+	if p.attackAnim.Phase() == animation.PhaseArmed &&
+		p.Input != nil &&
+		(p.Input.IsPressed(input.ActionMoveLeft) || p.Input.IsPressed(input.ActionMoveRight)) {
+		if controller, ok := p.Combat.controllers[p.Combat.currentID]; ok {
+			controller.Interrupt()
+		}
+		p.Combat.currentID = ""
+		p.State.IsAttacking = false
+		return
 	}
 
 	if !p.attackAnim.Done() {

@@ -69,9 +69,6 @@ func NewController(config AttackConfig, hitbox *Hitbox, owner *Actor) *Controlle
 }
 
 func (c *Controller) Start() bool {
-	if time.Now().Before(c.cooldown) {
-		return false
-	}
 	if !c.owner.Stats.ConsumeStamina(c.config.StaminaCost) {
 		return false
 	}

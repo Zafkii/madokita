@@ -2,6 +2,7 @@
 CopiedInfoForMigrate
 referenceCopy/src
 tools
+wea.md
 # Go build artifacts
 *.exe
 /game

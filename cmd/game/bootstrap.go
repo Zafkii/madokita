@@ -89,7 +89,8 @@ func (b *sceneBootstrap) Start() error {
 
 	target := os.Getenv("SCENE")
 	if target == "" {
-		target = "menu-intro"
+		// Default to the main menu if no scene is specified
+		target = "game-teststage"
 	}
 	if setup, ok := sceneSetups[target]; ok {
 		if err := setup(); err != nil {
