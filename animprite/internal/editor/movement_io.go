@@ -216,6 +216,9 @@ func applySpriteEntryProps(sprites []project.SpriteRow, anims []project.Animatio
 		for _, frame := range anim.Frames {
 			for _, entry := range frame.Sprites {
 				if entry.SpriteIdx >= 0 && entry.SpriteIdx < len(sprites) {
+					sprites[entry.SpriteIdx].OffsetX = entry.OffsetX
+					sprites[entry.SpriteIdx].OffsetY = entry.OffsetY
+					sprites[entry.SpriteIdx].Rotation = entry.Rotation
 					sprites[entry.SpriteIdx].OriginX = entry.OriginX
 					sprites[entry.SpriteIdx].OriginY = entry.OriginY
 					sprites[entry.SpriteIdx].ScaleX = entry.ScaleX

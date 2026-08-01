@@ -148,21 +148,6 @@ func (a *EditorApp) flushInputsToData() {
 		row.ScaleY = a.props[4].NumericValue()
 		row.OriginX = a.originInputs[0].NumericValue()
 		row.OriginY = a.originInputs[1].NumericValue()
-
-		if animIdx := a.animTable.SelectedIdx; animIdx >= 0 && animIdx < len(a.proj.Animations) {
-			anim := &a.proj.Animations[animIdx]
-			if anim.CurrentIdx >= 0 && anim.CurrentIdx < len(anim.Frames) {
-				if entry := a.ensureFrameEntry(&anim.Frames[anim.CurrentIdx], sel); entry != nil {
-					entry.OffsetX = row.OffsetX
-					entry.OffsetY = row.OffsetY
-					entry.Rotation = row.Rotation
-					entry.ScaleX = row.ScaleX
-					entry.ScaleY = row.ScaleY
-					entry.OriginX = row.OriginX
-					entry.OriginY = row.OriginY
-				}
-			}
-		}
 	}
 }
 

@@ -9,6 +9,35 @@ import (
 	"animprite/internal/project"
 )
 
+func TestApplySpriteEntryPropsPropagatesOffsetRotation(t *testing.T) {
+	sprites := []project.SpriteRow{
+		{Name: "base", ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
+		{Name: "sprite 2", ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
+	}
+	anims := []project.AnimationRow{
+		{
+			Name: "idle",
+			Frames: []project.AnimationFrame{
+				{Sprites: []project.FrameSpriteEntry{
+					{SpriteIdx: 1, SpriteFrameIdx: 0, OffsetX: -18, OffsetY: 16, Rotation: 5, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
+				}},
+				{Sprites: []project.FrameSpriteEntry{
+					{SpriteIdx: 1, SpriteFrameIdx: 1, OffsetX: 14, OffsetY: 12, Rotation: -45, ScaleX: 1.5, ScaleY: 0.75, OriginX: 0.25, OriginY: 0.75},
+				}},
+			},
+		},
+	}
+	applySpriteEntryProps(sprites, anims)
+
+	got := sprites[1]
+	if got.OffsetX != 14 || got.OffsetY != 12 || got.Rotation != -45 {
+		t.Errorf("offset/rotation not propagated: got %+v, want OffsetX=14 OffsetY=12 Rotation=-45 (last frame wins)", got)
+	}
+	if got.ScaleX != 1.5 || got.ScaleY != 0.75 || got.OriginX != 0.25 || got.OriginY != 0.75 {
+		t.Errorf("scale/origin not propagated: %+v", got)
+	}
+}
+
 func TestMovementRejectsBareFrame(t *testing.T) {
 	src := `package movements
 
