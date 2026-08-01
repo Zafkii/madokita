@@ -138,7 +138,7 @@ func (a *EditorApp) initTables() {
 		a.saveSnapshot()
 		newIdx := len(a.proj.Sprites)
 		a.proj.Sprites = append(a.proj.Sprites, project.SpriteRow{
-			Name:       fmt.Sprintf("sprite %d", newIdx+1),
+			Name:       spriteDefaultName(newIdx),
 			File:       "",
 			Width:      256,
 			Height:     256,

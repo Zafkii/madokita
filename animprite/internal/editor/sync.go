@@ -187,7 +187,7 @@ func (a *EditorApp) syncSpriteBtns() {
 				anim := &a.proj.Animations[a.animTable.SelectedIdx]
 				if anim.CurrentIdx >= 0 && anim.CurrentIdx < len(anim.Frames) {
 					frame := &anim.Frames[anim.CurrentIdx]
-					entry := a.frameSpriteEntry(frame, i)
+					entry := a.ensureFrameEntry(frame, i)
 					if entry != nil {
 						if entry.SpriteFrameIdx > 0 {
 							entry.SpriteFrameIdx--
@@ -207,7 +207,7 @@ func (a *EditorApp) syncSpriteBtns() {
 				anim := &a.proj.Animations[a.animTable.SelectedIdx]
 				if anim.CurrentIdx >= 0 && anim.CurrentIdx < len(anim.Frames) {
 					frame := &anim.Frames[anim.CurrentIdx]
-					entry := a.frameSpriteEntry(frame, i)
+					entry := a.ensureFrameEntry(frame, i)
 					if entry != nil {
 						if entry.SpriteFrameIdx < a.proj.Sprites[i].FrameCount-1 {
 							entry.SpriteFrameIdx++
@@ -258,6 +258,28 @@ func (a *EditorApp) frameSpriteEntry(frame *project.AnimationFrame, spriteIdx in
 		}
 	}
 	return nil
+}
+
+func (a *EditorApp) ensureFrameEntry(frame *project.AnimationFrame, spriteIdx int) *project.FrameSpriteEntry {
+	if entry := a.frameSpriteEntry(frame, spriteIdx); entry != nil {
+		return entry
+	}
+	if spriteIdx < 0 || spriteIdx >= len(a.proj.Sprites) {
+		return nil
+	}
+	s := a.proj.Sprites[spriteIdx]
+	frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
+		SpriteIdx:      spriteIdx,
+		SpriteFrameIdx: s.CurrentIdx,
+		OffsetX:        s.OffsetX,
+		OffsetY:        s.OffsetY,
+		Rotation:       s.Rotation,
+		OriginX:        s.OriginX,
+		OriginY:        s.OriginY,
+		ScaleX:         s.ScaleX,
+		ScaleY:         s.ScaleY,
+	})
+	return &frame.Sprites[len(frame.Sprites)-1]
 }
 
 func (a *EditorApp) currentFrameSpriteEntry() *project.FrameSpriteEntry {

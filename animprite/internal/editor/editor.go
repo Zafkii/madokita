@@ -261,7 +261,7 @@ func NewEditorApp() *EditorApp {
 	app.proj.DefaultOriginX = 0.5
 	app.proj.DefaultOriginY = 0.5
 	app.proj.Sprites = []project.SpriteRow{
-		{Name: "Base", File: "base.png", Width: 256, Height: 256, FrameCount: 1, CurrentIdx: 0, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
+		{Name: "base", File: "base.png", Width: 256, Height: 256, FrameCount: 1, CurrentIdx: 0, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
 	}
 	makeEntry := func() []project.FrameSpriteEntry {
 		return []project.FrameSpriteEntry{
@@ -354,19 +354,7 @@ func (a *EditorApp) initRightPanelWidgets() {
 			return
 		}
 		a.spriteEditIdx = spriteIdx
-		if a.frameSpriteEntry(frame, spriteIdx) == nil {
-			frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
-				SpriteIdx:      spriteIdx,
-				SpriteFrameIdx: 0,
-				OffsetX:        a.proj.Sprites[spriteIdx].OffsetX,
-				OffsetY:        a.proj.Sprites[spriteIdx].OffsetY,
-				Rotation:       a.proj.Sprites[spriteIdx].Rotation,
-				OriginX:        a.proj.Sprites[spriteIdx].OriginX,
-				OriginY:        a.proj.Sprites[spriteIdx].OriginY,
-				ScaleX:         a.proj.Sprites[spriteIdx].ScaleX,
-				ScaleY:         a.proj.Sprites[spriteIdx].ScaleY,
-			})
-		}
+		a.ensureFrameEntry(frame, spriteIdx)
 		a.loadAnimFrameProps(animIdx, frameIdx)
 	}
 

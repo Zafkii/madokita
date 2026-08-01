@@ -106,6 +106,7 @@ func (a *EditorApp) handleRightPanelMouse(mx, my int, justL bool) {
 		a.props[i].HandleMouse(mx, my, justL)
 	}
 	a.phaseDropdown.HandleMouse(mx, my, justL)
+	a.frameSpriteDropdown.HandleMouse(mx, my, justL)
 
 	for i := range a.originInputs {
 		a.originInputs[i].HandleMouse(mx, my, justL)

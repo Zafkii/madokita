@@ -132,6 +132,15 @@ func ImportMovement(path string) (*project.ProjectData, error) {
 	return proj, nil
 }
 
+// spriteDefaultName is the editor's display-name convention for sprite rows:
+// index 0 is "base", the rest count from 2 upward ("sprite 2", "sprite 3", ...).
+func spriteDefaultName(idx int) string {
+	if idx == 0 {
+		return "base"
+	}
+	return fmt.Sprintf("sprite %d", idx+1)
+}
+
 func parseSpriteSheets(expr ast.Expr) []project.SpriteRow {
 	cl, ok := expr.(*ast.CompositeLit)
 	if !ok {
@@ -160,7 +169,7 @@ func parseSpriteSheets(expr ast.Expr) []project.SpriteRow {
 				row.FrameCount = intLit(kve.Value)
 			}
 		}
-		row.Name = fmt.Sprintf("Sprite %d", len(rows))
+		row.Name = spriteDefaultName(len(rows))
 		rows = append(rows, row)
 	}
 	return rows
@@ -183,7 +192,7 @@ func buildSpriteList(anims []project.AnimationRow) []project.SpriteRow {
 	sprites := make([]project.SpriteRow, maxIdx+1)
 	for i := range sprites {
 		sprites[i] = project.SpriteRow{
-			Name:       fmt.Sprintf("Sprite %d", i),
+			Name:       spriteDefaultName(i),
 			Width:      256,
 			Height:     256,
 			FrameCount: 1,
