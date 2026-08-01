@@ -119,6 +119,32 @@ func TestTryAttackRejectedWhenStaggeredOrDead(t *testing.T) {
 	}
 }
 
+func TestGravityContinuesDuringMidAirAttack(t *testing.T) {
+	p := commitmentTestPlayer()
+	p.State.IsControlled = true
+	p.StageGroundY = 1e6 // never lands
+	p.Movement.gravity = 1000
+	p.Movement.jumpVelocity = -500
+	p.Movement.yVelocity = -50
+	p.Movement.IsGrounded = false
+	p.Y = 100
+
+	if !p.TryAttack("atk") {
+		t.Fatal("attack should start")
+	}
+	p.Update(time.Second / 10) // windup frame, movement locked
+	if !p.State.IsMovementLocked {
+		t.Fatal("windup should lock movement")
+	}
+	// Gravity must apply even while attacking mid-air.
+	if p.Movement.yVelocity <= -50 {
+		t.Errorf("yVelocity = %v, want it to increase (fall) during windup", p.Movement.yVelocity)
+	}
+	if p.Y <= 100 {
+		t.Errorf("Y = %v, want it to increase during windup", p.Y)
+	}
+}
+
 func TestAttackEndsAfterArmedDuration(t *testing.T) {
 	p := commitmentTestPlayer()
 	if !p.TryAttack("atk") {
@@ -144,5 +170,17 @@ func TestAttackEndsAfterArmedDuration(t *testing.T) {
 	}
 	if p.Combat.currentID != "" {
 		t.Errorf("currentID = %q, want empty", p.Combat.currentID)
+	}
+	// The phase switch must not re-lock the player when the animator reports
+	// done (Phase() falls back to windup): all locks must be released.
+	if p.State.IsMovementLocked {
+		t.Error("IsMovementLocked must be released after the attack ends")
+	}
+	if p.State.IsAnimationLocked {
+		t.Error("IsAnimationLocked must be released after the attack ends")
+	}
+	// And the player must be able to attack again.
+	if !p.TryAttack("atk") {
+		t.Error("re-attack must be allowed after the attack ended naturally")
 	}
 }

@@ -131,17 +131,18 @@ func (p *Player) Update(dt time.Duration) {
 			p.Movement.yVelocity = p.Movement.jumpVelocity
 			p.Movement.IsGrounded = false
 		}
+	}
 
-		if !p.Movement.IsGrounded {
-			p.Movement.yVelocity += p.Movement.gravity * dtSec
-			p.Y += p.Movement.yVelocity * dtSec
+	// Gravity runs unconditionally: attacking mid-air must not freeze the fall.
+	if !p.Movement.IsGrounded {
+		p.Movement.yVelocity += p.Movement.gravity * dtSec
+		p.Y += p.Movement.yVelocity * dtSec
 
-			footOffset := p.footHeight() * p.Scale
-			if p.Y+footOffset >= p.StageGroundY {
-				p.Y = p.StageGroundY - footOffset
-				p.Movement.yVelocity = 0
-				p.Movement.IsGrounded = true
-			}
+		footOffset := p.footHeight() * p.Scale
+		if p.Y+footOffset >= p.StageGroundY {
+			p.Y = p.StageGroundY - footOffset
+			p.Movement.yVelocity = 0
+			p.Movement.IsGrounded = true
 		}
 	}
 
@@ -255,6 +256,20 @@ func (p *Player) updateAttacking(dtSec float64) {
 
 	p.attackAnim.Update(dtSec)
 
+	// Finish first: when the animator is done, Phase() reports windup and the
+	// phase switch below would re-lock the player forever.
+	if p.attackAnim.Done() {
+		if controller, ok := p.Combat.controllers[p.Combat.currentID]; ok {
+			controller.Interrupt()
+		}
+		p.Combat.currentID = ""
+		p.State.IsAttacking = false
+		p.State.IsMovementLocked = false
+		p.State.IsAnimationLocked = false
+		p.PlayAnim("idle")
+		return
+	}
+
 	if controller, ok := p.Combat.controllers[p.Combat.currentID]; ok {
 		controller.SyncPhase(mapAnimToCombatPhase(p.attackAnim.Phase()))
 	}
@@ -273,8 +288,10 @@ func (p *Player) updateAttacking(dtSec float64) {
 		p.State.IsAnimationLocked = true
 	}
 
-	// Moving cancels the leftover armed pose (like the reference TS cancelGuard).
-	if p.attackAnim.Phase() == animation.PhaseArmed &&
+	// Moving cancels the attack from recover on (like the reference TS
+	// cancelGuard): walking away must not drag attack frames behind.
+	phase := p.attackAnim.Phase()
+	if (phase == animation.PhaseRecover || phase == animation.PhaseArmed) &&
 		p.Input != nil &&
 		(p.Input.IsPressed(input.ActionMoveLeft) || p.Input.IsPressed(input.ActionMoveRight)) {
 		if controller, ok := p.Combat.controllers[p.Combat.currentID]; ok {
@@ -282,18 +299,10 @@ func (p *Player) updateAttacking(dtSec float64) {
 		}
 		p.Combat.currentID = ""
 		p.State.IsAttacking = false
+		p.State.IsAnimationLocked = false
+		p.PlayAnim("walk")
 		return
 	}
-
-	if !p.attackAnim.Done() {
-		return
-	}
-	if controller, ok := p.Combat.controllers[p.Combat.currentID]; ok {
-		controller.Interrupt()
-	}
-	p.Combat.currentID = ""
-	p.State.IsAttacking = false
-	p.PlayAnim("idle")
 }
 
 func mapAnimToCombatPhase(p animation.AttackPhase) combat.AttackPhase {

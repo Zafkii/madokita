@@ -151,8 +151,9 @@ The player is locked by phases, derived from `AttackAnimator.Phase()` in `Player
 | Armed    | ✓    | ✓ (cancels the pose) |
 
 - `IsAttacking` = attack animation playing (drives `Draw`); `IsMovementLocked`/`IsAnimationLocked` drive input, set on `TryAttack` and per-phase in `updateAttacking`
-- Moving during the armed pose cancels the attack (like the reference TS `cancelGuard`); the armed pose is NOT called "guard" — that concept is reserved for future parries
+- Moving cancels the attack from recover on (like the reference TS `cancelGuard`); the armed pose is NOT called "guard" — that concept is reserved for future parries
 - `Controller.Start()` has no cooldown gate: the commitment phases pace attacks
+- Gravity runs unconditionally in `Player.Update` (not gated by `IsMovementLocked`): attacking mid-air must not freeze the fall
 
 ---
 
