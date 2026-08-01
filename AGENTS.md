@@ -284,25 +284,25 @@ Each `StageDef` defines `GroundY` (ground line Y) and `SpawnX` (horizontal spawn
 
 ## Ebitengine v2 GeoM Caveat
 
-`GeoM.Translate()` does NOT perform a proper matrix multiplication — it **only adds** to `tx`/`ty`. In contrast, `Scale()` multiplies ALL matrix components including `tx`/`ty`.
+`GeoM.Translate()` does NOT perform a proper matrix multiplication — it **only adds** to `tx`/`ty`. In contrast, `Scale()` and `Rotate()` multiply ALL matrix components **including** `tx`/`ty` (proper left-multiplication).
 
 This means the **order of method calls matters**:
 
-- Any `Translate` call BEFORE `Scale` gets multiplied by the scale factor
-- Any `Translate` call AFTER `Scale` stays unscaled (just added)
+- Any `Translate` call BEFORE `Scale`/`Rotate` gets transformed by them (scaled, and ROTATED — `Rotate` rotates the accumulated translation vector too, so an offset placed before `Rotate` orbits around the origin as the sprite spins)
+- Any `Translate` call AFTER `Scale`/`Rotate` stays raw (just added)
 
-**Correct GeoM order for sprite rendering:**
+**Correct GeoM order for sprite rendering** (rotation about origin, offset NOT rotated, offset scaled by character scale and mirrored when flipped — same as the editor):
 
 ```go
-op.GeoM.Translate(-originX, -originY)    // origin → scaled
-op.GeoM.Translate(ox, oy)                // per-frame offset → scaled
-op.GeoM.Rotate(rot)                      // rotation about origin
-op.GeoM.Scale(sx*Scale*flip, sy*Scale)   // scale everything above
-op.GeoM.Translate(p.X, p.Y)              // world → NOT scaled
-op.GeoM.Translate(-cameraX, 0)           // camera → NOT scaled
+op.GeoM.Translate(-originX, -originY)            // origin → scaled/rotated
+op.GeoM.Scale(sx*Scale*flip, sy*Scale)           // scale about origin (before rotation)
+op.GeoM.Rotate(rot)                              // rotation about origin
+op.GeoM.Translate(ox*Scale*flip, oy*Scale)       // offset → manually scaled+flipped, NOT rotated
+op.GeoM.Translate(p.X, p.Y)                      // world → NOT scaled
+op.GeoM.Translate(-cameraX, 0)                   // camera → NOT scaled
 ```
 
-Do NOT reorder to the mathematically intuitive chain (e.g., `S → R → T` from left to right) — Ebitengine v2's `Translate` behavior breaks it.
+Do NOT put the offset `Translate` BEFORE `Rotate` — the offset would orbit around the player (the weapon-position bug in attack active/recover phases). Do NOT reorder to the mathematically intuitive chain (e.g., `S → R → T` from left to right) — Ebitengine v2's `Translate` behavior breaks it.
 
 ## Scene Debug & Setup Map
 

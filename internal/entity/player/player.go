@@ -353,17 +353,27 @@ func (p *Player) drawSprites(screen *ebiten.Image, cameraX float64, sprites []an
 			originY = s.OriginY * float64(sheet.FrameH)
 		}
 
-		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(-originX, -originY)
-		op.GeoM.Translate(s.OffsetX, s.OffsetY)
-		if s.Rotation != 0 {
-			op.GeoM.Rotate(s.Rotation * math.Pi / 180)
-		}
 		flip := float64(1)
 		if p.FlipX {
 			flip = -1
 		}
+
+		// Offset scaled by character scale and mirrored, but NOT rotated:
+		// GeoM.Rotate rotates the accumulated translation too, so the offset
+		// must be applied after the rotation (same as the editor).
+		ox := s.OffsetX * p.Scale
+		oy := s.OffsetY * p.Scale
+		if p.FlipX {
+			ox = -ox
+		}
+
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(-originX, -originY)
 		op.GeoM.Scale(s.ScaleX*p.Scale*flip, s.ScaleY*p.Scale)
+		if s.Rotation != 0 {
+			op.GeoM.Rotate(s.Rotation * math.Pi / 180)
+		}
+		op.GeoM.Translate(ox, oy)
 		op.GeoM.Translate(p.X, p.Y)
 		op.GeoM.Translate(-cameraX, 0)
 		screen.DrawImage(img, op)
