@@ -102,6 +102,10 @@ func (b *sceneBootstrap) Start() error {
 func (b *sceneBootstrap) setupGameScene() error {
 	attacks.RegisterSayaka()
 
+	if err := data.Validate(); err != nil {
+		return err
+	}
+
 	if err := b.assetMgr.PreloadStage(game.TestStageDef); err != nil {
 		return err
 	}
