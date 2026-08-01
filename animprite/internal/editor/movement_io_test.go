@@ -9,6 +9,29 @@ import (
 	"animprite/internal/project"
 )
 
+func TestMovementRejectsBareFrame(t *testing.T) {
+	src := `package movements
+
+import . "madokita/internal/animation"
+
+var Legacy = Movement{
+	AssetKey: "legacy",
+	Animations: map[string]MovementAnimDef{
+		"idle": Anim(3, true,
+			F(0),
+		),
+	},
+}
+`
+	path := filepath.Join(t.TempDir(), "legacy.go")
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ImportMovement(path); err == nil {
+		t.Fatal("expected error for sprite-less F(...) frame, got nil")
+	}
+}
+
 func TestMovementRoundTripPerFrameSprites(t *testing.T) {
 	orig := &project.ProjectData{
 		AssetName:       "TestMulti",

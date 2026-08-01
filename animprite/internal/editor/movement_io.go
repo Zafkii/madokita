@@ -107,7 +107,11 @@ func ImportMovement(path string) (*project.ProjectData, error) {
 				case "Sprites":
 					proj.Sprites = parseSpriteSheets(kv.Value)
 				case "Animations":
-					proj.Animations = parseAnimationsMov(kv.Value)
+					anims, err := parseAnimationsMov(kv.Value)
+					if err != nil {
+						return nil, err
+					}
+					proj.Animations = anims
 				}
 			}
 		}
@@ -222,10 +226,10 @@ func applySpriteEntryProps(sprites []project.SpriteRow, anims []project.Animatio
 	}
 }
 
-func parseAnimationsMov(expr ast.Expr) []project.AnimationRow {
+func parseAnimationsMov(expr ast.Expr) ([]project.AnimationRow, error) {
 	cl, ok := expr.(*ast.CompositeLit)
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("Animations: expected map literal")
 	}
 	var anims []project.AnimationRow
 	for _, elt := range cl.Elts {
@@ -236,18 +240,20 @@ func parseAnimationsMov(expr ast.Expr) []project.AnimationRow {
 		name := stringLit(kv.Key)
 		call, ok := kv.Value.(*ast.CallExpr)
 		if !ok {
-			continue
+			return nil, fmt.Errorf("animation %q: expected Anim(...) call", name)
 		}
 		anim := project.AnimationRow{Name: name}
-		parseAnimCall(call, &anim)
+		if err := parseAnimCall(call, &anim); err != nil {
+			return nil, fmt.Errorf("animation %q: %w", name, err)
+		}
 		anims = append(anims, anim)
 	}
-	return anims
+	return anims, nil
 }
 
-func parseAnimCall(call *ast.CallExpr, anim *project.AnimationRow) {
+func parseAnimCall(call *ast.CallExpr, anim *project.AnimationRow) error {
 	if len(call.Args) < 2 {
-		return
+		return fmt.Errorf("Anim requires fps and loop")
 	}
 	anim.FPS = float64(intLit(call.Args[0]))
 	anim.Loop = boolIdent(call.Args[1])
@@ -255,11 +261,11 @@ func parseAnimCall(call *ast.CallExpr, anim *project.AnimationRow) {
 	for i := 2; i < len(call.Args); i++ {
 		fc, ok := call.Args[i].(*ast.CallExpr)
 		if !ok {
-			continue
+			return fmt.Errorf("Anim only accepts F(...) frames")
 		}
 		fn := exprString(fc.Fun)
 		if fn != "F" {
-			continue
+			return fmt.Errorf("Anim only accepts F(...) frames, got %s", fn)
 		}
 		frame := project.AnimationFrame{}
 		haveS := false
@@ -271,9 +277,8 @@ func parseAnimCall(call *ast.CallExpr, anim *project.AnimationRow) {
 			innerFn := exprString(inner.Fun)
 			switch innerFn {
 			case "S":
-				entry := parseSpriteEntry(inner)
 				haveS = true
-				frame.Sprites = append(frame.Sprites, entry)
+				frame.Sprites = append(frame.Sprites, parseSpriteEntry(inner))
 			case "HB", "HBR":
 				hb := parseHurtboxCall(inner)
 				if hb != nil {
@@ -282,23 +287,11 @@ func parseAnimCall(call *ast.CallExpr, anim *project.AnimationRow) {
 			}
 		}
 		if !haveS {
-			spriteFrame := 0
-			if len(fc.Args) > 0 {
-				if sf, ok := fc.Args[0].(*ast.BasicLit); ok && sf.Kind == token.INT {
-					spriteFrame = intLit(fc.Args[0])
-				}
-			}
-			frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
-				SpriteIdx:      0,
-				SpriteFrameIdx: spriteFrame,
-				ScaleX:         1,
-				ScaleY:         1,
-				OriginX:        0.5,
-				OriginY:        0.5,
-			})
+			return fmt.Errorf("F(...) requires at least one S(...) sprite")
 		}
 		anim.Frames = append(anim.Frames, frame)
 	}
+	return nil
 }
 
 func parseSpriteEntry(call *ast.CallExpr) project.FrameSpriteEntry {

@@ -151,12 +151,13 @@ Available constructors (defined in `internal/animation/types.go`):
 | `S` | `(spriteIdx, spriteFrameIdx int, rest ...float64)` | Builds `FrameSprite`; rest = offsetX, offsetY, rotation, scaleX, scaleY, originX, originY (defaults: 0, 0, 0, 1, 1, 0.5, 0.5) |
 | `HB` | `(w, h, ox, oy float64)` | Builds `FrameHurtbox` with defaults (scale=1, rot=0, mult=1) |
 | `HBR` | `(w, h, ox, oy, rot float64)` | Builds `FrameHurtbox` with custom rotation |
-| `AttackF` | `(s FrameSprite, phase AttackPhase)` | Builds single-sprite `AttackFrame` |
-| `PhasePtr` | `(p AttackPhase) *AttackPhase` | Pointer helper for `AttackFrame` literals (must be public — exported files live in other packages) |
+| `AttackF` | `(phase AttackPhase, sprites ...FrameSprite)` | Builds `AttackFrame` with one or more sprites (at least 1 required) |
+| `AttackAnim` | `(fps float64, loop bool, windup, active, recover, armed, armedFPS float64, wuF, atkF, rcF int, frames ...AttackFrame)` | Builds `AttackAnimDef` with phase timings (incl. armed) and frame counts |
 
 **Rules**:
 - MUST use dot-import — movement files are pure data, no logic
 - MUST use constructors, never struct literals (the `Sprites []SpriteSheetDef` block is the only allowed literal)
+- MUST declare at least one `S(...)` per `F(...)`/`AttackF(...)` — sprite-less frames are rejected
 - SHOULD keep frames inline (one `F(...)` per line)
 - MAY define shared vars only when the same set repeats across many frames AND hurts readability less than repetition
 

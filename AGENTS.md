@@ -256,15 +256,16 @@ var SayakaMovement = Movement{
 | `S(spriteIdx, spriteFrameIdx, rest ...float64)` | Sheet index, sub-frame index, then offsetX, offsetY, rotation, scaleX, scaleY, originX, originY | Wraps `FrameSprite` (defaults: 0, 0, 0, 1, 1, 0.5, 0.5) |
 | `HB(w, h, ox, oy)` | Width, Height, OffsetX, OffsetY | Wraps `FrameHurtbox` (scale=1, rot=0, mult=1) |
 | `HBR(w, h, ox, oy, rot)` | + Rotation for angled hurtboxes | Same with custom rotation |
-| `AttackF(s, phase)` | Single `S()` sprite + phase | Wraps single-sprite `AttackFrame` |
-| `AttackAnim(fps, loop, wu, atk, rc, wuF, atkF, rcF, frames...)` | FPS, loop, phase timings + frame counts, variadic frames | Wraps `AttackAnimDef` |
-| `PhasePtr(p)` | Phase constant | Pointer helper for `AttackFrame` literals |
+| `AttackF(phase, sprites...)` | Phase constant + variadic `S()` sprites (at least 1) | Wraps `AttackFrame` (one or more sprites) |
+| `AttackAnim(fps, loop, wu, atk, rc, armed, armedFPS, wuF, atkF, rcF, frames...)` | FPS, loop, phase timings (incl. armed) + frame counts, variadic frames | Wraps `AttackAnimDef` |
 
 **Rules:**
 - Always use dot-import in movement/attack data files (zero logic, pure data)
 - Never use struct literals — always the constructors (the `Sprites: []SpriteSheetDef{...}` block is the only allowed literal)
-- Keep everything inline (no extracted vars), each frame is one `F(...)` call
+- Keep everything inline (no extracted vars), each frame is one `F(...)`/`AttackF(...)` call
 - Multi-sprite frames: one `S(...)` per image rendered in that frame
+- Every `F(...)` and `AttackF(...)` must declare at least one `S(...)` — the editor rejects sprite-less frames
+- The editor only imports/exports this constructor format; struct-literal frames (`AttackFrame{...}`, legacy `OffsetX: [...]` fields) are rejected
 
 ## Key Patterns & Conventions
 

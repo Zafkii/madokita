@@ -66,6 +66,8 @@ type AttackAnimDef struct {
 	Windup        float64
 	ActiveTime    float64
 	Recover       float64
+	Armed         float64
+	ArmedFPS      float64
 	WindupFrames  int
 	ActiveFrames  int
 	RecoverFrames int
@@ -129,24 +131,23 @@ func F(parts ...any) Frame {
 	return f
 }
 
-func AttackF(s FrameSprite, phase AttackPhase) AttackFrame {
+func AttackF(phase AttackPhase, sprites ...FrameSprite) AttackFrame {
 	p := phase
 	return AttackFrame{
-		Sprites: []FrameSprite{s},
+		Sprites: sprites,
 		Phase:   &p,
 	}
 }
 
-func AttackAnim(fps float64, loop bool, windup, active, recover float64, windupFrames, activeFrames, recoverFrames int, frames ...AttackFrame) AttackAnimDef {
+func AttackAnim(fps float64, loop bool, windup, active, recover, armed, armedFPS float64, windupFrames, activeFrames, recoverFrames int, frames ...AttackFrame) AttackAnimDef {
 	return AttackAnimDef{
 		FPS: fps, Loop: loop,
 		Windup: windup, ActiveTime: active, Recover: recover,
+		Armed: armed, ArmedFPS: armedFPS,
 		WindupFrames: windupFrames, ActiveFrames: activeFrames, RecoverFrames: recoverFrames,
 		Frames: frames,
 	}
 }
-
-func PhasePtr(p AttackPhase) *AttackPhase { return &p }
 
 func HB(w, h, ox, oy float64) FrameHurtbox {
 	return FrameHurtbox{

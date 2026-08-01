@@ -37,37 +37,21 @@ func ExportAttack(path string, proj *project.ProjectData) error {
 
 		wuFrames, atkFrames, rcFrames := countPhaseFrames(anim.Frames)
 
-		fmt.Fprintf(&b, "\t\t%q: AttackAnim(%g, %s, %g, %g, %g, %d, %d, %d,\n",
+		fmt.Fprintf(&b, "\t\t%q: AttackAnim(%g, %s, %g, %g, %g, %g, %g, %d, %d, %d,\n",
 			anim.Name, anim.FPS, loopStr,
-			anim.Windup, anim.Active, anim.Recover,
+			anim.Windup, anim.Active, anim.Recover, anim.Armed, anim.ArmedFPS,
 			wuFrames, atkFrames, rcFrames)
 
 		for _, frame := range anim.Frames {
 			phaseStr := phaseName(frame.Phase)
-
-			if len(frame.Sprites) == 1 {
-				s := frame.Sprites[0]
-				if s.OffsetX == 0 && s.OffsetY == 0 && s.Rotation == 0 && s.ScaleX == 1 && s.ScaleY == 1 {
-					fmt.Fprintf(&b, "\t\t\tAttackF(S(%d, %d), %s),\n", s.SpriteIdx, s.SpriteFrameIdx, phaseStr)
-				} else {
-					fmt.Fprintf(&b, "\t\t\tAttackF(S(%d, %d, %g, %g, %g, %g, %g, %g, %g), %s),\n",
-						s.SpriteIdx, s.SpriteFrameIdx,
-						s.OffsetX, s.OffsetY, s.Rotation, s.ScaleX, s.ScaleY,
-						s.OriginX, s.OriginY, phaseStr)
-				}
-			} else {
-				b.WriteString("\t\t\tAttackFrame{\n")
-				b.WriteString("\t\t\t\tSprites: []FrameSprite{\n")
-				for _, s := range frame.Sprites {
-					fmt.Fprintf(&b, "\t\t\t\t\tS(%d, %d, %g, %g, %g, %g, %g, %g, %g),\n",
-						s.SpriteIdx, s.SpriteFrameIdx,
-						s.OffsetX, s.OffsetY, s.Rotation, s.ScaleX, s.ScaleY,
-						s.OriginX, s.OriginY)
-				}
-				b.WriteString("\t\t\t\t},\n")
-				fmt.Fprintf(&b, "\t\t\t\tPhase:        PhasePtr(%s),\n", phaseStr)
-				b.WriteString("\t\t\t},\n")
+			fmt.Fprintf(&b, "\t\t\tAttackF(%s,\n", phaseStr)
+			for _, s := range frame.Sprites {
+				fmt.Fprintf(&b, "\t\t\t\tS(%d, %d, %g, %g, %g, %g, %g, %g, %g),\n",
+					s.SpriteIdx, s.SpriteFrameIdx,
+					s.OffsetX, s.OffsetY, s.Rotation, s.ScaleX, s.ScaleY,
+					s.OriginX, s.OriginY)
 			}
+			b.WriteString("\t\t\t),\n")
 		}
 
 		b.WriteString("\t\t),\n")
@@ -153,7 +137,11 @@ func ImportAttack(path string) (*project.ProjectData, error) {
 				case "Sprites":
 					proj.Sprites = parseSpriteSheets(kv.Value)
 				case "Animations":
-					proj.Animations = parseAttackAnimations(kv.Value)
+					anims, err := parseAttackAnimations(kv.Value)
+					if err != nil {
+						return nil, err
+					}
+					proj.Animations = anims
 				}
 			}
 		}
@@ -178,10 +166,10 @@ func ImportAttack(path string) (*project.ProjectData, error) {
 	return proj, nil
 }
 
-func parseAttackAnimations(expr ast.Expr) []project.AnimationRow {
+func parseAttackAnimations(expr ast.Expr) ([]project.AnimationRow, error) {
 	cl, ok := expr.(*ast.CompositeLit)
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("Animations: expected map literal")
 	}
 	var anims []project.AnimationRow
 	for _, elt := range cl.Elts {
@@ -192,24 +180,25 @@ func parseAttackAnimations(expr ast.Expr) []project.AnimationRow {
 		name := stringLit(kv.Key)
 		call, ok := kv.Value.(*ast.CallExpr)
 		if !ok {
-			continue
+			return nil, fmt.Errorf("animation %q: expected AttackAnim(...) call", name)
 		}
 		anim := project.AnimationRow{Name: name}
-		parseAttackAnimCall(call, &anim)
+		if err := parseAttackAnimCall(call, &anim); err != nil {
+			return nil, fmt.Errorf("animation %q: %w", name, err)
+		}
 		anims = append(anims, anim)
 	}
-	return anims
+	return anims, nil
 }
 
-func parseAttackAnimCall(call *ast.CallExpr, anim *project.AnimationRow) {
+func parseAttackAnimCall(call *ast.CallExpr, anim *project.AnimationRow) error {
 	ident, ok := call.Fun.(*ast.Ident)
 	if !ok || ident.Name != "AttackAnim" {
-		return
+		return fmt.Errorf("expected AttackAnim(...) call")
 	}
-
 	args := call.Args
-	if len(args) < 8 {
-		return
+	if len(args) < 10 {
+		return fmt.Errorf("AttackAnim requires fps, loop, windup, active, recover, armed, armedFPS, windupFrames, activeFrames, recoverFrames and frames...")
 	}
 
 	anim.FPS = floatLit(args[0])
@@ -217,132 +206,47 @@ func parseAttackAnimCall(call *ast.CallExpr, anim *project.AnimationRow) {
 	anim.Windup = floatLit(args[2])
 	anim.Active = floatLit(args[3])
 	anim.Recover = floatLit(args[4])
+	anim.Armed = floatLit(args[5])
+	anim.ArmedFPS = floatLit(args[6])
 
-	frameArgsStart := 8
-	for i := frameArgsStart; i < len(args); i++ {
-		frame := project.AnimationFrame{}
-		innerCall, ok := args[i].(*ast.CallExpr)
-		if ok {
-			ident, ok := innerCall.Fun.(*ast.Ident)
-			if ok && ident.Name == "AttackF" {
-				frame = parseAttackFFrame(innerCall)
-				anim.Frames = append(anim.Frames, frame)
-				continue
-			}
+	for i := 10; i < len(args); i++ {
+		fc, ok := args[i].(*ast.CallExpr)
+		if !ok {
+			return fmt.Errorf("unsupported frame: only AttackF(...) is allowed")
 		}
-		cl, ok := args[i].(*ast.CompositeLit)
-		if ok {
-			frame = parseAttackStructFrame(cl)
-			anim.Frames = append(anim.Frames, frame)
+		if ident, ok := fc.Fun.(*ast.Ident); !ok || ident.Name != "AttackF" {
+			return fmt.Errorf("unsupported frame: only AttackF(...) is allowed, got %s", exprString(fc.Fun))
 		}
+		frame, err := parseAttackFFrame(fc)
+		if err != nil {
+			return err
+		}
+		anim.Frames = append(anim.Frames, frame)
 	}
+	return nil
 }
 
-func parseAttackFFrame(call *ast.CallExpr) project.AnimationFrame {
-	frame := project.AnimationFrame{}
-	if len(call.Args) < 2 {
-		return frame
+func parseAttackFFrame(call *ast.CallExpr) (project.AnimationFrame, error) {
+	var frame project.AnimationFrame
+	if len(call.Args) < 1 {
+		return frame, fmt.Errorf("AttackF requires a phase constant and at least one S(...) sprite")
 	}
-	phaseIdent, ok := call.Args[1].(*ast.Ident)
+	phaseIdent, ok := call.Args[0].(*ast.Ident)
 	if !ok {
-		return frame
+		return frame, fmt.Errorf("AttackF first argument must be a phase constant")
 	}
 	frame.Phase = phaseFromIdent(phaseIdent.Name)
-	if inner, ok := call.Args[0].(*ast.CallExpr); ok && exprString(inner.Fun) == "S" {
+	for i := 1; i < len(call.Args); i++ {
+		inner, ok := call.Args[i].(*ast.CallExpr)
+		if !ok || exprString(inner.Fun) != "S" {
+			return frame, fmt.Errorf("AttackF only accepts S(...) sprites")
+		}
 		frame.Sprites = append(frame.Sprites, parseSpriteEntry(inner))
-	} else {
-		frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
-			SpriteIdx:      0,
-			SpriteFrameIdx: intLit(call.Args[0]),
-			ScaleX:         1,
-			ScaleY:         1,
-			OriginX:        0.5,
-			OriginY:        0.5,
-		})
 	}
-	return frame
-}
-
-func parseAttackStructFrame(cl *ast.CompositeLit) project.AnimationFrame {
-	frame := project.AnimationFrame{}
-	for _, elt := range cl.Elts {
-		kv, ok := elt.(*ast.KeyValueExpr)
-		if !ok {
-			continue
-		}
-		key := exprString(kv.Key)
-		switch key {
-		case "Sprites":
-			if cl2, ok := kv.Value.(*ast.CompositeLit); ok {
-				for _, e := range cl2.Elts {
-					if inner, ok := e.(*ast.CallExpr); ok && exprString(inner.Fun) == "S" {
-						frame.Sprites = append(frame.Sprites, parseSpriteEntry(inner))
-					}
-				}
-			}
-		case "SpriteFrames":
-			if cl2, ok := kv.Value.(*ast.CompositeLit); ok {
-				for _, e := range cl2.Elts {
-					frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
-						SpriteFrameIdx: intLit(e),
-						ScaleX:         1,
-						ScaleY:         1,
-						OriginX:        0.5,
-						OriginY:        0.5,
-					})
-				}
-			}
-		case "OffsetX":
-			if cl2, ok := kv.Value.(*ast.CompositeLit); ok {
-				for i, e := range cl2.Elts {
-					if i < len(frame.Sprites) {
-						frame.Sprites[i].OffsetX = floatLit(e)
-					}
-				}
-			}
-		case "OffsetY":
-			if cl2, ok := kv.Value.(*ast.CompositeLit); ok {
-				for i, e := range cl2.Elts {
-					if i < len(frame.Sprites) {
-						frame.Sprites[i].OffsetY = floatLit(e)
-					}
-				}
-			}
-		case "Rotation":
-			if cl2, ok := kv.Value.(*ast.CompositeLit); ok {
-				for i, e := range cl2.Elts {
-					if i < len(frame.Sprites) {
-						frame.Sprites[i].Rotation = floatLit(e)
-					}
-				}
-			}
-		case "ScaleX":
-			if cl2, ok := kv.Value.(*ast.CompositeLit); ok {
-				for i, e := range cl2.Elts {
-					if i < len(frame.Sprites) {
-						frame.Sprites[i].ScaleX = floatLit(e)
-					}
-				}
-			}
-		case "ScaleY":
-			if cl2, ok := kv.Value.(*ast.CompositeLit); ok {
-				for i, e := range cl2.Elts {
-					if i < len(frame.Sprites) {
-						frame.Sprites[i].ScaleY = floatLit(e)
-					}
-				}
-			}
-		case "Phase":
-			if ce, ok := kv.Value.(*ast.CallExpr); ok {
-				if len(ce.Args) > 0 {
-					if ident, ok := ce.Args[0].(*ast.Ident); ok {
-						frame.Phase = phaseFromIdent(ident.Name)
-					}
-				}
-			}
-		}
+	if len(frame.Sprites) == 0 {
+		return frame, fmt.Errorf("AttackF requires at least one S(...) sprite")
 	}
-	return frame
+	return frame, nil
 }
 
 func phaseFromIdent(name string) project.FramePhase {
