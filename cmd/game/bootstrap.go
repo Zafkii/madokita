@@ -7,7 +7,8 @@ import (
 	"madokita/internal/assets"
 	"madokita/internal/audio"
 	"madokita/internal/combat"
-	"madokita/internal/data/characters/movements"
+	"madokita/internal/data"
+	"madokita/internal/data/characters/attacks"
 	"madokita/internal/entity/player"
 	"madokita/internal/event"
 	"madokita/internal/game"
@@ -99,27 +100,25 @@ func (b *sceneBootstrap) Start() error {
 }
 
 func (b *sceneBootstrap) setupGameScene() error {
+	attacks.RegisterSayaka()
+
 	if err := b.assetMgr.PreloadStage(game.TestStageDef); err != nil {
 		return err
 	}
 
-	def := &movements.SayakaMovement
-	sheets := make([]assets.AssetEntry, 0, len(def.Sprites))
-	for _, s := range def.Sprites {
-		sheets = append(sheets, assets.AssetEntry{
-			Key:        def.AssetKey,
-			Path:       s.File,
-			FrameW:     s.FrameW,
-			FrameH:     s.FrameH,
-			FrameCount: s.FrameCount,
-		})
+	cd, ok := data.Get("sayaka")
+	if !ok || len(cd.Animations) == 0 {
+		return fmt.Errorf("character %q not registered", "sayaka")
 	}
-	if err := b.assetMgr.LoadCharacter(&assets.CharacterSheets{Key: def.AssetKey, Sheets: sheets}); err != nil {
+	def := &cd.Animations[0]
+
+	if err := b.assetMgr.PreloadCharacter(&cd); err != nil {
 		return err
 	}
 
 	p := player.New(0, 0, newPlayerActor(), b.inputMgr, b.eventBus)
 	p.SetupAnim(def, b.assetMgr)
+	p.SetupCombat(cd.Attack, cd.AttackConfigs, b.assetMgr)
 	p.PlayAnim("idle")
 	p.State.IsControlled = true
 

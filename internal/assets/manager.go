@@ -3,6 +3,8 @@ package assets
 import (
 	"image/color"
 
+	"madokita/internal/animation"
+	"madokita/internal/data"
 	"madokita/internal/ui"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -17,6 +19,8 @@ type AssetManager struct {
 	imgCache    *ui.ImageCache
 	frames      map[string][]*ebiten.Image
 	charFrames  map[string][][]*ebiten.Image
+	charPaths   map[string][]string
+	pathRefs    map[string]int
 	stageLayers map[string][]LayerItem
 	tint        *TintController
 }
@@ -26,12 +30,17 @@ func NewAssetManager(cache *ui.ImageCache) *AssetManager {
 		imgCache:    cache,
 		frames:      make(map[string][]*ebiten.Image),
 		charFrames:  make(map[string][][]*ebiten.Image),
+		charPaths:   make(map[string][]string),
+		pathRefs:    make(map[string]int),
 		stageLayers: make(map[string][]LayerItem),
 		tint:        NewTintController(),
 	}
 }
 
 func (m *AssetManager) PreloadStage(stage *StageDef) error {
+	if _, ok := m.stageLayers[stage.ID]; ok {
+		return nil
+	}
 	var items []LayerItem
 	for _, entry := range stage.Images {
 		img, err := m.imgCache.Load(entry.Path)
@@ -42,13 +51,18 @@ func (m *AssetManager) PreloadStage(stage *StageDef) error {
 			m.frames[entry.Key] = SliceFrames(img, entry.FrameW, entry.FrameH, entry.FrameCount)
 		}
 		items = append(items, LayerItem{Entry: entry, Image: img})
+		m.pathRefs[entry.Path]++
 	}
 	m.stageLayers[stage.ID] = items
 	return nil
 }
 
 func (m *AssetManager) LoadCharacter(char *CharacterSheets) error {
+	if _, ok := m.charFrames[char.Key]; ok {
+		return nil
+	}
 	var sheets [][]*ebiten.Image
+	paths := make([]string, 0, len(char.Sheets))
 	for _, entry := range char.Sheets {
 		img, err := m.imgCache.Load(entry.Path)
 		if err != nil {
@@ -56,9 +70,62 @@ func (m *AssetManager) LoadCharacter(char *CharacterSheets) error {
 		}
 		frames := SliceFrames(img, entry.FrameW, entry.FrameH, entry.FrameCount)
 		sheets = append(sheets, frames)
+		paths = append(paths, entry.Path)
+		m.pathRefs[entry.Path]++
 	}
 	m.charFrames[char.Key] = sheets
+	m.charPaths[char.Key] = paths
 	return nil
+}
+
+// PreloadCharacter loads every spritesheet a character needs for a match:
+// its primary movement animation plus its attack animation, if any.
+func (m *AssetManager) PreloadCharacter(cd *data.CharacterData) error {
+	if cd == nil || len(cd.Animations) == 0 {
+		return nil
+	}
+	def := &cd.Animations[0]
+	if err := m.LoadCharacter(characterSheets(def.AssetKey, def.Sprites)); err != nil {
+		return err
+	}
+	if cd.Attack != nil {
+		return m.LoadCharacter(characterSheets(cd.Attack.AssetKey, cd.Attack.Sprites))
+	}
+	return nil
+}
+
+// UnloadCharacter releases the frame slices and source textures of a
+// character, returning memory between matches on low-end machines.
+func (m *AssetManager) UnloadCharacter(charKey string) {
+	delete(m.charFrames, charKey)
+	for _, p := range m.charPaths[charKey] {
+		m.releasePath(p)
+	}
+	delete(m.charPaths, charKey)
+}
+
+func characterSheets(assetKey string, sprites []animation.SpriteSheetDef) *CharacterSheets {
+	sheets := make([]AssetEntry, 0, len(sprites))
+	for _, s := range sprites {
+		sheets = append(sheets, AssetEntry{
+			Key:        assetKey,
+			Path:       s.File,
+			FrameW:     s.FrameW,
+			FrameH:     s.FrameH,
+			FrameCount: s.FrameCount,
+		})
+	}
+	return &CharacterSheets{Key: assetKey, Sheets: sheets}
+}
+
+// releasePath drops one reference to a cached texture and frees it from the
+// ImageCache once no character or stage uses it anymore.
+func (m *AssetManager) releasePath(path string) {
+	m.pathRefs[path]--
+	if m.pathRefs[path] <= 0 {
+		delete(m.pathRefs, path)
+		m.imgCache.Remove(path)
+	}
 }
 
 func (m *AssetManager) GetFrame(charKey string, sheetIdx, frameIdx int) *ebiten.Image {
@@ -88,6 +155,12 @@ func (m *AssetManager) Tint() *TintController {
 }
 
 func (m *AssetManager) UnloadStage(stageID string) {
+	for _, item := range m.stageLayers[stageID] {
+		if item.Entry.FrameCount > 1 {
+			delete(m.frames, item.Entry.Key)
+		}
+		m.releasePath(item.Entry.Path)
+	}
 	delete(m.stageLayers, stageID)
 }
 

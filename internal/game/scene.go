@@ -120,6 +120,17 @@ func (s *GameScene) Enter() error {
 }
 
 func (s *GameScene) Exit() error {
+	if s.Player != nil {
+		if s.Player.AnimDef != nil {
+			s.assetM.UnloadCharacter(s.Player.AnimDef.AssetKey)
+		}
+		if s.Player.AttackDef != nil {
+			s.assetM.UnloadCharacter(s.Player.AttackDef.AssetKey)
+		}
+	}
+	if s.stage != nil {
+		s.assetM.UnloadStage(s.stage.ID)
+	}
 	return nil
 }
 

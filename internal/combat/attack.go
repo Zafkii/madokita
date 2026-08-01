@@ -122,6 +122,21 @@ func (c *Controller) Interrupt() {
 	c.cooldown = time.Now().Add(c.config.Cooldown)
 }
 
+// SyncPhase forces the controller into the given phase without using the
+// time-based Update() transition. Used when the attack animation drives phase
+// changes: the hitbox activates only while the active phase is reported.
+func (c *Controller) SyncPhase(p AttackPhase) {
+	if c.phase == p {
+		return
+	}
+	c.phase = p
+	if p == PhaseActive {
+		c.hitbox.Activate()
+	} else {
+		c.hitbox.Deactivate()
+	}
+}
+
 func (c *Controller) Phase() AttackPhase   { return c.phase }
 func (c *Controller) Config() AttackConfig { return c.config }
 func (c *Controller) Hitbox() *Hitbox      { return c.hitbox }
