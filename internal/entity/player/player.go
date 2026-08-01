@@ -367,11 +367,19 @@ func (p *Player) drawSprites(screen *ebiten.Image, cameraX float64, sprites []an
 			ox = -ox
 		}
 
+		// Rotation must be negated when flipped: R(θ)·S(-1) = M·R(-θ), but the
+		// mirror of the right-facing render is M·R(θ). Without the negation the
+		// weapon points the wrong way on rotated frames.
+		rot := s.Rotation
+		if p.FlipX {
+			rot = -rot
+		}
+
 		op := &ebiten.DrawImageOptions{}
 		op.GeoM.Translate(-originX, -originY)
 		op.GeoM.Scale(s.ScaleX*p.Scale*flip, s.ScaleY*p.Scale)
-		if s.Rotation != 0 {
-			op.GeoM.Rotate(s.Rotation * math.Pi / 180)
+		if rot != 0 {
+			op.GeoM.Rotate(rot * math.Pi / 180)
 		}
 		op.GeoM.Translate(ox, oy)
 		op.GeoM.Translate(p.X, p.Y)

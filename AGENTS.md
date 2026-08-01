@@ -304,6 +304,8 @@ op.GeoM.Translate(-cameraX, 0)                   // camera → NOT scaled
 
 Do NOT put the offset `Translate` BEFORE `Rotate` — the offset would orbit around the player (the weapon-position bug in attack active/recover phases). Do NOT reorder to the mathematically intuitive chain (e.g., `S → R → T` from left to right) — Ebitengine v2's `Translate` behavior breaks it.
 
+**Flipped sprites**: when `FlipX`, NEGATE the rotation angle (`rot = -rot` before `Rotate`). Because `R(θ)·S(-1) = M·R(-θ)`, rotating the mirrored sprite by `+θ` produces the wrong orientation (`M·R(θ)` is the true mirror) — rotated weapon frames point the wrong way when facing left. The offset is mirrored separately (`ox = -ox`), which is already correct.
+
 ## Scene Debug & Setup Map
 
 `cmd/game/bootstrap.go` has a `sceneSetups map[string]func() error` in `Start()` that runs pre-setup before switching to a scene. Add entries here for any scene needing asset preloading:
