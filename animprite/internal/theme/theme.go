@@ -100,7 +100,7 @@ var Dark = Palette{
 	InputBG:          color.RGBA{26, 26, 46, 255},
 	InputBorder:      color.RGBA{65, 65, 85, 255},
 	InputFocusBorder: color.RGBA{102, 170, 255, 255},
-	SelectionBG:      color.RGBA{255, 230, 0, 102},
+	SelectionBG:      color.RGBA{255, 238, 0, 102},
 	SelectionText:    color.RGBA{0, 0, 0, 255},
 
 	// UI chrome
@@ -155,8 +155,8 @@ var Light = Palette{
 	InputBG:          color.RGBA{245, 245, 250, 255},
 	InputBorder:      color.RGBA{200, 205, 210, 255},
 	InputFocusBorder: color.RGBA{100, 160, 255, 255},
-	SelectionBG:      color.RGBA{100, 160, 255, 100},
-	SelectionText:    color.RGBA{0, 0, 0, 255},
+	SelectionBG:      color.RGBA{0, 38, 255, 227},
+	SelectionText:    color.RGBA{255, 255, 255, 255},
 
 	// UI chrome
 	Border:         color.RGBA{195, 200, 210, 255},
