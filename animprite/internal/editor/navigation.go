@@ -73,14 +73,14 @@ func (a *EditorApp) navigateToHurtbox(hbIdx int) {
 			a.props[1].SetNumeric(hb.Y)
 			a.props[1].Min = -99999
 			a.props[1].Step = 1
-			a.props[2].SetLabel("Width")
+			a.props[2].SetLabel("Scale X")
 			a.props[2].SetNumeric(hb.Width)
-			a.props[2].Min = 0
-			a.props[2].Step = 1
-			a.props[3].SetLabel("Height")
+			a.props[2].Min = -99999
+			a.props[2].Step = 0.05
+			a.props[3].SetLabel("Scale Y")
 			a.props[3].SetNumeric(hb.Height)
-			a.props[3].Min = 0
-			a.props[3].Step = 1
+			a.props[3].Min = -99999
+			a.props[3].Step = 0.05
 			a.props[4].SetLabel("Rotation (°)")
 			a.props[4].SetNumeric(hb.Rotation)
 			a.props[4].Min = -360
