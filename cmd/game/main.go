@@ -52,6 +52,10 @@ type GameApp struct {
 	frameW, frameH  int
 	frameCalibrated bool
 
+	// Client size of the drawable area, measured in Layout. The single source
+	// of truth for the windowed snap (see snapWindowAspect in window.go).
+	lastClientW, lastClientH int
+
 	// Timestamp of the previous Update, for real dt in the game loop.
 	lastTick time.Time
 

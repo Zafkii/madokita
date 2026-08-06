@@ -40,11 +40,17 @@ func (g *GameApp) setClientSize(width, height int) {
 // back so the fixed-resolution canvas always fills the client and no black
 // letterbox bars appear. The tolerance avoids fighting the resize at the
 // rounding boundary.
+//
+// The client size comes from g.lastClient (measured in Layout), not from
+// ebiten.WindowSize(): that call returns the window DIP size, whose meaning
+// flips between the requested total and the actual framebuffer depending on
+// which callback updated it last, so it is not safe to derive either the
+// client area or the frame deltas from it.
 func (g *GameApp) snapWindowAspect() {
 	if !g.frameCalibrated || ebiten.IsFullscreen() || ebiten.IsWindowMaximized() {
 		return
 	}
-	cw, ch := ebiten.WindowSize()
+	cw, ch := g.lastClientW, g.lastClientH
 	if cw <= 0 || ch <= 0 {
 		return
 	}
@@ -52,8 +58,8 @@ func (g *GameApp) snapWindowAspect() {
 	if targetH < 1 {
 		targetH = 1
 	}
-	if absInt(ch-targetH) >= 2 {
-		ebiten.SetWindowSize(cw+g.frameW, targetH+g.frameH)
+	if absInt(ch-targetH) >= 1 {
+		g.setClientSize(cw, targetH)
 	}
 }
 
@@ -113,13 +119,9 @@ func (g *GameApp) Draw(screen *ebiten.Image) {
 }
 
 func (g *GameApp) Layout(w, h int) (int, int) {
-	if ebiten.IsWindowMaximized() {
-		g.sceneMgr.SetGameSize(w, h)
-		return w, h
-	}
 	gw, gh := settings.GetResolution()
 	g.sceneMgr.SetGameSize(gw, gh)
-	if !g.frameCalibrated && !ebiten.IsFullscreen() {
+	if !g.frameCalibrated && !ebiten.IsFullscreen() && !ebiten.IsWindowMaximized() {
 		// First windowed layout: the client area is what the OS left after
 		// taking its title bar and borders, so the frame size is the
 		// difference between the requested resolution and what we got.
@@ -127,5 +129,6 @@ func (g *GameApp) Layout(w, h int) (int, int) {
 		g.frameH = gh - h
 		g.frameCalibrated = true
 	}
+	g.lastClientW, g.lastClientH = w, h
 	return gw, gh
 }
