@@ -1,14 +1,12 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"image"
 	"log"
 	"os"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"madokita/internal/assets"
@@ -54,9 +52,8 @@ type GameApp struct {
 	frameW, frameH  int
 	frameCalibrated bool
 
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	// Timestamp of the previous Update, for real dt in the game loop.
+	lastTick time.Time
 
 	pendingWindow bool
 	pendingData   settings.Data
@@ -92,7 +89,7 @@ func NewGameApp() *GameApp {
 		assetMgr:  assetMgr,
 		audioMgr:  audioMgr,
 	}
-	app.ctx, app.cancel = context.WithCancel(context.Background())
+	app.lastTick = time.Now()
 
 	app.runtime.Container().Register("events", app.eventBus)
 	app.runtime.Container().Register("input", app.inputMgr)
@@ -126,26 +123,6 @@ func NewGameApp() *GameApp {
 	})
 
 	return app
-}
-
-func (g *GameApp) runGameLoop(ctx context.Context) {
-	g.wg.Add(1)
-	defer g.wg.Done()
-
-	ticker := time.NewTicker(time.Second / 60)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if g.runtime.Phase() == engine.PhaseRunning {
-				g.sceneMgr.Update(1.0 / 60.0)
-			}
-			g.inputMgr.Update()
-		}
-	}
 }
 
 func isBrokenVmwgfx() bool {
@@ -210,8 +187,6 @@ func main() {
 	defer app.runtime.Shutdown()
 	defer database.Close()
 
-	go app.runGameLoop(app.ctx)
-
 	d := settings.GetData()
 	app.setClientSize(d.Resolution.Width, d.Resolution.Height)
 	ebiten.SetWindowSizeLimits(minWindowW, minWindowW*9/16, -1, -1)
@@ -227,9 +202,10 @@ func main() {
 		}
 		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeDisabled)
 		ebiten.SetFullscreen(true)
+	} else {
+		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	}
 	ebiten.SetWindowTitle("Madokita")
-	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	if img, err := assets.LoadICO("assets/madokita.ico", 0); err == nil && img != nil {
 		ebiten.SetWindowIcon([]image.Image{img})
@@ -238,7 +214,4 @@ func main() {
 	if err := ebiten.RunGame(app); err != nil && !errors.Is(err, ErrWindowClose) {
 		log.Fatal(err)
 	}
-
-	app.cancel()
-	app.wg.Wait()
 }

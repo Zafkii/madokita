@@ -2,12 +2,18 @@ package main
 
 import (
 	"math"
+	"time"
 
+	"madokita/internal/engine"
 	"madokita/internal/input"
 	"madokita/internal/settings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
+
+// maxFrameDt clamps the advance time per Update so a stutter (window drag,
+// OS stall) never injects a huge dt into physics or menu timers.
+const maxFrameDt = 0.1
 
 func absInt(x int) int {
 	if x < 0 {
@@ -57,6 +63,22 @@ func (g *GameApp) Update() error {
 		settings.SetWindowPosition(wx, wy)
 		return ErrWindowClose
 	}
+
+	dt := time.Since(g.lastTick).Seconds()
+	if dt <= 0 {
+		dt = 1.0 / 60.0
+	}
+	if dt > maxFrameDt {
+		dt = maxFrameDt
+	}
+	g.lastTick = time.Now()
+
+	if g.runtime.Phase() == engine.PhaseRunning {
+		if err := g.sceneMgr.Update(dt); err != nil {
+			return err
+		}
+	}
+	g.inputMgr.Update()
 
 	if g.pendingWindow {
 		g.pendingWindow = false
