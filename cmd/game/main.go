@@ -178,7 +178,7 @@ func NewGameApp() *GameApp {
 		audioMgr.SetChannelVolume("music", d.VolumeMusic)
 		audioMgr.SetChannelVolume("effects", d.VolumeEffects)
 	})
-	ebiten.SetWindowDecorated(false)
+	applyWindowDecorations()
 	save.Initialize(save.NewSQLiteRepo())
 
 	if logoImg, err := assets.LoadICO("assets/madokita.ico", 16); err == nil && logoImg != nil {
@@ -294,7 +294,7 @@ func main() {
 			scale := mon.DeviceScaleFactor()
 			ebiten.SetWindowSize(int(float64(mw)*scale), int(float64(mh)*scale))
 		}
-		ebiten.SetWindowDecorated(false)
+		applyWindowDecorations()
 		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeDisabled)
 		ebiten.SetFullscreen(true)
 	}

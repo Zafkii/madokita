@@ -119,6 +119,12 @@ func cursorForEdge(e resizeEdge) ebiten.CursorShapeType {
 }
 
 func (g *GameApp) Update() error {
+	if NativeTitleBar && ebiten.IsWindowBeingClosed() {
+		wx, wy := ebiten.WindowPosition()
+		settings.SetWindowPosition(wx, wy)
+		return ErrWindowClose
+	}
+
 	if g.pendingWindow {
 		g.pendingWindow = false
 		d := g.pendingData
@@ -137,7 +143,9 @@ func (g *GameApp) Update() error {
 		ebiten.SetMaxTPS(d.FPSLimit)
 	}
 
-	g.syncTitleBarScale()
+	if !NativeTitleBar {
+		g.syncTitleBarScale()
+	}
 
 	leftDown := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 	justPressed := leftDown && !g.prevLeftBtn
@@ -162,7 +170,7 @@ func (g *GameApp) Update() error {
 		goto endUpdate
 	}
 
-	if !ebiten.IsFullscreen() && justPressed && my >= 0 && my < g.barLogicH && mx >= g.gameWidth-g.btnLogicW*3 {
+	if !NativeTitleBar && !ebiten.IsFullscreen() && justPressed && my >= 0 && my < g.barLogicH && mx >= g.gameWidth-g.btnLogicW*3 {
 		switch g.titleBarButtonAt(mx) {
 		case btnClose:
 			return ErrWindowClose
@@ -183,7 +191,7 @@ func (g *GameApp) Update() error {
 		goto endUpdate
 	}
 
-	if !ebiten.IsFullscreen() && !isMaxed && justPressed {
+	if !NativeTitleBar && !ebiten.IsFullscreen() && !isMaxed && justPressed {
 		if ccx, ccy, cok := g.clientCursorPos(); cok {
 			if e := g.detectEdge(ccx, ccy); e != edgeNone {
 				sx, sy := windrag.ScreenCursorPos()
@@ -222,7 +230,7 @@ func (g *GameApp) Update() error {
 		} else {
 			g.dragPending = false
 		}
-	} else if !ebiten.IsFullscreen() && justPressed && my >= 0 && my < g.barLogicH {
+	} else if !NativeTitleBar && !ebiten.IsFullscreen() && justPressed && my >= 0 && my < g.barLogicH {
 		now := time.Now()
 		isDouble := !g.clickTimer.IsZero() && now.Sub(g.clickTimer) < 500*time.Millisecond &&
 			absInt(mx-g.lastClickMX) < 8 && absInt(my-g.lastClickMY) < 8
@@ -254,13 +262,13 @@ func (g *GameApp) Update() error {
 	g.prevLeftBtn = leftDown
 
 endUpdate:
-	if !ebiten.IsFullscreen() && !g.resizing.active && my >= 0 && my < g.barLogicH && mx >= g.gameWidth-g.btnLogicW*3 {
+	if !NativeTitleBar && !ebiten.IsFullscreen() && !g.resizing.active && my >= 0 && my < g.barLogicH && mx >= g.gameWidth-g.btnLogicW*3 {
 		g.hoveredBtn = g.titleBarButtonAt(mx)
 	} else {
 		g.hoveredBtn = btnNone
 	}
 
-	if !ebiten.IsFullscreen() && !isMaxed {
+	if !NativeTitleBar && !ebiten.IsFullscreen() && !isMaxed {
 		if ccx, ccy, cok := g.clientCursorPos(); cok {
 			if g.resizing.active {
 				ebiten.SetCursorShape(cursorForEdge(g.resizing.edge))
@@ -288,7 +296,7 @@ endUpdate:
 		g.restoreState = rsIdle
 	}
 
-	if !ebiten.IsFullscreen() && !ebiten.IsWindowMaximized() && g.restoreState == rsIdle {
+	if !NativeTitleBar && !ebiten.IsFullscreen() && !ebiten.IsWindowMaximized() && g.restoreState == rsIdle {
 		w, h := ebiten.WindowSize()
 		if targetH := w * 9 / 16; h != targetH {
 			ebiten.SetWindowSize(w, targetH)
@@ -299,7 +307,7 @@ endUpdate:
 
 func (g *GameApp) Draw(screen *ebiten.Image) {
 	g.sceneMgr.Draw(screen)
-	if !ebiten.IsFullscreen() {
+	if !NativeTitleBar && !ebiten.IsFullscreen() {
 		g.drawTitleBar(screen)
 	}
 }
