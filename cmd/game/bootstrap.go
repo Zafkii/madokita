@@ -11,6 +11,7 @@ import (
 	"madokita/internal/data/characters/attacks"
 	"madokita/internal/entity/player"
 	"madokita/internal/event"
+	"madokita/internal/fonts"
 	"madokita/internal/game"
 	"madokita/internal/input"
 	"madokita/internal/localization"
@@ -18,7 +19,6 @@ import (
 	"madokita/internal/platform"
 	"madokita/internal/scene"
 	"madokita/internal/settings"
-	"madokita/internal/fonts"
 	"madokita/internal/ui"
 )
 
@@ -73,9 +73,6 @@ func (b *sceneBootstrap) Initialize() error {
 func (b *sceneBootstrap) Start() error {
 	if err := ui.SetFontFromTTF(fonts.PxPlusIBMVGA8x14TTF, 13); err != nil {
 		return fmt.Errorf("loading UI font: %w", err)
-	}
-	if err := ui.SetTitleFontFromTTF(fonts.PxPlusIBMVGA8x14TTF); err != nil {
-		return fmt.Errorf("loading title font: %w", err)
 	}
 
 	data := settings.GetData()

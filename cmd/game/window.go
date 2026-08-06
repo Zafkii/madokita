@@ -1,11 +1,10 @@
 package main
 
 import (
-	"time"
+	"math"
 
 	"madokita/internal/input"
 	"madokita/internal/settings"
-	"madokita/internal/windrag"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -17,109 +16,43 @@ func absInt(x int) int {
 	return x
 }
 
-func (g *GameApp) clientCursorPos() (cx, cy int, ok bool) {
-	mx, my := ebiten.CursorPosition()
-	if g.outsideWidth <= 0 || g.outsideHeight <= 0 || g.gameWidth <= 0 || g.gameHeight <= 0 {
-		return 0, 0, false
+// setClientSize sizes the window so the OS client area (the region Ebitengine
+// renders to) is exactly width x height, with the native title bar and borders
+// added on top. GLFW measures the whole window, so the request must include
+// the OS frame deltas once calibrated.
+func (g *GameApp) setClientSize(width, height int) {
+	if g.frameCalibrated {
+		ebiten.SetWindowSize(width+g.frameW, height+g.frameH)
+		return
 	}
-	cx = mx * g.outsideWidth / g.gameWidth
-	cy = my * g.outsideHeight / g.gameHeight
-	return cx, cy, true
+	ebiten.SetWindowSize(width, height)
 }
 
-func (g *GameApp) detectEdge(cx, cy int) resizeEdge {
-	ow, oh := g.outsideWidth, g.outsideHeight
-	if cx < 0 || cy < 0 || cx >= ow || cy >= oh {
-		return edgeNone
+// snapWindowAspect keeps the windowed client area at the game's 16:9 aspect
+// ratio. The OS handles the actual resizing via the native window borders;
+// whenever the client area drifts from 16:9 during a resize, it is snapped
+// back so the fixed-resolution canvas always fills the client and no black
+// letterbox bars appear. The tolerance avoids fighting the resize at the
+// rounding boundary.
+func (g *GameApp) snapWindowAspect() {
+	if !g.frameCalibrated || ebiten.IsFullscreen() || ebiten.IsWindowMaximized() {
+		return
 	}
-	onTop := cy <= resizeEdgeThick
-	onBot := cy >= oh-1-resizeEdgeThick
-	onLef := cx <= resizeEdgeThick
-	onRig := cx >= ow-1-resizeEdgeThick
-
-	switch {
-	case onTop && onLef:
-		return edgeTopLeft
-	case onTop && onRig:
-		return edgeTopRight
-	case onBot && onLef:
-		return edgeBottomLeft
-	case onBot && onRig:
-		return edgeBottomRight
-	case onTop:
-		return edgeTop
-	case onBot:
-		return edgeBottom
-	case onLef:
-		return edgeLeft
-	case onRig:
-		return edgeRight
+	cw, ch := ebiten.WindowSize()
+	if cw <= 0 || ch <= 0 {
+		return
 	}
-	return edgeNone
-}
-
-func (g *GameApp) computeResize(e resizeEdge, dx, dy int) (newW, newH, newX, newY int) {
-	iW, iH := g.resizing.initW, g.resizing.initH
-	iX, iY := g.resizing.initX, g.resizing.initY
-
-	right := func(w int) (int, int) { return w, w * 9 / 16 }
-	left := func(w int) (int, int, int) { nw := w; nh := w * 9 / 16; return nw, nh, iX + (iW - nw) }
-
-	switch e {
-	case edgeRight:
-		newW = max(minWindowW, iW+dx)
-		newW, newH = right(newW)
-		return newW, newH, iX, iY
-	case edgeLeft:
-		newW = max(minWindowW, iW-dx)
-		newW, newH, newX = left(newW)
-		return newW, newH, newX, iY
-	case edgeBottom:
-		newH = max(minWindowW*9/16, iH+dy)
-		newW = max(minWindowW, newH*16/9)
-		newH = newW * 9 / 16
-		return newW, newH, iX, iY
-	case edgeTop:
-		newH = max(minWindowW*9/16, iH-dy)
-		newW = max(minWindowW, newH*16/9)
-		newH = newW * 9 / 16
-		return newW, newH, iX, iY + (iH - newH)
-	case edgeTopLeft:
-		newW = max(minWindowW, iW-dx)
-		newW, newH, newX = left(newW)
-		return newW, newH, newX, iY + (iH - newH)
-	case edgeTopRight:
-		newW = max(minWindowW, iW+dx)
-		newW, newH = right(newW)
-		return newW, newH, iX, iY + (iH - newH)
-	case edgeBottomLeft:
-		newW = max(minWindowW, iW-dx)
-		newW, newH, newX = left(newW)
-		return newW, newH, newX, iY
-	case edgeBottomRight:
-		newW = max(minWindowW, iW+dx)
-		newW, newH = right(newW)
-		return newW, newH, iX, iY
+	targetH := int(math.Round(float64(cw) * 9 / 16))
+	if targetH < 1 {
+		targetH = 1
 	}
-	return iW, iH, iX, iY
-}
-
-func cursorForEdge(e resizeEdge) ebiten.CursorShapeType {
-	switch e {
-	case edgeLeft, edgeRight:
-		return ebiten.CursorShapeEWResize
-	case edgeTop, edgeBottom:
-		return ebiten.CursorShapeNSResize
-	case edgeTopLeft, edgeBottomRight:
-		return ebiten.CursorShapeNWSEResize
-	case edgeTopRight, edgeBottomLeft:
-		return ebiten.CursorShapeNESWResize
+	if absInt(ch-targetH) >= 2 {
+		ebiten.SetWindowSize(cw+g.frameW, targetH+g.frameH)
 	}
-	return ebiten.CursorShapeDefault
 }
 
 func (g *GameApp) Update() error {
-	if NativeTitleBar && ebiten.IsWindowBeingClosed() {
+	if ebiten.IsWindowBeingClosed() {
 		wx, wy := ebiten.WindowPosition()
 		settings.SetWindowPosition(wx, wy)
 		return ErrWindowClose
@@ -137,193 +70,40 @@ func (g *GameApp) Update() error {
 			}
 			ebiten.SetFullscreen(true)
 		} else {
-			ebiten.SetWindowSize(d.Resolution.Width, d.Resolution.Height)
+			g.setClientSize(d.Resolution.Width, d.Resolution.Height)
+			ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 			ebiten.SetFullscreen(false)
 		}
 		ebiten.SetMaxTPS(d.FPSLimit)
 	}
 
-	if !NativeTitleBar {
-		g.syncTitleBarScale()
-	}
-
-	leftDown := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
-	justPressed := leftDown && !g.prevLeftBtn
-	isMaxed := ebiten.IsWindowMaximized()
-
-	mx, my := ebiten.CursorPosition()
-
-	if g.resizing.active {
-		if !leftDown {
-			g.resizing.active = false
-			wx, wy := ebiten.WindowPosition()
-			settings.SetWindowPosition(wx, wy)
-		} else {
-			sx, sy := windrag.ScreenCursorPos()
-			dx := sx - g.resizing.startSX
-			dy := sy - g.resizing.startSY
-			nw, nh, nx, ny := g.computeResize(g.resizing.edge, dx, dy)
-			ebiten.SetWindowSize(nw, nh)
-			ebiten.SetWindowPosition(nx, ny)
-		}
-		g.prevLeftBtn = leftDown
-		goto endUpdate
-	}
-
-	if !NativeTitleBar && !ebiten.IsFullscreen() && justPressed && my >= 0 && my < g.barLogicH && mx >= g.gameWidth-g.btnLogicW*3 {
-		switch g.titleBarButtonAt(mx) {
-		case btnClose:
-			return ErrWindowClose
-		case btnMaximize:
-			if isMaxed {
-				g.restoreState = rsPending
-				g.restoreW = g.prevW
-				g.restoreH = g.prevH
-				ebiten.RestoreWindow()
-			} else {
-				g.prevW, g.prevH = ebiten.WindowSize()
-				ebiten.MaximizeWindow()
-			}
-		case btnMinimize:
-			ebiten.MinimizeWindow()
-		}
-		g.prevLeftBtn = leftDown
-		goto endUpdate
-	}
-
-	if !NativeTitleBar && !ebiten.IsFullscreen() && !isMaxed && justPressed {
-		if ccx, ccy, cok := g.clientCursorPos(); cok {
-			if e := g.detectEdge(ccx, ccy); e != edgeNone {
-				sx, sy := windrag.ScreenCursorPos()
-				wx, wy := ebiten.WindowPosition()
-				g.resizing = resizeInfo{
-					active:  true,
-					edge:    e,
-					startSX: sx,
-					startSY: sy,
-					initW:   g.outsideWidth,
-					initH:   g.outsideHeight,
-					initX:   wx,
-					initY:   wy,
-				}
-				g.prevLeftBtn = leftDown
-				goto endUpdate
-			}
-		}
-	}
-
-	if g.dragMgr.IsDragging() {
-		if !leftDown {
-			g.dragMgr.StopDrag()
-			wx, wy := ebiten.WindowPosition()
-			settings.SetWindowPosition(wx, wy)
-		} else {
-			if x, y, ok := g.dragMgr.Update(); ok && !ebiten.IsFullscreen() {
-				ebiten.SetWindowPosition(x, y)
-			}
-		}
-	} else if g.dragPending {
-		if leftDown {
-			g.dragPending = false
-			wx, wy := ebiten.WindowPosition()
-			g.dragMgr.StartDrag(wx, wy)
-		} else {
-			g.dragPending = false
-		}
-	} else if !NativeTitleBar && !ebiten.IsFullscreen() && justPressed && my >= 0 && my < g.barLogicH {
-		now := time.Now()
-		isDouble := !g.clickTimer.IsZero() && now.Sub(g.clickTimer) < 500*time.Millisecond &&
-			absInt(mx-g.lastClickMX) < 8 && absInt(my-g.lastClickMY) < 8
-		g.clickTimer = now
-		g.lastClickMX = mx
-		g.lastClickMY = my
-
-		if isDouble {
-			if isMaxed {
-				g.restoreState = rsPending
-				g.restoreW = g.prevW
-				g.restoreH = g.prevH
-				ebiten.RestoreWindow()
-			} else {
-				g.prevW, g.prevH = ebiten.WindowSize()
-				ebiten.MaximizeWindow()
-			}
-		} else if isMaxed {
-			g.restoreState = rsPending
-			g.restoreW = g.prevW
-			g.restoreH = g.prevH
-			ebiten.RestoreWindow()
-			g.dragPending = true
-		} else {
-			wx, wy := ebiten.WindowPosition()
-			g.dragMgr.StartDrag(wx, wy)
-		}
-	}
-	g.prevLeftBtn = leftDown
-
-endUpdate:
-	if !NativeTitleBar && !ebiten.IsFullscreen() && !g.resizing.active && my >= 0 && my < g.barLogicH && mx >= g.gameWidth-g.btnLogicW*3 {
-		g.hoveredBtn = g.titleBarButtonAt(mx)
-	} else {
-		g.hoveredBtn = btnNone
-	}
-
-	if !NativeTitleBar && !ebiten.IsFullscreen() && !isMaxed {
-		if ccx, ccy, cok := g.clientCursorPos(); cok {
-			if g.resizing.active {
-				ebiten.SetCursorShape(cursorForEdge(g.resizing.edge))
-			} else if e := g.detectEdge(ccx, ccy); e != edgeNone {
-				ebiten.SetCursorShape(cursorForEdge(e))
-			} else {
-				ebiten.SetCursorShape(ebiten.CursorShapeDefault)
-			}
-		}
-	} else {
-		ebiten.SetCursorShape(ebiten.CursorShapeDefault)
-	}
+	g.snapWindowAspect()
 
 	if g.inputMgr.IsChordJustPressed(input.ActionToggleFullscreen) {
 		settings.SetFullscreen(!settings.GetData().Fullscreen)
 	}
 
-	switch g.restoreState {
-	case rsPending:
-		if !ebiten.IsWindowMaximized() {
-			g.restoreState = rsApply
-		}
-	case rsApply:
-		ebiten.SetWindowSize(g.restoreW, g.restoreH)
-		g.restoreState = rsIdle
-	}
-
-	if !NativeTitleBar && !ebiten.IsFullscreen() && !ebiten.IsWindowMaximized() && g.restoreState == rsIdle {
-		w, h := ebiten.WindowSize()
-		if targetH := w * 9 / 16; h != targetH {
-			ebiten.SetWindowSize(w, targetH)
-		}
-	}
 	return nil
 }
 
 func (g *GameApp) Draw(screen *ebiten.Image) {
 	g.sceneMgr.Draw(screen)
-	if !NativeTitleBar && !ebiten.IsFullscreen() {
-		g.drawTitleBar(screen)
-	}
 }
 
 func (g *GameApp) Layout(w, h int) (int, int) {
-	g.outsideWidth = w
-	g.outsideHeight = h
 	if ebiten.IsWindowMaximized() {
-		g.gameWidth = w
-		g.gameHeight = h
 		g.sceneMgr.SetGameSize(w, h)
 		return w, h
 	}
 	gw, gh := settings.GetResolution()
-	g.gameWidth = gw
-	g.gameHeight = gh
 	g.sceneMgr.SetGameSize(gw, gh)
+	if !g.frameCalibrated && !ebiten.IsFullscreen() {
+		// First windowed layout: the client area is what the OS left after
+		// taking its title bar and borders, so the frame size is the
+		// difference between the requested resolution and what we got.
+		g.frameW = gw - w
+		g.frameH = gh - h
+		g.frameCalibrated = true
+	}
 	return gw, gh
 }

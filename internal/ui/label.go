@@ -237,69 +237,6 @@ func DrawSymbolTextCentered(screen *ebiten.Image, str string, cx, cy int, scale 
 	drawSymbolTextFace(screen, str, x, y, face, size, clr)
 }
 
-var TitleFace font.Face = basicfont.Face7x13
-var titleTTF *opentype.Font
-var titleFontMu sync.Mutex
-var curTitleFontSize float64
-
-func SetTitleFontFromTTF(data []byte) error {
-	tt, err := opentype.Parse(data)
-	if err != nil {
-		return err
-	}
-	titleFontMu.Lock()
-	defer titleFontMu.Unlock()
-	titleTTF = tt
-	curTitleFontSize = 0
-	return nil
-}
-
-func SetTitleFontPixelSize(pixels float64) {
-	size := math.Round(pixels)
-	if size < 6 {
-		size = 6
-	}
-	if size > 72 {
-		size = 72
-	}
-	titleFontMu.Lock()
-	defer titleFontMu.Unlock()
-	if size == curTitleFontSize {
-		return
-	}
-	curTitleFontSize = size
-	if titleTTF == nil {
-		TitleFace = basicfont.Face7x13
-		return
-	}
-	f, err := opentype.NewFace(titleTTF, &opentype.FaceOptions{
-		Size:    size,
-		DPI:     72,
-		Hinting: font.HintingFull,
-	})
-	if err != nil {
-		TitleFace = basicfont.Face7x13
-		return
-	}
-	TitleFace = f
-}
-
-func TitleTextWidth(str string) int {
-	return text.BoundString(TitleFace, str).Dx()
-}
-
-func TitleTextHeight() int {
-	return TitleFace.Metrics().Height.Ceil()
-}
-
-func TitleAscent() int {
-	return TitleFace.Metrics().Ascent.Ceil()
-}
-
-func DrawTitleText(screen *ebiten.Image, str string, x, y int, clr color.Color) {
-	text.Draw(screen, str, TitleFace, x, y, clr)
-}
-
 func FillRect(screen *ebiten.Image, x, y, w, h int, clr color.Color) {
 	if w <= 0 || h <= 0 {
 		return

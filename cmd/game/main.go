@@ -24,61 +24,16 @@ import (
 	"madokita/internal/scene"
 	"madokita/internal/settings"
 	"madokita/internal/ui"
-	"madokita/internal/windrag"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 var ErrWindowClose = errors.New("window close requested")
 
-type titleBarBtn int
-
 const (
-	btnNone titleBarBtn = iota
-	btnMinimize
-	btnMaximize
-	btnClose
-)
-
-const (
-	screenWidth       = 1280
-	screenHeight      = 720
-	titleBarPhysH     = 30
-	btnPhysW          = 30
-	btnPhysPad        = 8
-	minWindowW        = 854
-	resizeEdgeThick   = 6
-)
-
-type resizeEdge int
-
-const (
-	edgeNone resizeEdge = iota
-	edgeLeft
-	edgeRight
-	edgeTop
-	edgeBottom
-	edgeTopLeft
-	edgeTopRight
-	edgeBottomLeft
-	edgeBottomRight
-)
-
-type resizeInfo struct {
-	active  bool
-	edge    resizeEdge
-	startSX int
-	startSY int
-	initW   int
-	initH   int
-	initX   int
-	initY   int
-}
-
-const (
-	rsIdle = iota
-	rsPending
-	rsApply
+	screenWidth  = 1280
+	screenHeight = 720
+	minWindowW   = 854
 )
 
 type GameApp struct {
@@ -94,22 +49,10 @@ type GameApp struct {
 	assetMgr  *assets.AssetManager
 	audioMgr  *audio.AudioManager
 
-	dragMgr      *windrag.DragManager
-	prevLeftBtn  bool
-	titleBarImg  *ebiten.Image
-	titleBarW    int
-
-	clickTimer   time.Time
-	lastClickMX  int
-	lastClickMY  int
-	dragPending  bool
-	gameWidth     int
-	gameHeight    int
-	outsideWidth  int
-	outsideHeight int
-	barLogicH     int
-	btnLogicW     int
-	resizing      resizeInfo
+	// OS window frame (title bar + borders) deltas, measured once in Layout
+	// so the client area can be sized exactly to the game resolution.
+	frameW, frameH  int
+	frameCalibrated bool
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -117,15 +60,6 @@ type GameApp struct {
 
 	pendingWindow bool
 	pendingData   settings.Data
-
-	prevW, prevH    int
-	restoreState    int
-	restoreW, restoreH int
-
-	hoveredBtn titleBarBtn
-	titleLogo  *ebiten.Image
-
-	prevTitleFontSize float64
 }
 
 func NewGameApp() *GameApp {
@@ -157,8 +91,6 @@ func NewGameApp() *GameApp {
 		cache:     cache,
 		assetMgr:  assetMgr,
 		audioMgr:  audioMgr,
-		dragMgr:   &windrag.DragManager{},
-		barLogicH: 1,
 	}
 	app.ctx, app.cancel = context.WithCancel(context.Background())
 
@@ -178,12 +110,10 @@ func NewGameApp() *GameApp {
 		audioMgr.SetChannelVolume("music", d.VolumeMusic)
 		audioMgr.SetChannelVolume("effects", d.VolumeEffects)
 	})
-	applyWindowDecorations()
+	// Defer the OS close so the window position can be persisted in Update
+	// when ebiten.IsWindowBeingClosed fires, before returning ErrWindowClose.
+	ebiten.SetWindowClosingHandled(true)
 	save.Initialize(save.NewSQLiteRepo())
-
-	if logoImg, err := assets.LoadICO("assets/madokita.ico", 16); err == nil && logoImg != nil {
-		app.titleLogo = ebiten.NewImageFromImage(logoImg)
-	}
 
 	app.runtime.Systems().Add(&platformBootstrap{platform: app.platform})
 	app.runtime.Systems().Add(&sceneBootstrap{
@@ -283,7 +213,8 @@ func main() {
 	go app.runGameLoop(app.ctx)
 
 	d := settings.GetData()
-	ebiten.SetWindowSize(d.Resolution.Width, d.Resolution.Height)
+	app.setClientSize(d.Resolution.Width, d.Resolution.Height)
+	ebiten.SetWindowSizeLimits(minWindowW, minWindowW*9/16, -1, -1)
 	if d.WindowX != 0 || d.WindowY != 0 {
 		ebiten.SetWindowPosition(d.WindowX, d.WindowY)
 	}
@@ -294,7 +225,6 @@ func main() {
 			scale := mon.DeviceScaleFactor()
 			ebiten.SetWindowSize(int(float64(mw)*scale), int(float64(mh)*scale))
 		}
-		applyWindowDecorations()
 		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeDisabled)
 		ebiten.SetFullscreen(true)
 	}
