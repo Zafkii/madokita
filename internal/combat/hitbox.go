@@ -1,7 +1,7 @@
 package combat
 
 import (
-	math2 "madokita/internal/math"
+	math2 "madokita-gems/internal/math"
 )
 
 type HitboxConfig struct {

@@ -15,11 +15,11 @@ func Path() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(cfg, "madokita")
+	dir := filepath.Join(cfg, "madokita-gems")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "madokita.sav"), nil
+	return filepath.Join(dir, "madokita-gems.sav"), nil
 }
 
 func Init() error {

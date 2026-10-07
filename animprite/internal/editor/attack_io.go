@@ -15,7 +15,7 @@ func ExportAttack(path string, proj *project.ProjectData) error {
 	var b strings.Builder
 
 	b.WriteString("package attacks\n\n")
-	b.WriteString("import . \"madokita/internal/animation\"\n\n")
+	b.WriteString("import . \"madokita-gems/internal/animation\"\n\n")
 
 	fmt.Fprintf(&b, "var %s = Attack{\n", proj.AssetName)
 	fmt.Fprintf(&b, "\tAssetKey:       %q,\n", proj.AssetKey)

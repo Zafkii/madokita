@@ -4,22 +4,22 @@ import (
 	"fmt"
 	"os"
 
-	"madokita/internal/assets"
-	"madokita/internal/audio"
-	"madokita/internal/combat"
-	"madokita/internal/data"
-	"madokita/internal/data/characters/attacks"
-	"madokita/internal/entity/player"
-	"madokita/internal/event"
-	"madokita/internal/fonts"
-	"madokita/internal/game"
-	"madokita/internal/input"
-	"madokita/internal/localization"
-	"madokita/internal/menu"
-	"madokita/internal/platform"
-	"madokita/internal/scene"
-	"madokita/internal/settings"
-	"madokita/internal/ui"
+	"madokita-gems/internal/assets"
+	"madokita-gems/internal/audio"
+	"madokita-gems/internal/combat"
+	"madokita-gems/internal/data"
+	"madokita-gems/internal/data/characters/attacks"
+	"madokita-gems/internal/entity/player"
+	"madokita-gems/internal/event"
+	"madokita-gems/internal/fonts"
+	"madokita-gems/internal/game"
+	"madokita-gems/internal/input"
+	"madokita-gems/internal/localization"
+	"madokita-gems/internal/menu"
+	"madokita-gems/internal/platform"
+	"madokita-gems/internal/scene"
+	"madokita-gems/internal/settings"
+	"madokita-gems/internal/ui"
 )
 
 func newPlayerActor() *combat.Actor {
@@ -131,8 +131,8 @@ func (b *sceneBootstrap) setupGameScene() error {
 
 func (b *sceneBootstrap) setupMenuAssets() error {
 	images := []string{
-		"menu/madokita-title.png",
-		"menu/madokita-title-top.png",
+		"menu/madokita-gems-title.png",
+		"menu/madokita-gems-title-top.png",
 		"menu/star-title-.png",
 		"menu/star-title-top.png",
 		"menu/prevmenu1.png",

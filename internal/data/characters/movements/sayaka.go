@@ -1,6 +1,6 @@
 package movements
 
-import . "madokita/internal/animation"
+import . "madokita-gems/internal/animation"
 
 var SayakaMovement = Movement{
 	AssetKey:       "sayaka_movement",

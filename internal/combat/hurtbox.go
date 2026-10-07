@@ -1,6 +1,6 @@
 package combat
 
-import math2 "madokita/internal/math"
+import math2 "madokita-gems/internal/math"
 
 type HurtboxType int
 

@@ -3,10 +3,10 @@ package attacks
 import (
 	"time"
 
-	. "madokita/internal/animation"
-	"madokita/internal/combat"
-	"madokita/internal/data"
-	"madokita/internal/data/characters/movements"
+	. "madokita-gems/internal/animation"
+	"madokita-gems/internal/combat"
+	"madokita-gems/internal/data"
+	"madokita-gems/internal/data/characters/movements"
 )
 
 // SayakaVerticalAttack is generated from the animprite editor export

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	. "madokita/internal/animation"
+	. "madokita-gems/internal/animation"
 )
 
 func resetRegistry() {

@@ -2,9 +2,9 @@ package menu
 
 import (
 	"image/color"
-	"madokita/internal/audio"
-	"madokita/internal/scene"
-	"madokita/internal/ui"
+	"madokita-gems/internal/audio"
+	"madokita-gems/internal/scene"
+	"madokita-gems/internal/ui"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"

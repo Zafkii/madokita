@@ -9,19 +9,19 @@ import (
 	"strings"
 	"time"
 
-	"madokita/internal/assets"
-	"madokita/internal/audio"
-	"madokita/internal/combat"
-	"madokita/internal/database"
-	"madokita/internal/ecs"
-	"madokita/internal/engine"
-	"madokita/internal/event"
-	"madokita/internal/input"
-	"madokita/internal/platform"
-	"madokita/internal/save"
-	"madokita/internal/scene"
-	"madokita/internal/settings"
-	"madokita/internal/ui"
+	"madokita-gems/internal/assets"
+	"madokita-gems/internal/audio"
+	"madokita-gems/internal/combat"
+	"madokita-gems/internal/database"
+	"madokita-gems/internal/ecs"
+	"madokita-gems/internal/engine"
+	"madokita-gems/internal/event"
+	"madokita-gems/internal/input"
+	"madokita-gems/internal/platform"
+	"madokita-gems/internal/save"
+	"madokita-gems/internal/scene"
+	"madokita-gems/internal/settings"
+	"madokita-gems/internal/ui"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -209,9 +209,9 @@ func main() {
 	} else {
 		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	}
-	ebiten.SetWindowTitle("Madokita")
+	ebiten.SetWindowTitle("Madokita Gems")
 
-	if img, err := assets.LoadICO("assets/madokita.ico", 0); err == nil && img != nil {
+	if img, err := assets.LoadICO("assets/madokita-gems.ico", 0); err == nil && img != nil {
 		ebiten.SetWindowIcon([]image.Image{img})
 	}
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Standalone Ebitengine-based animation editor for the Madokita game. Independent Go module with its own `go.mod` and `cmd/editor` entry point.
+Standalone Ebitengine-based animation editor for the Madokita Gems game. Independent Go module with its own `go.mod` and `cmd/editor` entry point.
 
 ## Architecture
 
@@ -88,7 +88,7 @@ Viewport rendering with:
 ### Completed (Visual Layer)
 
 - Window chrome: drag, resize (6px edges), minimize/maximize/close with hover states
-- Window position/size persistence (JSON in `UserConfigDir/madokita/animprite.json`)
+- Window position/size persistence (JSON in `UserConfigDir/madokita-gems/animprite.json`)
 - Camera: pan (left drag), zoom (scroll wheel toward cursor), reset
 - Canvas: zoom-aware grid, origin crosshair, dashed boundary
 - Theme: Dark/Light toggle with 29-color palette

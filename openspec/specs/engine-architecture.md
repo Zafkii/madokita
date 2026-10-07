@@ -1,4 +1,4 @@
-# Engine Architecture — Madokita
+# Engine Architecture — Madokita Gems
 
 ## Overview
 

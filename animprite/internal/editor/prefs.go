@@ -20,7 +20,7 @@ func prefsPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "madokita", "animprite.json"), nil
+	return filepath.Join(dir, "madokita-gems", "animprite.json"), nil
 }
 
 func LoadWindowPrefs() windowPrefs {

@@ -3,9 +3,9 @@ package menu
 import (
 	"fmt"
 	"image/color"
-	"madokita/internal/localization"
-	"madokita/internal/settings"
-	"madokita/internal/ui"
+	"madokita-gems/internal/localization"
+	"madokita-gems/internal/settings"
+	"madokita-gems/internal/ui"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )

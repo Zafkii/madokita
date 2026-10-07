@@ -1,4 +1,4 @@
-module madokita
+module madokita-gems
 
 go 1.26.4
 

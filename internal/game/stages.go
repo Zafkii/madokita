@@ -1,6 +1,6 @@
 package game
 
-import "madokita/internal/assets"
+import "madokita-gems/internal/assets"
 
 var TestStageDef = &assets.StageDef{
 	ID:      "teststage",

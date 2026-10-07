@@ -3,7 +3,7 @@ package settings
 import (
 	"database/sql"
 	"encoding/json"
-	"madokita/internal/database"
+	"madokita-gems/internal/database"
 	"os"
 )
 

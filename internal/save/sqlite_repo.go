@@ -3,7 +3,7 @@ package save
 import (
 	"database/sql"
 	"encoding/json"
-	"madokita/internal/database"
+	"madokita-gems/internal/database"
 )
 
 type SQLiteRepo struct{}

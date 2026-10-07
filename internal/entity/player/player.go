@@ -2,12 +2,12 @@ package player
 
 import (
 	"math"
-	"madokita/internal/animation"
-	"madokita/internal/assets"
-	"madokita/internal/combat"
-	math2 "madokita/internal/math"
-	"madokita/internal/event"
-	"madokita/internal/input"
+	"madokita-gems/internal/animation"
+	"madokita-gems/internal/assets"
+	"madokita-gems/internal/combat"
+	math2 "madokita-gems/internal/math"
+	"madokita-gems/internal/event"
+	"madokita-gems/internal/input"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"

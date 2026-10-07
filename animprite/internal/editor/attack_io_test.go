@@ -183,7 +183,7 @@ func writeTempGo(t *testing.T, name, src string) string {
 func TestAttackRejectsLegacyStructFrame(t *testing.T) {
 	src := `package attacks
 
-import . "madokita/internal/animation"
+import . "madokita-gems/internal/animation"
 
 var Legacy = Attack{
 	AssetKey: "legacy",
@@ -207,7 +207,7 @@ var Legacy = Attack{
 func TestAttackRejectsOldArgumentOrder(t *testing.T) {
 	src := `package attacks
 
-import . "madokita/internal/animation"
+import . "madokita-gems/internal/animation"
 
 var Legacy = Attack{
 	AssetKey: "legacy",
@@ -226,7 +226,7 @@ var Legacy = Attack{
 func TestAttackRejectsSpriteLessFrame(t *testing.T) {
 	src := `package attacks
 
-import . "madokita/internal/animation"
+import . "madokita-gems/internal/animation"
 
 var Legacy = Attack{
 	AssetKey: "legacy",

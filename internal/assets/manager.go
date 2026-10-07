@@ -3,9 +3,9 @@ package assets
 import (
 	"image/color"
 
-	"madokita/internal/animation"
-	"madokita/internal/data"
-	"madokita/internal/ui"
+	"madokita-gems/internal/animation"
+	"madokita-gems/internal/data"
+	"madokita-gems/internal/ui"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )

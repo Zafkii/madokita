@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"madokita/internal/animation"
-	"madokita/internal/combat"
+	"madokita-gems/internal/animation"
+	"madokita-gems/internal/combat"
 )
 
 // commitmentTestDef is a synthetic attack with one frame per phase at 10fps

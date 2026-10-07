@@ -2,10 +2,10 @@ package menu
 
 import (
 	"image/color"
-	"madokita/internal/audio"
-	"madokita/internal/localization"
-	"madokita/internal/scene"
-	"madokita/internal/ui"
+	"madokita-gems/internal/audio"
+	"madokita-gems/internal/localization"
+	"madokita-gems/internal/scene"
+	"madokita-gems/internal/ui"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -26,8 +26,8 @@ func NewPreloadScene(mgr *scene.Manager, cache *ui.ImageCache, audioMgr *audio.A
 		cache:    cache,
 		audioMgr: audioMgr,
 		images: []string{
-			"menu/madokita-title.png",
-			"menu/madokita-title-top.png",
+			"menu/madokita-gems-title.png",
+			"menu/madokita-gems-title-top.png",
 			"menu/star-title-.png",
 			"menu/star-title-top.png",
 			"menu/prevmenu1.png",

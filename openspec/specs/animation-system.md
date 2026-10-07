@@ -1,4 +1,4 @@
-# Animation System — Madokita
+# Animation System — Madokita Gems
 
 ## Overview
 
@@ -140,7 +140,7 @@ type SpriteSheetDef struct {
 
 Movement data lives in `internal/data/characters/movements/*.go`. Each file defines one `animation.Movement` variable.
 
-**Pattern**: dot-import `madokita/internal/animation` + constructors for zero-noise data definitions.
+**Pattern**: dot-import `madokita-gems/internal/animation` + constructors for zero-noise data definitions.
 
 Available constructors (defined in `internal/animation/types.go`):
 
@@ -166,7 +166,7 @@ Available constructors (defined in `internal/animation/types.go`):
 ```go
 package movements
 
-import . "madokita/internal/animation"
+import . "madokita-gems/internal/animation"
 
 var SayakaMovement = Movement{
     AssetKey:       "sayaka_movement",

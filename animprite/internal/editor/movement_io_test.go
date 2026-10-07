@@ -41,7 +41,7 @@ func TestApplySpriteEntryPropsPropagatesOffsetRotation(t *testing.T) {
 func TestMovementRejectsBareFrame(t *testing.T) {
 	src := `package movements
 
-import . "madokita/internal/animation"
+import . "madokita-gems/internal/animation"
 
 var Legacy = Movement{
 	AssetKey: "legacy",

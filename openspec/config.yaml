@@ -2,7 +2,7 @@ schema: spec-driven
 
 context: |
   Two-module Go project:
-    1. Madokita (fighting game) — root module
+    1. Madokita Gems (fighting game) — root module
     2. animprite (animation editor) — submodule at animprite/
 
   Tech stack: Go 1.26.4, Ebitengine/v2 v2.9.9

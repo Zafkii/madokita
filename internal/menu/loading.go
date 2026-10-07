@@ -2,8 +2,8 @@ package menu
 
 import (
 	"image/color"
-	"madokita/internal/scene"
-	"madokita/internal/ui"
+	"madokita-gems/internal/scene"
+	"madokita-gems/internal/ui"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )

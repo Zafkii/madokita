@@ -1,8 +1,8 @@
-# Madokita — AI Project Guide
+# Madokita Gems — AI Project Guide
 
 ## Overview
 
-Two-in-one Go project: **Madokita** (fighting game) + **animprite** (animation editor).
+Two-in-one Go project: **Madokita Gems** (fighting game) + **animprite** (animation editor).
 
 - **Stack**: Go 1.26.4, Ebitengine/v2 v2.9.9
 - **Architecture**: ECS-influenced, scene-based, phase-driven runtime
@@ -248,7 +248,7 @@ Movement data files (`internal/data/characters/movements/*.go`) use **dot-import
 ```go
 package movements
 
-import . "madokita/internal/animation"
+import . "madokita-gems/internal/animation"
 
 var SayakaMovement = Movement{
     AssetKey:       "sayaka_movement",
@@ -288,7 +288,7 @@ var SayakaMovement = Movement{
 - **Error handling**: Go standard (`if err != nil { return err }`), no panics in production paths
 - **Theme system**: All UI elements read `theme.Manager.Current` for colors (hot-swappable)
 - **Widget lifecycle**: Widgets have `Visible`/`Enabled` flags — no reconstruction on toggle
-- **Multiple modules**: Game (`madokita` module) and editor (`animprite` module) are independent Go modules sharing no code
+- **Multiple modules**: Game (`madokita-gems` module) and editor (`animprite` module) are independent Go modules sharing no code
 - **Window dragging**: Same pattern duplicated in both modules (win32 API for cursor position)
 - **Settings persistence**: Game uses SQLite; editor uses JSON (simpler, no dependency)
 

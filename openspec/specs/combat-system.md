@@ -1,4 +1,4 @@
-# Combat System — Madokita
+# Combat System — Madokita Gems
 
 ## Overview
 

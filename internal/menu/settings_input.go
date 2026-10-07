@@ -2,10 +2,10 @@ package menu
 
 import (
 	"fmt"
-	"madokita/internal/input"
-	"madokita/internal/localization"
-	"madokita/internal/settings"
-	"madokita/internal/ui"
+	"madokita-gems/internal/input"
+	"madokita-gems/internal/localization"
+	"madokita-gems/internal/settings"
+	"madokita-gems/internal/ui"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"

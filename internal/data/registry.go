@@ -3,8 +3,8 @@ package data
 import (
 	"fmt"
 
-	"madokita/internal/animation"
-	"madokita/internal/combat"
+	"madokita-gems/internal/animation"
+	"madokita-gems/internal/combat"
 )
 
 type CharacterData struct {

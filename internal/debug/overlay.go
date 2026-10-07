@@ -5,9 +5,9 @@ import (
 	"image/color"
 	"math"
 
-	"madokita/internal/entity/player"
-	"madokita/internal/input"
-	"madokita/internal/ui"
+	"madokita-gems/internal/entity/player"
+	"madokita-gems/internal/input"
+	"madokita-gems/internal/ui"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/colorm"

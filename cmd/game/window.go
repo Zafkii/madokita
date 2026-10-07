@@ -4,9 +4,9 @@ import (
 	"math"
 	"time"
 
-	"madokita/internal/engine"
-	"madokita/internal/input"
-	"madokita/internal/settings"
+	"madokita-gems/internal/engine"
+	"madokita-gems/internal/input"
+	"madokita-gems/internal/settings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )

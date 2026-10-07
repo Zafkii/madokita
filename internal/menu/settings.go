@@ -1,10 +1,10 @@
 package menu
 
 import (
-	"madokita/internal/audio"
-	"madokita/internal/input"
-	"madokita/internal/scene"
-	"madokita/internal/ui"
+	"madokita-gems/internal/audio"
+	"madokita-gems/internal/input"
+	"madokita-gems/internal/scene"
+	"madokita-gems/internal/ui"
 	"math"
 	"strings"
 
@@ -97,8 +97,8 @@ func (s *SettingsScene) Enter() error {
 	s.capturing = false
 	s.showResetDialog = false
 
-	base := s.cache.Get("menu/madokita-title.png")
-	overlay := s.cache.Get("menu/madokita-title-top.png")
+	base := s.cache.Get("menu/madokita-gems-title.png")
+	overlay := s.cache.Get("menu/madokita-gems-title-top.png")
 	cosmic := s.cache.Get("menu/cosmic-effect.png")
 	if base != nil {
 		s.animTitle = NewAnimatedTitle(base, overlay, cosmic, s.audioMgr)

@@ -1,8 +1,8 @@
 package enemy
 
 import (
-	"madokita/internal/combat"
-	"madokita/internal/entity/player"
+	"madokita-gems/internal/combat"
+	"madokita-gems/internal/entity/player"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"

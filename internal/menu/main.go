@@ -2,11 +2,11 @@ package menu
 
 import (
 	"image/color"
-	"madokita/internal/audio"
-	"madokita/internal/input"
-	"madokita/internal/localization"
-	"madokita/internal/scene"
-	"madokita/internal/ui"
+	"madokita-gems/internal/audio"
+	"madokita-gems/internal/input"
+	"madokita-gems/internal/localization"
+	"madokita-gems/internal/scene"
+	"madokita-gems/internal/ui"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -57,8 +57,8 @@ func (s *MainMenuScene) Enter() error {
 	s.selectedIdx = 0
 	s.active = true
 
-	base := s.cache.Get("menu/madokita-title.png")
-	overlay := s.cache.Get("menu/madokita-title-top.png")
+	base := s.cache.Get("menu/madokita-gems-title.png")
+	overlay := s.cache.Get("menu/madokita-gems-title-top.png")
 	cosmic := s.cache.Get("menu/cosmic-effect.png")
 	if base != nil {
 		s.animTitle = NewAnimatedTitle(base, overlay, cosmic, s.audioMgr)

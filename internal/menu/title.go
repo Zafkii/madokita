@@ -2,7 +2,7 @@ package menu
 
 import (
 	"image/color"
-	"madokita/internal/audio"
+	"madokita-gems/internal/audio"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"

@@ -2,7 +2,7 @@ package menu
 
 import (
 	"fmt"
-	"madokita/internal/settings"
+	"madokita-gems/internal/settings"
 	"math"
 )
 
