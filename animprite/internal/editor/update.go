@@ -11,6 +11,11 @@ import (
 )
 
 func (a *EditorApp) Update() error {
+	if ebiten.IsWindowBeingClosed() {
+		a.saveCurrentPrefs()
+		return ErrWindowClose
+	}
+
 	mx, my := ebiten.CursorPosition()
 	justL := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
 
@@ -47,46 +52,31 @@ func (a *EditorApp) Update() error {
 
 	a.hoveredFilePath = ""
 
-	a.syncTitleBarScale()
 	leftDown := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
-	justPressed := leftDown && !a.win.prevLeftBtn
-	isMaxed := ebiten.IsWindowMaximized()
-
-	skipMouse, err := a.handleWindowChrome(mx, my, leftDown, justPressed, isMaxed)
-	if err != nil {
-		return err
-	}
-	a.win.prevLeftBtn = leftDown
 
 	_, wy := ebiten.Wheel()
 	if wy != 0 {
 		a.dispatchWheel(mx, my, wy)
 	}
 
-	a.handleCanvasMouse(mx, my, leftDown, justPressed)
+	a.handleCanvasMouse(mx, my, leftDown, justL)
 	a.updateHandleHighlight(mx, my)
 
-	if !skipMouse {
-		popupHit := a.modeDropdown.PopupHit(mx, my)
-		a.themeBtn.HandleMouse(mx, my, justL && !popupHit)
-		a.openBtn.HandleMouse(mx, my, justL && !popupHit)
-		a.saveBtn.HandleMouse(mx, my, justL && !popupHit)
-		a.modeDropdown.HandleMouse(mx, my, justL)
+	popupHit := a.modeDropdown.PopupHit(mx, my)
+	a.themeBtn.HandleMouse(mx, my, justL && !popupHit)
+	a.openBtn.HandleMouse(mx, my, justL && !popupHit)
+	a.saveBtn.HandleMouse(mx, my, justL && !popupHit)
+	a.modeDropdown.HandleMouse(mx, my, justL)
 
-		a.handleTopPanelMouse(mx, my, justL)
-		a.handleRightPanelMouse(mx, my, justL)
-	}
+	a.handleTopPanelMouse(mx, my, justL)
+	a.handleRightPanelMouse(mx, my, justL)
 
-	if !skipMouse {
-		a.handleDragSelect()
-	}
+	a.handleDragSelect()
 
 	a.handleInputUpdate()
 	a.handleRightPanelKeys()
 
-	a.updateWindowCursor(isMaxed)
-	a.handleWindowRestoreState()
-	a.handleResetView(mx, my, justPressed)
+	a.handleResetView(mx, my, justL)
 
 	if a.statusTime > 0 {
 		a.statusTime--

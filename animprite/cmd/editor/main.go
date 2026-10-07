@@ -15,7 +15,6 @@ func main() {
 	ebiten.SetWindowSize(editor.DefaultWinW, editor.DefaultWinH)
 	ebiten.SetWindowTitle("Animprite")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
-	ebiten.SetWindowDecorated(false)
 
 	if img, err := editor.LoadICO("assets/logo.ico", 0); err == nil && img != nil {
 		ebiten.SetWindowIcon([]image.Image{img})

@@ -61,7 +61,6 @@ madokita/
 │   │   ├── project/   # Domain model: AnimationRow, SpriteRow, ProjectData, DeepCopy (zero Ebitengine dep)
 │   │   ├── theme/     # Dark/Light palette system (29 color fields)
 │   │   ├── ui/        # Editor UI widgets (Button, Dropdown, TextInput, Slider, Table)
-│   │   └── windrag/   # Window dragging (same pattern as game)
 │   └── ... (module-level go.mod, air.toml, Makefile)
 │
 ├── assets/            # Game assets (images, audio, etc.)
@@ -173,14 +172,13 @@ The player is locked by phases, derived from `AttackAnimator.Phase()` in `Player
 
 - `EditorApp` implements `ebiten.Game` (Update/Draw/Layout)
 - **Immediate-mode UI**: widgets painted every frame with vector primitives
-- No widget hierarchy — flat dispatch in `Update()` (split across 3 files: `update.go` orchestrator, `update_window.go` chrome, `update_canvas.go` interaction), draw order in `Draw()`
+- No widget hierarchy — flat dispatch in `Update()` (split across 2 files: `update.go` orchestrator, `update_canvas.go` interaction), draw order in `Draw()`
 - **`internal/project/`** — domain model (`ProjectData`, `AnimationRow`, `SpriteRow`, etc.) in a zero-dependency package, testable without Ebitengine
 
 ### Layout
 
 ```
 +----------------------------------------------------------+
-| Title Bar (28px)                              [_][□][X]  |
 | Mode Indicator (22px)                                    |
 +----------------------------------------------------------+
 | Top Panel: ModeDropdown [Open] [Save] [Dark]             |
@@ -201,7 +199,7 @@ The player is locked by phases, derived from `AttackAnimator.Phase()` in `Player
 
 | Feature                                             | Status            |
 | --------------------------------------------------- | ----------------- |
-| Window chrome (drag/resize/minimize/maximize/close) | ✅ Done           |
+| Native window chrome (OS title bar)                 | ✅ Done           |
 | Window pref persistence (JSON)                      | ✅ Done           |
 | Camera (pan, zoom, reset)                           | ✅ Done           |
 | Canvas (grid, crosshair, boundary)                  | ✅ Done           |
@@ -289,7 +287,7 @@ var SayakaMovement = Movement{
 - **Theme system**: All UI elements read `theme.Manager.Current` for colors (hot-swappable)
 - **Widget lifecycle**: Widgets have `Visible`/`Enabled` flags — no reconstruction on toggle
 - **Multiple modules**: Game (`madokita-gems` module) and editor (`animprite` module) are independent Go modules sharing no code
-- **Window dragging**: Same pattern duplicated in both modules (win32 API for cursor position)
+- **Native window chrome**: Both apps use the OS-native title bar/decoration (no custom-drawn chrome); the editor keeps window position/size in JSON prefs
 - **Settings persistence**: Game uses SQLite; editor uses JSON (simpler, no dependency)
 
 ## Spawn System

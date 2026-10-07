@@ -3,20 +3,15 @@ package editor
 import (
 	"fmt"
 	"image"
-	"image/color"
 
 	"animprite/internal/theme"
 	"animprite/internal/ui"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 func (a *EditorApp) Draw(screen *ebiten.Image) {
 	p := a.th.Current
-	if !ebiten.IsFullscreen() {
-		a.drawTitleBar(screen)
-	}
 	a.drawModeIndicator(screen, p)
 	a.drawTopPanel(screen, p)
 	a.drawStatusbar(screen, p)
@@ -27,109 +22,13 @@ func (a *EditorApp) Draw(screen *ebiten.Image) {
 	a.drawRightPanel(screen, p)
 }
 
-func (a *EditorApp) drawTitleBar(screen *ebiten.Image) {
-	w := a.win.outsideWidth
-	bh := a.win.barLogicH
-	if w < a.win.btnLogicW*3 || bh <= 0 {
-		return
-	}
-	if a.win.titleBarImg == nil || a.win.titleBarW != w {
-		if a.win.titleBarImg != nil {
-			a.win.titleBarImg.Deallocate()
-		}
-		a.win.titleBarImg = ebiten.NewImage(w, bh)
-		a.win.titleBarImg.Fill(color.RGBA{18, 18, 30, 200})
-		a.win.titleBarW = w
-	}
-	screen.DrawImage(a.win.titleBarImg, nil)
-
-	leftX := 8
-	if a.titleLogo != nil {
-		logoTargetH := a.win.barLogicH - 4
-		srcH := a.titleLogo.Bounds().Dy()
-		srcW := a.titleLogo.Bounds().Dx()
-		if srcH > 0 {
-			scale := float64(logoTargetH) / float64(srcH)
-			dstW := int(float64(srcW) * scale)
-			dstY := (a.win.barLogicH - logoTargetH) / 2
-			op := &ebiten.DrawImageOptions{}
-			op.GeoM.Scale(scale, scale)
-			op.GeoM.Translate(float64(leftX), float64(dstY))
-			screen.DrawImage(a.titleLogo, op)
-			leftX += dstW + 6
-		}
-	}
-	title := "Animprite"
-	titleW := ui.TextWidth(title)
-	if leftX+titleW < w-a.win.btnLogicW*3-4 {
-		ui.DrawText(screen, title, leftX, 6, 1.1, color.RGBA{230, 230, 245, 255})
-	}
-
-	bW := float32(a.win.btnLogicW)
-	barH := float32(a.win.barLogicH)
-	closeX := float32(w - a.win.btnLogicW)
-	maxiX := float32(w - a.win.btnLogicW*2)
-	miniX := float32(w - a.win.btnLogicW*3)
-
-	bg := color.RGBA{35, 35, 50, 220}
-	bgHov := color.RGBA{55, 55, 75, 240}
-	bgClose := color.RGBA{180, 40, 40, 220}
-	bgCloseHov := color.RGBA{220, 60, 60, 240}
-
-	if a.win.hoveredBtn == btnMinimize {
-		vector.DrawFilledRect(screen, miniX, 0, bW, barH, bgHov, false)
-	} else {
-		vector.DrawFilledRect(screen, miniX, 0, bW, barH, bg, false)
-	}
-	if a.win.hoveredBtn == btnMaximize {
-		vector.DrawFilledRect(screen, maxiX, 0, bW, barH, bgHov, false)
-	} else {
-		vector.DrawFilledRect(screen, maxiX, 0, bW, barH, bg, false)
-	}
-	if a.win.hoveredBtn == btnClose {
-		vector.DrawFilledRect(screen, closeX, 0, bW, barH, bgCloseHov, false)
-	} else {
-		vector.DrawFilledRect(screen, closeX, 0, bW, barH, bgClose, false)
-	}
-
-	sep := color.RGBA{50, 50, 70, 255}
-	vector.StrokeLine(screen, closeX, 0, closeX, barH, 1, sep, false)
-	vector.StrokeLine(screen, maxiX, 0, maxiX, barH, 1, sep, false)
-	vector.StrokeLine(screen, miniX, 0, miniX, barH, 1, sep, false)
-
-	sym := color.RGBA{230, 230, 245, 255}
-	sw := max(float32(1), bW/10)
-	midY := barH * 0.5
-
-	mmx := maxiX + bW*0.5
-	rw := bW * 0.48
-	rh := barH * 0.44
-	if ebiten.IsWindowMaximized() {
-		off := bW * 0.14
-		vector.StrokeRect(screen, mmx-rw*0.5-off, midY-rh*0.5-off, rw, rh, sw, sym, false)
-		vector.StrokeRect(screen, mmx-rw*0.5, midY-rh*0.5, rw, rh, sw, sym, false)
-	} else {
-		vector.StrokeRect(screen, mmx-rw*0.5, midY-rh*0.5, rw, rh, sw, sym, false)
-	}
-
-	cmx := miniX + bW*0.5
-	ly := barH * 0.68
-	hl := bW * 0.25
-	vector.StrokeLine(screen, cmx-hl, ly, cmx+hl, ly, sw, sym, false)
-
-	dmx := closeX + bW*0.5
-	d := bW * 0.28
-	vector.StrokeLine(screen, dmx-d, midY-d, dmx+d, midY+d, sw, sym, false)
-	vector.StrokeLine(screen, dmx+d, midY-d, dmx-d, midY+d, sw, sym, false)
-}
-
 func (a *EditorApp) drawModeIndicator(screen *ebiten.Image, p theme.Palette) {
-	ui.FillRect(screen, 0, titleBarH, a.win.outsideWidth, a.modeIndH(), p.ModeIndBG)
+	ui.FillRect(screen, 0, 0, a.win.outsideWidth, a.modeIndH(), p.ModeIndBG)
 	text := "Editing movement frames"
 	if a.isAttackMode() {
 		text = "Editing attack frames"
 	}
-	ui.DrawText(screen, text, 12, titleBarH+4, 0.92, p.TextMuted)
+	ui.DrawText(screen, text, 12, 4, 0.92, p.TextMuted)
 }
 
 func (a *EditorApp) modeIndH() int {
@@ -164,7 +63,7 @@ func (a *EditorApp) drawTopPanel(screen *ebiten.Image, p theme.Palette) {
 }
 
 func (a *EditorApp) topPanelY() int {
-	return titleBarH + a.modeIndH()
+	return a.modeIndH()
 }
 
 func (a *EditorApp) tableGridX() int {

@@ -2,7 +2,6 @@ package editor
 
 import (
 	"fmt"
-	"time"
 
 	"animprite/internal/canvas"
 	"animprite/internal/filedialog"
@@ -10,7 +9,6 @@ import (
 	"animprite/internal/project"
 	"animprite/internal/theme"
 	"animprite/internal/ui"
-	"animprite/internal/windrag"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -18,24 +16,8 @@ import (
 var ErrWindowClose = fmt.Errorf("window close requested")
 
 type windowState struct {
-	dragMgr            *windrag.DragManager
-	prevLeftBtn        bool
-	titleBarImg        *ebiten.Image
-	titleBarW          int
-	clickTimer         time.Time
-	lastClickMX        int
-	lastClickMY        int
-	dragPending        bool
-	outsideWidth       int
-	outsideHeight      int
-	barLogicH          int
-	btnLogicW          int
-	resizing           resizeInfo
-	prevW, prevH       int
-	restoreState       int
-	restoreW, restoreH int
-	hoveredBtn         titleBarBtn
-
+	outsideWidth                                               int
+	outsideHeight                                              int
 	resetViewBtnX, resetViewBtnY, resetViewBtnW, resetViewBtnH int
 }
 
@@ -71,9 +53,8 @@ type rightPanelState struct {
 type EditorApp struct {
 	mode editorMode
 
-	canvas    *canvas.Canvas
-	th        *theme.Manager
-	titleLogo *ebiten.Image
+	canvas *canvas.Canvas
+	th     *theme.Manager
 
 	modeDropdown *ui.Dropdown
 	themeBtn     *ui.Button
@@ -88,7 +69,7 @@ type EditorApp struct {
 	atkTimingInputs     [5]*ui.TextInput
 	fpsInput            *ui.TextInput
 
-	loopInput          *ui.TextInput
+	loopInput *ui.TextInput
 
 	loadedSprites map[int]*ebiten.Image
 
@@ -97,25 +78,25 @@ type EditorApp struct {
 	hurtboxTable *ui.Table
 	hitboxTable  *ui.Table
 
-	animNameInputs      []*ui.TextInput
+	animNameInputs []*ui.TextInput
 
-	animAddFrameBtns    []*ui.Button
-	animRemoveFrameBtns []*ui.Button
-	animFramePrevBtns   []*ui.Button
-	animFrameNextBtns   []*ui.Button
-	animFrameInputs     []*ui.TextInput
-	spriteBrowseBtns    []*ui.Button
-	spriteFramePrevBtns []*ui.Button
-	spriteFrameNextBtns []*ui.Button
-	spriteWidthInputs   []*ui.TextInput
-	spriteHeightInputs  []*ui.TextInput
-	hurtboxWidthInputs  []*ui.TextInput
-	hurtboxHeightInputs []*ui.TextInput
-	hurtboxDmgMultInputs    []*ui.TextInput
-	hitboxWidthInputs   []*ui.TextInput
-	hitboxHeightInputs  []*ui.TextInput
-	hurtboxXInputs      []*ui.TextInput
-	hurtboxYInputs      []*ui.TextInput
+	animAddFrameBtns     []*ui.Button
+	animRemoveFrameBtns  []*ui.Button
+	animFramePrevBtns    []*ui.Button
+	animFrameNextBtns    []*ui.Button
+	animFrameInputs      []*ui.TextInput
+	spriteBrowseBtns     []*ui.Button
+	spriteFramePrevBtns  []*ui.Button
+	spriteFrameNextBtns  []*ui.Button
+	spriteWidthInputs    []*ui.TextInput
+	spriteHeightInputs   []*ui.TextInput
+	hurtboxWidthInputs   []*ui.TextInput
+	hurtboxHeightInputs  []*ui.TextInput
+	hurtboxDmgMultInputs []*ui.TextInput
+	hitboxWidthInputs    []*ui.TextInput
+	hitboxHeightInputs   []*ui.TextInput
+	hurtboxXInputs       []*ui.TextInput
+	hurtboxYInputs       []*ui.TextInput
 
 	topPanelH                int
 	prevMouseX, prevMouseY   int
@@ -169,15 +150,12 @@ func NewEditorApp() *EditorApp {
 		prevSelectedAnimFrameIdx: -1,
 		spriteEditIdx:            0,
 		loadedSprites:            make(map[int]*ebiten.Image),
-		win: windowState{
-			dragMgr: &windrag.DragManager{},
-		},
 	}
 
 	app.win.outsideWidth = DefaultWinW
 	app.win.outsideHeight = DefaultWinH
 
-	canvasTop := titleBarH + modeIndicatorH + app.topPanelH
+	canvasTop := modeIndicatorH + app.topPanelH
 	app.canvas = canvas.New(
 		0,
 		canvasTop,
@@ -187,7 +165,7 @@ func NewEditorApp() *EditorApp {
 	)
 
 	groupH := dropdownH + btnGap + rightBtnH + btnGap + rightBtnH + btnGap + rightBtnH
-	groupTop := titleBarH + modeIndicatorH + (app.topPanelH-groupH)/2
+	groupTop := modeIndicatorH + (app.topPanelH-groupH)/2
 	app.modeDropdown = ui.NewDropdown(panelPad, groupTop, dropdownW, dropdownH, th)
 	app.modeDropdown.Options = []string{"Movement Editor", "Attack Editor"}
 	app.modeDropdown.DisplayText = "Movement Editor"
@@ -285,10 +263,6 @@ func NewEditorApp() *EditorApp {
 	app.navigateToAnim(0)
 
 	app.prevSelectedHurtboxIdx = -1
-
-	if logoImg, err := LoadICO("assets/logo.ico", 16); err == nil && logoImg != nil {
-		app.titleLogo = ebiten.NewImageFromImage(logoImg)
-	}
 
 	return app
 }

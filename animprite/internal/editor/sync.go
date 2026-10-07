@@ -510,14 +510,14 @@ func (a *EditorApp) syncLayout() {
 	w, h := a.win.outsideWidth, a.win.outsideHeight
 	a.computeTopPanelHeight()
 
-	canvasTop := titleBarH + modeIndicatorH + a.topPanelH
+	canvasTop := modeIndicatorH + a.topPanelH
 	a.canvas.X = 0
 	a.canvas.Y = canvasTop
 	a.canvas.Width = w - rightPanelW
 	a.canvas.Height = h - canvasTop - statusbarH
 
 	groupH := dropdownH + btnGap + rightBtnH + btnGap + rightBtnH + btnGap + rightBtnH
-	groupTop := titleBarH + modeIndicatorH + (a.topPanelH-groupH)/2
+	groupTop := modeIndicatorH + (a.topPanelH-groupH)/2
 	a.modeDropdown.Y = groupTop
 
 	btnY0 := groupTop + dropdownH + btnGap
