@@ -50,6 +50,7 @@ type SettingsScene struct {
 	cache     *ui.ImageCache
 	audioMgr  *audio.AudioManager
 	animTitle *AnimatedTitle
+	gemsTitle *AnimatedTitle
 
 	selNav    navTab
 	selMiddle int
@@ -97,13 +98,7 @@ func (s *SettingsScene) Enter() error {
 	s.capturing = false
 	s.showResetDialog = false
 
-	base := s.cache.Get("menu/madokita-gems-title.png")
-	overlay := s.cache.Get("menu/madokita-gems-title-top.png")
-	cosmic := s.cache.Get("menu/cosmic-effect.png")
-	if base != nil {
-		s.animTitle = NewAnimatedTitle(base, overlay, cosmic, s.audioMgr)
-		s.animTitle.Reset()
-	}
+	s.animTitle, s.gemsTitle = newMenuTitles(s.cache, s.audioMgr)
 
 	s.titleY = int(math.Floor(float64(DesignHeight) * TitleYRatio))
 	s.contentY = int(math.Floor(float64(DesignHeight) * ContentYRatio))

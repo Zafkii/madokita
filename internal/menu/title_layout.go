@@ -40,4 +40,10 @@ const (
 	CosmicWobbleY = 0.1
 	CosmicJitterX = 0.25
 	CosmicJitterY = 0.25
+
+	// Gems subtitle, aligned to the right edge of Madokita.
+	GemsTitleScale  = 1.5
+	GemsTitleX      = 888.0
+	GemsTitleY      = 255.0
+	GemsCosmicSpeed = 12.0
 )

@@ -50,6 +50,9 @@ func (s *SettingsScene) Update(dt float64) error {
 	if s.animTitle != nil {
 		s.animTitle.Update(dt)
 	}
+	if s.gemsTitle != nil {
+		s.gemsTitle.Update(dt)
+	}
 
 	mx, my := s.inputMgr.CursorPosition()
 	gw, gh := s.mgr.GameSize()

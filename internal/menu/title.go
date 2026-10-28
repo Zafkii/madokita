@@ -8,6 +8,19 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+type CosmicMotion int
+
+const (
+	CosmicFull CosmicMotion = iota
+	CosmicLeft
+)
+
+type TitleConfig struct {
+	X, Y   float64
+	Scale  float64
+	Motion CosmicMotion
+}
+
 type AnimatedTitle struct {
 	base    *ebiten.Image
 	overlay *ebiten.Image
@@ -23,8 +36,9 @@ type AnimatedTitle struct {
 	maskBuf   *ebiten.Image
 	tintBuf   *ebiten.Image
 
-	cosmicX float64
-	cosmicY float64
+	cosmicX      float64
+	cosmicY      float64
+	cosmicMotion CosmicMotion
 
 	targetR, targetG, targetB, targetA float32
 	lerpFrom, lerpTo                   BorderColor
@@ -38,25 +52,25 @@ type AnimatedTitle struct {
 	lastPos  float64
 }
 
-func NewAnimatedTitle(base, overlay, cosmic *ebiten.Image, audioMgr *audio.AudioManager) *AnimatedTitle {
+func NewAnimatedTitle(base, overlay, cosmic *ebiten.Image, audioMgr *audio.AudioManager, cfg TitleConfig) *AnimatedTitle {
 	b := base.Bounds()
 	nw, nh := b.Dx(), b.Dy()
-
-	sx := (TitleDesignWidth - float64(nw)*TitleBaseScale) / 2
 
 	pix := ebiten.NewImage(1, 1)
 	pix.Fill(color.White)
 
 	t := &AnimatedTitle{
-		base:    base,
-		overlay: overlay,
-		cosmic:  cosmic,
-		pixel:   pix,
-		nw:      nw, nh: nh,
-		screenScale: TitleBaseScale,
-		screenX:     sx,
-		screenY:     TitleY - float64(nh)*TitleBaseScale/2,
-		audioMgr:    audioMgr,
+		base:         base,
+		overlay:      overlay,
+		cosmic:       cosmic,
+		pixel:        pix,
+		nw:           nw,
+		nh:           nh,
+		screenScale:  cfg.Scale,
+		screenX:      cfg.X,
+		screenY:      cfg.Y,
+		cosmicMotion: cfg.Motion,
+		audioMgr:     audioMgr,
 	}
 	t.setColor(BorderCycleColors[len(BorderCycleColors)-1])
 	t.lastPos = -1
@@ -112,9 +126,13 @@ func (a *AnimatedTitle) Update(dt float64) {
 	a.lastPos = pos
 
 	if a.cycleActive {
-		t := pos * 0.00018
-		a.cosmicX += CosmicTravelX*dt + math.Sin(t*0.002)*CosmicWobbleX + math.Cos(t*0.02)*CosmicJitterX
-		a.cosmicY += CosmicTravelY*dt + math.Sin(t*0.002)*CosmicWobbleY + math.Cos(t*0.06)*CosmicJitterY
+		if a.cosmicMotion == CosmicLeft {
+			a.cosmicX -= GemsCosmicSpeed * dt
+		} else {
+			t := pos * 0.00018
+			a.cosmicX += CosmicTravelX*dt + math.Sin(t*0.002)*CosmicWobbleX + math.Cos(t*0.02)*CosmicJitterX
+			a.cosmicY += CosmicTravelY*dt + math.Sin(t*0.002)*CosmicWobbleY + math.Cos(t*0.06)*CosmicJitterY
+		}
 	}
 
 	if pos >= TitleFillStart && !a.cycleActive {

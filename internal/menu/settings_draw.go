@@ -15,6 +15,9 @@ func (s *SettingsScene) Draw(screen *ebiten.Image) {
 	if s.animTitle != nil {
 		s.animTitle.Draw(screen)
 	}
+	if s.gemsTitle != nil {
+		s.gemsTitle.Draw(screen)
+	}
 
 	ui.DrawTextCentered(screen, "Settings",
 		DesignWidth/2, s.titleY, 3.0, color.RGBA{255, 255, 255, 255})

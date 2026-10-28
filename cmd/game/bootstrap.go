@@ -133,6 +133,9 @@ func (b *sceneBootstrap) setupMenuAssets() error {
 	images := []string{
 		"menu/madokita-gems-title.png",
 		"menu/madokita-gems-title-top.png",
+		"menu/gemstitle.png",
+		"menu/gemstop.png",
+		"menu/gemseffect.jpg",
 		"menu/star-title-.png",
 		"menu/star-title-top.png",
 		"menu/prevmenu1.png",

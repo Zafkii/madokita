@@ -27,13 +27,14 @@ type MainMenuScene struct {
 	phase       mainMenuPhase
 	phaseTimer  float64
 	animTitle   *AnimatedTitle
+	gemsTitle   *AnimatedTitle
 	options     []*ui.MenuOption
 	selectedIdx int
 
-	ttsText     string
-	ttsAlive    bool
-	ttsAlpha    float64
-	ttsTimer    float64
+	ttsText  string
+	ttsAlive bool
+	ttsAlpha float64
+	ttsTimer float64
 
 	appearStarted bool
 	appearTimer   float64
@@ -57,13 +58,7 @@ func (s *MainMenuScene) Enter() error {
 	s.selectedIdx = 0
 	s.active = true
 
-	base := s.cache.Get("menu/madokita-gems-title.png")
-	overlay := s.cache.Get("menu/madokita-gems-title-top.png")
-	cosmic := s.cache.Get("menu/cosmic-effect.png")
-	if base != nil {
-		s.animTitle = NewAnimatedTitle(base, overlay, cosmic, s.audioMgr)
-		s.animTitle.Reset()
-	}
+	s.animTitle, s.gemsTitle = newMenuTitles(s.cache, s.audioMgr)
 
 	s.ttsText = localization.Get("MENU.TOUCH_TO_START")
 	s.ttsAlive = true
@@ -127,6 +122,9 @@ func (s *MainMenuScene) Update(dt float64) error {
 	if s.animTitle != nil {
 		s.animTitle.Update(dt)
 	}
+	if s.gemsTitle != nil {
+		s.gemsTitle.Update(dt)
+	}
 
 	mx, my := s.inputMgr.CursorPosition()
 	gw, gh := s.mgr.GameSize()
@@ -182,7 +180,7 @@ func (s *MainMenuScene) Update(dt float64) error {
 				opt.YOffset = 0
 				continue
 			}
-			progress := math.Sin(t/dur * math.Pi / 2)
+			progress := math.Sin(t / dur * math.Pi / 2)
 			opt.Alpha = progress
 			opt.YOffset = -8 * (1 - progress)
 		}
@@ -203,6 +201,9 @@ func (s *MainMenuScene) Draw(screen *ebiten.Image) {
 
 	if s.animTitle != nil {
 		s.animTitle.Draw(screen)
+	}
+	if s.gemsTitle != nil {
+		s.gemsTitle.Draw(screen)
 	}
 
 	switch s.phase {
