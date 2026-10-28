@@ -43,7 +43,7 @@ const (
 
 	// Gems subtitle, aligned to the right edge of Madokita.
 	GemsTitleScale  = 1.5
-	GemsTitleX      = 888.0
-	GemsTitleY      = 255.0
+	GemsTitleX      = 928.0
+	GemsTitleY      = 240.0
 	GemsCosmicSpeed = 12.0
 )
