@@ -106,6 +106,9 @@ type audioEntry struct {
 	lr       *loopReader
 	looping  bool
 	duration time.Duration
+
+	lastPos    time.Duration
+	hasLastPos bool
 }
 
 type AudioManager struct {
@@ -212,9 +215,11 @@ func (a *AudioManager) Play(name string) {
 	if e.looping {
 		e.lr = &loopReader{data: e.data}
 		e.player = a.ctx.NewPlayer(e.lr)
+		e.hasLastPos = false
 	} else {
 		e.tr = &trackedReader{src: bytes.NewReader(e.data)}
 		e.player = a.ctx.NewPlayer(e.tr)
+		e.hasLastPos = false
 	}
 	if vol := a.channelVolumeFor(name); vol >= 0 {
 		e.player.SetVolume(vol)
@@ -232,6 +237,7 @@ func (a *AudioManager) PlayLoop(name string) {
 	}
 	e.lr = &loopReader{data: e.data}
 	e.player = a.ctx.NewPlayer(e.lr)
+	e.hasLastPos = false
 	if vol := a.channelVolumeFor(name); vol >= 0 {
 		e.player.SetVolume(vol)
 	}
@@ -303,13 +309,49 @@ func (a *AudioManager) GetPosition(name string) (time.Duration, bool) {
 	if !ok || e.player == nil {
 		return 0, false
 	}
-	if e.looping && e.lr != nil {
-		return e.lr.currentPos(), true
+
+	var read time.Duration
+	switch {
+	case e.looping && e.lr != nil:
+		read = e.lr.currentPos()
+	case e.tr != nil:
+		read = e.tr.currentPos()
+	default:
+		return 0, false
 	}
-	if e.tr != nil {
-		return e.tr.currentPos(), true
+
+	// oto reads the source ahead in large chunks (0.5 s by default), so the
+	// reader position jumps. Subtract what the player has not sent to the
+	// audio device yet to get the actual playback position, which advances
+	// continuously.
+	buffered := time.Duration(float64(e.player.BufferedSize()) / float64(sampleRate*bytesPerFrame) * float64(time.Second))
+	pos := read - buffered
+
+	if e.looping && e.duration > 0 {
+		sec := math.Mod(pos.Seconds(), e.duration.Seconds())
+		if sec < 0 {
+			sec += e.duration.Seconds()
+		}
+		pos = time.Duration(sec * float64(time.Second))
+	} else if pos < 0 {
+		pos = 0
 	}
-	return 0, false
+
+	// The source position and BufferedSize are read separately, so a buffer
+	// refill can slip between both reads and make the estimate jump
+	// backwards. Keep the reported position monotonic, allowing the
+	// legitimate loop wrap.
+	if e.hasLastPos {
+		wrapped := e.looping && e.duration > 0 &&
+			e.lastPos > e.duration*3/4 && pos < e.duration/4
+		if !wrapped && pos < e.lastPos {
+			pos = e.lastPos
+		}
+	}
+	e.lastPos = pos
+	e.hasLastPos = true
+
+	return pos, true
 }
 
 func (a *AudioManager) GetDuration(name string) (time.Duration, bool) {

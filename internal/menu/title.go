@@ -8,6 +8,33 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+type BorderColor struct {
+	R, G, B, A float32
+}
+
+func titleColor(r, g, b uint8, a float32) BorderColor {
+	return BorderColor{
+		R: float32(r) / 255,
+		G: float32(g) / 255,
+		B: float32(b) / 255,
+		A: a,
+	}
+}
+
+// titleInitialColor is the color shown before the cycle starts.
+var titleInitialColor = titleColor(255, 255, 255, 0.7)
+
+// titleColorOrder is the title color cycle, in playback order.
+// Edit this list to reorder, add, or remove colors: the cycle starts at the
+// initial color and then walks this slice in order, looping forever.
+var titleColorOrder = []BorderColor{
+	titleColor(253, 128, 255, 0.7), // pink
+	titleColor(255, 238, 0, 0.8),   // yellow
+	titleColor(198, 83, 255, 0.7),  // purple
+	titleColor(255, 8, 8, 0.7),     // red
+	titleColor(0, 217, 255, 0.7),   // light blue
+}
+
 type CosmicMotion int
 
 const (
@@ -41,15 +68,10 @@ type AnimatedTitle struct {
 	cosmicMotion CosmicMotion
 
 	targetR, targetG, targetB, targetA float32
-	lerpFrom, lerpTo                   BorderColor
-	lerpT                              float64
-	cycleIdx                           int
-	cycleTimer                         float64
 	cycleActive                        bool
 
 	audioMgr *audio.AudioManager
 	entered  bool
-	lastPos  float64
 }
 
 func NewAnimatedTitle(base, overlay, cosmic *ebiten.Image, audioMgr *audio.AudioManager, cfg TitleConfig) *AnimatedTitle {
@@ -72,26 +94,23 @@ func NewAnimatedTitle(base, overlay, cosmic *ebiten.Image, audioMgr *audio.Audio
 		cosmicMotion: cfg.Motion,
 		audioMgr:     audioMgr,
 	}
-	t.setColor(BorderCycleColors[len(BorderCycleColors)-1])
-	t.lastPos = -1
+	t.setColor(titleInitialColor)
 	return t
 }
 
 func (a *AnimatedTitle) setColor(c BorderColor) {
 	a.targetR, a.targetG, a.targetB, a.targetA = c.R, c.G, c.B, c.A
-	a.lerpFrom, a.lerpTo = c, c
-	a.lerpT = 1
 }
 
 func (a *AnimatedTitle) Reset() {
-	a.cycleActive = false
-	a.cycleTimer = 0
-	a.cycleIdx = 0
-	a.setColor(BorderCycleColors[len(BorderCycleColors)-1])
-	a.cosmicX = 0
-	a.cosmicY = 0
 	a.entered = true
-	a.lastPos = -1
+	// Evaluate the timeline now so the first frame drawn after a scene
+	// switch already has the right state instead of a white flash or a
+	// backward jump of the cosmic texture.
+	pos := a.musicPos()
+	a.cycleActive = pos >= TitleFillStart
+	a.applyCosmicAt(pos)
+	a.applyColorAt(pos)
 }
 
 func (a *AnimatedTitle) musicPos() float64 {
@@ -108,75 +127,77 @@ func (a *AnimatedTitle) musicPos() float64 {
 	return 0
 }
 
-func (a *AnimatedTitle) Update(dt float64) {
+func (a *AnimatedTitle) Update(_ float64) {
 	if !a.entered {
 		return
 	}
 
 	pos := a.musicPos()
-
-	if a.lastPos > 0 && pos < a.lastPos-TrackDuration*0.1 {
-		a.cycleActive = false
-		a.cycleTimer = 0
-		a.cycleIdx = 0
-		a.setColor(BorderCycleColors[len(BorderCycleColors)-1])
-		a.cosmicX = 0
-		a.cosmicY = 0
-	}
-	a.lastPos = pos
-
-	if a.cycleActive {
-		if a.cosmicMotion == CosmicLeft {
-			a.cosmicX -= GemsCosmicSpeed * dt
-		} else {
-			t := pos * 0.00018
-			a.cosmicX += CosmicTravelX*dt + math.Sin(t*0.002)*CosmicWobbleX + math.Cos(t*0.02)*CosmicJitterX
-			a.cosmicY += CosmicTravelY*dt + math.Sin(t*0.002)*CosmicWobbleY + math.Cos(t*0.06)*CosmicJitterY
-		}
-	}
-
-	if pos >= TitleFillStart && !a.cycleActive {
-		a.cycleActive = true
-		a.cycleTimer = 0
-		a.cycleIdx = 0
-		last := len(BorderCycleColors) - 1
-		a.lerpFrom = BorderCycleColors[last]
-		a.lerpTo = BorderCycleColors[0]
-		a.lerpT = 0
-	}
-
-	if a.cycleActive {
-		a.cycleTimer += dt
-		if a.cycleTimer >= CycleInterval && a.lerpT >= 1 {
-			a.cycleTimer -= CycleInterval
-			a.cycleIdx++
-			if a.cycleIdx >= len(BorderCycleColors)-1 {
-				a.cycleIdx = 0
-			}
-			a.startCycle()
-		}
-		if a.lerpT < 1 {
-			a.lerpT += dt / ColorTransitionDur
-			if a.lerpT > 1 {
-				a.lerpT = 1
-			}
-			from, to := a.lerpFrom, a.lerpTo
-			a.targetR = from.R + (to.R-from.R)*float32(a.lerpT)
-			a.targetG = from.G + (to.G-from.G)*float32(a.lerpT)
-			a.targetB = from.B + (to.B-from.B)*float32(a.lerpT)
-			a.targetA = from.A + (to.A-from.A)*float32(a.lerpT)
-		}
-	}
+	a.cycleActive = pos >= TitleFillStart
+	a.applyCosmicAt(pos)
+	a.applyColorAt(pos)
 }
 
-func (a *AnimatedTitle) startCycle() {
-	a.lerpFrom = BorderCycleColors[a.cycleIdx]
-	next := a.cycleIdx + 1
-	if next >= len(BorderCycleColors)-1 {
-		next = 0
+// applyCosmicAt derives the cosmic drift from the music position. The motion
+// used to be accumulated frame by frame, which made the texture jump backwards
+// whenever a scene rebuilt the title. A time-based offset keeps it continuous
+// across scene switches.
+func (a *AnimatedTitle) applyCosmicAt(pos float64) {
+	if pos < TitleFillStart {
+		a.cosmicX = 0
+		a.cosmicY = 0
+		return
 	}
-	a.lerpTo = BorderCycleColors[next]
-	a.lerpT = 0
+
+	active := pos - TitleFillStart
+
+	if a.cosmicMotion == CosmicLeft {
+		a.cosmicX = -GemsCosmicSpeed * active
+		a.cosmicY = 0
+		return
+	}
+
+	// The original motion added the wobble/jitter terms once per frame.
+	// Reference them to 60 FPS so the drift stays frame-rate independent
+	// while keeping the calibrated speed.
+	const refFPS = 60.0
+	t := pos * 0.00018
+	a.cosmicX = active * (CosmicTravelX + refFPS*(math.Sin(t*0.002)*CosmicWobbleX+math.Cos(t*0.02)*CosmicJitterX))
+	a.cosmicY = active * (CosmicTravelY + refFPS*(math.Sin(t*0.002)*CosmicWobbleY+math.Cos(t*0.06)*CosmicJitterY))
+}
+
+// applyColorAt derives the current color from the music position instead of
+// accumulating per-scene state. A title created mid-song (for example when
+// entering Settings and coming back) therefore resumes the exact color on the
+// timeline instead of resetting to the initial white.
+func (a *AnimatedTitle) applyColorAt(pos float64) {
+	if len(titleColorOrder) == 0 || CycleInterval <= 0 || pos < TitleFillStart {
+		a.setColor(titleInitialColor)
+		return
+	}
+
+	n := len(titleColorOrder)
+	elapsed := pos - TitleFillStart
+	step := int(elapsed / CycleInterval)
+	segT := elapsed - float64(step)*CycleInterval
+	to := titleColorOrder[step%n]
+
+	if segT >= ColorTransitionDur {
+		a.setColor(to)
+		return
+	}
+
+	from := titleInitialColor
+	if step > 0 {
+		from = titleColorOrder[(step-1)%n]
+	}
+	t := float32(segT / ColorTransitionDur)
+	a.setColor(BorderColor{
+		R: from.R + (to.R-from.R)*t,
+		G: from.G + (to.G-from.G)*t,
+		B: from.B + (to.B-from.B)*t,
+		A: from.A + (to.A-from.A)*t,
+	})
 }
 
 func (a *AnimatedTitle) ensureBufs() {
