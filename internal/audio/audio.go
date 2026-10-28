@@ -117,6 +117,7 @@ type AudioManager struct {
 	basePath       string
 	channelVolumes map[string]float64
 	entryChannels  map[string]string
+	masterVolume   float64
 }
 
 func NewAudioManager(basePath string, bufferSizeMs int) *AudioManager {
@@ -142,6 +143,7 @@ func NewAudioManager(basePath string, bufferSizeMs int) *AudioManager {
 		basePath:       basePath,
 		channelVolumes: make(map[string]float64),
 		entryChannels:  make(map[string]string),
+		masterVolume:   1,
 	}
 }
 
@@ -253,7 +255,21 @@ func (a *AudioManager) channelVolumeFor(name string) float64 {
 	if !ok {
 		vol = 1.0
 	}
-	return vol
+	return vol * a.masterVolume
+}
+
+// SetMasterVolume sets the global multiplier applied on top of every channel
+// volume. It updates tracks that are already playing.
+func (a *AudioManager) SetMasterVolume(vol float64) {
+	a.masterVolume = math.Max(0, math.Min(1, vol))
+	for name, e := range a.entries {
+		if e.player == nil {
+			continue
+		}
+		if vol := a.channelVolumeFor(name); vol >= 0 {
+			e.player.SetVolume(vol)
+		}
+	}
 }
 
 func (a *AudioManager) Stop(name string) {
@@ -282,7 +298,7 @@ func (a *AudioManager) SetChannelVolume(channel string, vol float64) {
 	for name, ch := range a.entryChannels {
 		if ch == channel {
 			if e, ok := a.entries[name]; ok && e.player != nil {
-				e.player.SetVolume(vol)
+				e.player.SetVolume(vol * a.masterVolume)
 			}
 		}
 	}

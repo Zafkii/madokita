@@ -100,14 +100,14 @@ func NewGameApp() *GameApp {
 	app.runtime.Container().Register("platform", app.platform)
 
 	d0 := settings.GetData()
-	audioMgr.SetChannelVolume("general", d0.VolumeGeneral)
+	audioMgr.SetMasterVolume(d0.VolumeGeneral)
 	audioMgr.SetChannelVolume("music", d0.VolumeMusic)
 	audioMgr.SetChannelVolume("effects", d0.VolumeEffects)
 
 	settings.SetOnApply(func(d settings.Data) {
 		app.pendingData = d
 		app.pendingWindow = true
-		audioMgr.SetChannelVolume("general", d.VolumeGeneral)
+		audioMgr.SetMasterVolume(d.VolumeGeneral)
 		audioMgr.SetChannelVolume("music", d.VolumeMusic)
 		audioMgr.SetChannelVolume("effects", d.VolumeEffects)
 	})
