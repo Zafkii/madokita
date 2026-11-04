@@ -103,6 +103,7 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 	if offset {
 		if justPressed {
 			a.saveSnapshot()
+			a.syncPanelToSelection()
 		}
 		if hbIdx := a.hurtboxTable.SelectedIdx; hbIdx >= 0 {
 			hbp := a.hurtboxList()
@@ -148,6 +149,7 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 		if justPressed {
 			if h := a.canvas.HandleHitTest(mx, my); h >= 0 {
 				a.saveSnapshot()
+				a.syncPanelToSelection()
 				a.scaleHandle = h
 				a.initScaleOrig(h)
 			}

@@ -17,6 +17,7 @@ const (
 )
 
 type scaleOrigData struct {
+	target                   rightPanelMode
 	handleIdx                int
 	anchorWx                 float64
 	anchorWy                 float64

@@ -95,6 +95,12 @@ func (a *EditorApp) Update() error {
 
 func (a *EditorApp) flushInputsToData() {
 	sel := a.spriteTable.SelectedIdx
+	mode := a.panelMode
+	if a.scaleHandle >= 0 {
+		// A drag must keep editing the element it started on, even if the
+		// panel mode changes mid-drag (e.g. the preview advancing frames).
+		mode = a.scaleOrig.target
+	}
 
 	if animIdx := a.animTable.SelectedIdx; animIdx >= 0 && animIdx < len(a.proj.Animations) {
 		anim := &a.proj.Animations[animIdx]
@@ -107,7 +113,7 @@ func (a *EditorApp) flushInputsToData() {
 		anim.Loop = strings.EqualFold(a.loopInput.Text, "true")
 	}
 
-	if a.panelMode == panelModeHurtbox && a.hurtboxTable.SelectedIdx >= 0 {
+	if mode == panelModeHurtbox && a.hurtboxTable.SelectedIdx >= 0 {
 		hbp := a.hurtboxList()
 		if hbp != nil && a.hurtboxTable.SelectedIdx < len(*hbp) {
 			hb := &(*hbp)[a.hurtboxTable.SelectedIdx]
@@ -117,7 +123,7 @@ func (a *EditorApp) flushInputsToData() {
 			hb.Height = a.props[3].NumericValue()
 			hb.Rotation = a.props[4].NumericValue()
 		}
-	} else if a.panelMode == panelModeAnimFrame {
+	} else if mode == panelModeAnimFrame {
 		if !a.prev.previewPlaying {
 			if entry := a.currentFrameSpriteEntry(); entry != nil {
 				entry.OffsetX = a.props[0].NumericValue()

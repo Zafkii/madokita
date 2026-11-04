@@ -54,6 +54,7 @@ func (a *EditorApp) initScaleOrig(h int) {
 	}
 
 	o := &a.scaleOrig
+	o.target = a.panelMode
 	o.handleIdx = h
 	o.anchorWx = cx + alx*cos - aly*sin
 	o.anchorWy = cy + alx*sin + aly*cos
@@ -61,7 +62,7 @@ func (a *EditorApp) initScaleOrig(h int) {
 	o.origH = sel.H
 	o.origRot = sel.Rotation
 
-	switch a.panelMode {
+	switch o.target {
 	case panelModeHurtbox:
 		sx, sy, ox, oy, rotDeg := a.getSpriteTransformForHurtboxSel()
 		o.hbSx, o.hbSy = sx, sy
@@ -100,7 +101,7 @@ func (a *EditorApp) initScaleOrig(h int) {
 func (a *EditorApp) applyHandleScale(mx, my int) {
 	o := &a.scaleOrig
 	if o.pxW <= 0 || o.pxH <= 0 {
-		if a.panelMode == panelModeSprite || a.panelMode == panelModeAnimFrame || a.panelMode == panelModeHitbox {
+		if o.target == panelModeSprite || o.target == panelModeAnimFrame || o.target == panelModeHitbox {
 			return
 		}
 	}
@@ -201,7 +202,7 @@ func (a *EditorApp) applyHandleScale(mx, my int) {
 	a.canvas.Selection.Rotation = o.origRot
 	a.canvas.Selection.Visible = true
 
-	switch a.panelMode {
+	switch o.target {
 	case panelModeHurtbox:
 		hbp := a.hurtboxList()
 		if hbp != nil && a.hurtboxTable.SelectedIdx >= 0 && a.hurtboxTable.SelectedIdx < len(*hbp) {

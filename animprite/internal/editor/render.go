@@ -155,9 +155,10 @@ func (a *EditorApp) buildSpriteRenders() {
 		hbp := a.hurtboxList()
 		if hbp != nil && hbIdx < len(*hbp) {
 			hb := (*hbp)[hbIdx]
-			sx, sy := entry.ScaleX, entry.ScaleY
-			spriteRot := entry.Rotation
-			ox, oy := entry.OffsetX, entry.OffsetY
+			// Hurtboxes render against the frame's first sprite entry
+			// (see buildHurtboxRenders), so the selection must use the same
+			// transform instead of the sprite-selected entry.
+			sx, sy, ox, oy, spriteRot := a.spriteTransformForFrame(activeFrame)
 			rotRad := spriteRot * math.Pi / 180
 			cos := math.Cos(rotRad)
 			sin := math.Sin(rotRad)

@@ -68,11 +68,11 @@ func (a *EditorApp) navigateToHurtbox(hbIdx int) {
 			a.props[0].SetLabel("Offset X")
 			a.props[0].SetNumeric(hb.X)
 			a.props[0].Min = -99999
-			a.props[0].Step = 1
+			a.props[0].Step = 0.01
 			a.props[1].SetLabel("Offset Y")
 			a.props[1].SetNumeric(hb.Y)
 			a.props[1].Min = -99999
-			a.props[1].Step = 1
+			a.props[1].Step = 0.01
 			a.props[2].SetLabel("Scale X")
 			a.props[2].SetNumeric(hb.Width)
 			a.props[2].Min = -99999
@@ -120,6 +120,47 @@ func (a *EditorApp) navigateToHurtbox(hbIdx int) {
 
 	a.prevSelectedHurtboxIdx = a.hurtboxTable.SelectedIdx
 	a.syncLayout()
+}
+
+// canvasSelectionTarget reports which element the canvas selection currently
+// belongs to, using the same priority order as buildSpriteRenders.
+func (a *EditorApp) canvasSelectionTarget() (rightPanelMode, bool) {
+	entry := a.currentFrameSpriteEntry()
+	if hbIdx := a.hurtboxTable.SelectedIdx; hbIdx >= 0 && entry != nil {
+		if hbp := a.hurtboxList(); hbp != nil && hbIdx < len(*hbp) {
+			return panelModeHurtbox, true
+		}
+	}
+	if s := a.spriteTable.SelectedIdx; s >= 0 && s < len(a.proj.Sprites) {
+		return panelModeSprite, true
+	}
+	if entry != nil && a.animTable.SelectedIdx >= 0 &&
+		entry.SpriteIdx >= 0 && entry.SpriteIdx < len(a.proj.Sprites) {
+		return panelModeAnimFrame, true
+	}
+	return 0, false
+}
+
+// syncPanelToSelection aligns the right panel with the selection drawn on the
+// canvas. Without this, a stale panelMode (for example after the preview or a
+// frame change with a hurtbox selected) makes handle drags and the per-frame
+// input flush edit a different element than the one showing handles.
+func (a *EditorApp) syncPanelToSelection() {
+	mode, ok := a.canvasSelectionTarget()
+	if !ok || a.panelMode == mode {
+		return
+	}
+	switch mode {
+	case panelModeHurtbox:
+		a.navigateToHurtbox(a.hurtboxTable.SelectedIdx)
+	case panelModeSprite:
+		a.navigateToSprite(a.spriteTable.SelectedIdx)
+	case panelModeAnimFrame:
+		animIdx := a.animTable.SelectedIdx
+		if animIdx >= 0 && animIdx < len(a.proj.Animations) {
+			a.loadAnimFrameProps(animIdx, a.proj.Animations[animIdx].CurrentIdx)
+		}
+	}
 }
 
 func (a *EditorApp) navigateToHitbox(hbIdx int) {
