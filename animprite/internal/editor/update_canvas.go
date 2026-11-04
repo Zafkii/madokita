@@ -97,8 +97,8 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 	dx := float64(mx - a.prevMouseX)
 	dy := float64(my - a.prevMouseY)
 	ctrl := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
-	shift := ebiten.IsKeyPressed(ebiten.KeyShift)
-	offset := ctrl && shift
+	caps := ebiten.IsKeyPressed(ebiten.KeyCapsLock)
+	offset := caps
 
 	if offset {
 		if justPressed {
