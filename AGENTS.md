@@ -292,9 +292,9 @@ var SayakaMovement = Movement{
 
 ## Spawn System
 
-Each `StageDef` defines `GroundY` (ground line Y) and `SpawnX` (horizontal spawn point). When `GameScene.SetPlayer(p)` is called, it automatically invokes `p.Spawn(stage.SpawnX, stage.GroundY)`. The `Player.Spawn()` method computes `footOffset = FrameSize * (1 - DefaultOriginY) * Scale` and positions the player so feet touch the ground.
+Each `StageDef` defines `GroundY` (logical ground line Y) and `SpawnX` (horizontal spawn point). When `GameScene.SetPlayer(p)` is called, it automatically invokes `p.Spawn(stage.SpawnX, stage.GroundY)`. `Player.Spawn()` places the player's **origin** on the logical ground line (`p.Y = stage.GroundY`) and marks it grounded.
 
-**No manual Y calculation needed.** Never use `p.Y = GroundY - (FrameSize/2)*Scale` — that formula is wrong for characters with a non-0.5 DefaultOriginY. Always let `Spawn()` handle it.
+There is **no automatic visual foot offset**. The game must resolve ground contact through collision boxes (or place the visual floor independently); never derive `p.Y` from `FrameSize`/`DefaultOriginY`.
 
 ## Ebitengine v2 GeoM Caveat
 

@@ -155,11 +155,9 @@ type StageDef struct {
 func (p *Player) Spawn(x, stageGroundY float64) {
     p.X = x
     p.StageGroundY = stageGroundY
-    originY := p.AnimDef.DefaultOriginY // falls back to 0.5
-    footOffset := FrameSize * (1 - originY) * p.Scale
-    p.Y = stageGroundY - footOffset
+    p.Y = stageGroundY
     p.Movement.IsGrounded = true
 }
 ```
 
-`internal/game/scene.go` — `GameScene.SetPlayer(p)` automatically calls `p.Spawn(stage.SpawnX, stage.GroundY)`. Bootstrap code must NOT manually compute Y — the formula `GroundY - (FrameSize/2)*Scale` is wrong for non-0.5 DefaultOriginY characters.
+`internal/game/scene.go` — `GameScene.SetPlayer(p)` automatically calls `p.Spawn(stage.SpawnX, stage.GroundY)`. The player's **origin** is placed on the logical ground line; there is no automatic visual foot offset. Ground contact must be resolved by collision boxes (or by placing the visual floor independently).

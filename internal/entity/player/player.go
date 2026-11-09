@@ -1,13 +1,13 @@
 package player
 
 import (
-	"math"
 	"madokita-gems/internal/animation"
 	"madokita-gems/internal/assets"
 	"madokita-gems/internal/combat"
-	math2 "madokita-gems/internal/math"
 	"madokita-gems/internal/event"
 	"madokita-gems/internal/input"
+	math2 "madokita-gems/internal/math"
+	"math"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -72,12 +72,12 @@ type Player struct {
 
 func New(x, y float64, actor *combat.Actor, inputMgr *input.Manager, bus *event.Bus) *Player {
 	return &Player{
-		X:        x,
-		Y:        y,
-		FlipX:    false,
-		Actor:    actor,
-		Input:    inputMgr,
-		EventBus: bus,
+		X:            x,
+		Y:            y,
+		FlipX:        false,
+		Actor:        actor,
+		Input:        inputMgr,
+		EventBus:     bus,
 		Scale:        0.5,
 		StageGroundY: GroundY,
 		Tracker:      combat.NewTracker(0),
@@ -138,9 +138,11 @@ func (p *Player) Update(dt time.Duration) {
 		p.Movement.yVelocity += p.Movement.gravity * dtSec
 		p.Y += p.Movement.yVelocity * dtSec
 
-		footOffset := p.footHeight() * p.Scale
-		if p.Y+footOffset >= p.StageGroundY {
-			p.Y = p.StageGroundY - footOffset
+		// The player's Y is the logical ground contact. Collision boxes own
+		// the real ground resolution; this clamp keeps the origin on the
+		// stage's ground line until that system exists.
+		if p.Y >= p.StageGroundY {
+			p.Y = p.StageGroundY
 			p.Movement.yVelocity = 0
 			p.Movement.IsGrounded = true
 		}
@@ -318,17 +320,6 @@ func mapAnimToCombatPhase(p animation.AttackPhase) combat.AttackPhase {
 	}
 }
 
-func (p *Player) footHeight() float64 {
-	h := float64(FrameSize)
-	if p.AnimDef == nil {
-		return h * 0.5
-	}
-	if len(p.AnimDef.Sprites) > 0 && p.AnimDef.Sprites[0].FrameH > 0 {
-		h = float64(p.AnimDef.Sprites[0].FrameH)
-	}
-	return h * (1 - p.AnimDef.DefaultOriginY)
-}
-
 func (p *Player) PlayAnim(name string) bool {
 	if p.Animations.Animator == nil {
 		return false
@@ -340,11 +331,14 @@ func (p *Player) PlayAnim(name string) bool {
 	return false
 }
 
+// Spawn places the player's origin on the logical ground line. Visual
+// grounding is intentionally not derived from the animation frame: the game
+// should resolve ground contact with collision boxes (or place the visual
+// floor independently).
 func (p *Player) Spawn(x, stageGroundY float64) {
 	p.X = x
 	p.StageGroundY = stageGroundY
-	footOffset := p.footHeight() * p.Scale
-	p.Y = stageGroundY - footOffset
+	p.Y = stageGroundY
 	p.Movement.yVelocity = 0
 	p.Movement.IsGrounded = true
 }

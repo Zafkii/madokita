@@ -117,7 +117,7 @@ type ProjectData struct {
 - `SetupAnim(def *animation.Movement, am *assets.AssetManager)` — the player holds the AssetManager; there is no pre-sliced frame array anymore
 - `Draw()` iterates `frame.Sprites` and draws `am.GetFrame(def.AssetKey, s.SpriteIdx, s.SpriteFrameIdx)` with the entry's own transform
 - **Origin per sprite**: when the entry's sheet exists in `def.Sprites`, origin = `s.OriginX * sheet.FrameW` / `s.OriginY * sheet.FrameH`; otherwise falls back to `DefaultOriginX/Y * FrameSize`
-- **Footprint**: `footHeight()` uses sheet 0's `FrameH` (fallback `FrameSize` = 256) and `DefaultOriginY`
+- **Logical ground contact**: there is no `footHeight()` visual offset. `Player.Spawn()` places the origin on the logical ground line; ground collision is resolved by collision boxes (or by an independently placed visual floor).
 
 ## Asset Loading
 

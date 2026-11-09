@@ -184,3 +184,39 @@ func TestAttackEndsAfterArmedDuration(t *testing.T) {
 		t.Error("re-attack must be allowed after the attack ended naturally")
 	}
 }
+
+func TestSpawnUsesLogicalGroundLine(t *testing.T) {
+	p := &Player{Scale: 1}
+	p.Spawn(123, 700)
+
+	if p.X != 123 {
+		t.Errorf("X = %v, want 123", p.X)
+	}
+	if p.Y != 700 {
+		t.Errorf("Y = %v, want the logical ground line 700", p.Y)
+	}
+	if p.StageGroundY != 700 {
+		t.Errorf("StageGroundY = %v, want 700", p.StageGroundY)
+	}
+	if !p.Movement.IsGrounded {
+		t.Error("spawned player must start grounded")
+	}
+}
+
+func TestGroundClampUsesPlayerY(t *testing.T) {
+	p := &Player{
+		State:        State{IsControlled: true, IsMovementLocked: true},
+		Movement:     Movement{gravity: 1000, yVelocity: 1000},
+		StageGroundY: 700,
+		Y:            650,
+		Scale:        1,
+	}
+	p.Update(100 * time.Millisecond)
+
+	if p.Y != 700 {
+		t.Errorf("Y = %v, want clamped to 700", p.Y)
+	}
+	if !p.Movement.IsGrounded {
+		t.Error("player must be grounded after reaching the ground line")
+	}
+}
