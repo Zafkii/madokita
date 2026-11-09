@@ -3,7 +3,7 @@ package project
 type FramePhase int
 
 const (
-	PhaseWindup  FramePhase = iota
+	PhaseWindup FramePhase = iota
 	PhaseActive
 	PhaseRecover
 	PhaseArmed
@@ -60,12 +60,12 @@ type SpriteRow struct {
 }
 
 type HurtboxRow struct {
-	X          float64
-	Y          float64
-	Width      float64
-	Height     float64
-	Rotation   float64
-	DmgMult    float64
+	X        float64
+	Y        float64
+	Width    float64
+	Height   float64
+	Rotation float64
+	DmgMult  float64
 }
 
 type HitboxRow struct {
@@ -81,4 +81,5 @@ type ProjectData struct {
 	Animations     []AnimationRow
 	Sprites        []SpriteRow
 	HitDefs        []HitboxRow
+	Stage          StageData
 }

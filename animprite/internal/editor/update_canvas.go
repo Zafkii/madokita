@@ -9,6 +9,11 @@ import (
 )
 
 func (a *EditorApp) handleCanvasWheel(mx, my int, wy float64, ctrl, shift bool) {
+	if a.isStageMode() {
+		a.handleStageCanvasWheel(mx, my, wy, ctrl, shift)
+		return
+	}
+
 	cx, cy2, cw, ch := a.canvas.X, a.canvas.Y, a.canvas.Width, a.canvas.Height
 	if mx >= cx && mx <= cx+cw && my >= cy2 && my <= cy2+ch {
 		switch {
@@ -29,7 +34,7 @@ func (a *EditorApp) handleCanvasWheel(mx, my int, wy float64, ctrl, shift bool) 
 					a.props[2].SetNumeric(hb.Width)
 					a.props[3].SetNumeric(hb.Height)
 				}
-		} else if a.panelMode == panelModeSprite && a.spriteTable.SelectedIdx >= 0 {
+			} else if a.panelMode == panelModeSprite && a.spriteTable.SelectedIdx >= 0 {
 				a.panelMode = panelModeSprite
 				row := &a.proj.Sprites[a.spriteTable.SelectedIdx]
 				row.ScaleX = math.Round((row.ScaleX+wy*0.05)*100) / 100
@@ -82,6 +87,11 @@ func (a *EditorApp) handleCanvasWheel(mx, my int, wy float64, ctrl, shift bool) 
 }
 
 func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
+	if a.isStageMode() {
+		a.handleStageCanvasMouse(mx, my, leftDown, justPressed)
+		return
+	}
+
 	if !leftDown {
 		a.scaleHandle = -1
 	}
@@ -199,6 +209,9 @@ func (a *EditorApp) dispatchWheel(mx, my int, wy float64) {
 		a.wheelChanged = false
 	}
 	if my >= ty && my < ty+a.topPanelH {
+		if a.isStageMode() {
+			return
+		}
 		if !a.handleScrollWheel(mx, my, wy) {
 			tables := []*ui.Table{a.animTable, a.spriteTable, a.hurtboxTable, a.hitboxTable}
 			for _, tbl := range tables {

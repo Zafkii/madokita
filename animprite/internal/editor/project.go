@@ -5,6 +5,15 @@ import "animprite/internal/project"
 const maxUndo = 50
 
 func (a *EditorApp) saveSnapshot() {
+	a.pushSnapshot()
+	a.dirty = true
+}
+
+func (a *EditorApp) saveSnapshotNoDirty() {
+	a.pushSnapshot()
+}
+
+func (a *EditorApp) pushSnapshot() {
 	a.undoStack = append(a.undoStack, project.DeepCopy(&a.proj))
 	if len(a.undoStack) > maxUndo {
 		a.undoStack = a.undoStack[1:]
@@ -37,6 +46,23 @@ func (a *EditorApp) redo() {
 }
 
 func (a *EditorApp) rebuildFromProj() {
+	if a.isStageMode() {
+		if a.proj.Stage.Version == 0 {
+			a.proj.Stage.Version = project.StageVersion
+		}
+		idx := a.st.selectedObj
+		if idx >= len(a.proj.Stage.Objects) {
+			idx = len(a.proj.Stage.Objects) - 1
+		}
+		if idx < 0 {
+			idx = -1
+		}
+		a.setStageCanvasBounds()
+		a.selectStageObject(idx)
+		a.syncLayout()
+		return
+	}
+
 	a.ensureFrameSprites()
 	a.syncAnimBtns()
 	a.syncSpriteBtns()
@@ -73,4 +99,8 @@ func (a *EditorApp) setStatus(msg string) {
 
 func (a *EditorApp) isAttackMode() bool {
 	return a.mode == modeAttack
+}
+
+func (a *EditorApp) isStageMode() bool {
+	return a.mode == modeStage
 }

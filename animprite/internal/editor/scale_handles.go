@@ -95,6 +95,11 @@ func (a *EditorApp) initScaleOrig(h int) {
 			o.pxW = float64(row.Width)
 			o.pxH = float64(row.Height)
 		}
+	case panelModeStage:
+		o.originX = 0.5
+		o.originY = 0.5
+		o.pxW = sel.W
+		o.pxH = sel.H
 	}
 }
 
@@ -260,6 +265,17 @@ func (a *EditorApp) applyHandleScale(mx, my int) {
 			a.props[1].SetNumeric(entry.OffsetY)
 			a.props[3].SetNumeric(entry.ScaleX)
 			a.props[4].SetNumeric(entry.ScaleY)
+		}
+	case panelModeStage:
+		if obj := a.selectedStageObject(); obj != nil {
+			obj.Width = math.Max(1, math.Round(newW*100)/100)
+			obj.Height = math.Max(1, math.Round(newH*100)/100)
+			obj.X = newCx
+			obj.Y = newCy
+			a.props[0].SetNumeric(obj.X)
+			a.props[1].SetNumeric(obj.Y)
+			a.props[2].SetNumeric(obj.Width)
+			a.props[3].SetNumeric(obj.Height)
 		}
 	}
 }

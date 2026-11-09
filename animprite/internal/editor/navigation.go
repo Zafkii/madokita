@@ -125,6 +125,13 @@ func (a *EditorApp) navigateToHurtbox(hbIdx int) {
 // canvasSelectionTarget reports which element the canvas selection currently
 // belongs to, using the same priority order as buildSpriteRenders.
 func (a *EditorApp) canvasSelectionTarget() (rightPanelMode, bool) {
+	if a.isStageMode() {
+		if a.selectedStageObject() != nil {
+			return panelModeStage, true
+		}
+		return 0, false
+	}
+
 	entry := a.currentFrameSpriteEntry()
 	if hbIdx := a.hurtboxTable.SelectedIdx; hbIdx >= 0 && entry != nil {
 		if hbp := a.hurtboxList(); hbp != nil && hbIdx < len(*hbp) {
@@ -160,6 +167,9 @@ func (a *EditorApp) syncPanelToSelection() {
 		if animIdx >= 0 && animIdx < len(a.proj.Animations) {
 			a.loadAnimFrameProps(animIdx, a.proj.Animations[animIdx].CurrentIdx)
 		}
+	case panelModeStage:
+		a.panelMode = panelModeStage
+		a.syncStageInputs()
 	}
 }
 

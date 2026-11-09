@@ -11,6 +11,11 @@ import (
 )
 
 func (a *EditorApp) buildSpriteRenders() {
+	if a.isStageMode() {
+		a.buildStageRenders()
+		return
+	}
+
 	var activeFrame *project.AnimationFrame
 	if a.animTable.SelectedIdx >= 0 && a.animTable.SelectedIdx < len(a.proj.Animations) {
 		anim := &a.proj.Animations[a.animTable.SelectedIdx]
@@ -76,6 +81,7 @@ func (a *EditorApp) buildSpriteRenders() {
 					ScaleY:   sy,
 					OriginX:  orx,
 					OriginY:  ory,
+					Opacity:  1,
 				})
 			} else {
 				renders = append(renders, canvas.SpriteRender{
@@ -88,6 +94,7 @@ func (a *EditorApp) buildSpriteRenders() {
 					OriginY:      ory,
 					PlaceholderW: pw,
 					PlaceholderH: ph,
+					Opacity:      1,
 				})
 			}
 		}
@@ -128,6 +135,7 @@ func (a *EditorApp) buildSpriteRenders() {
 					ScaleY:   row.ScaleY,
 					OriginX:  row.OriginX,
 					OriginY:  row.OriginY,
+					Opacity:  1,
 				})
 			} else {
 				renders = append(renders, canvas.SpriteRender{
@@ -140,6 +148,7 @@ func (a *EditorApp) buildSpriteRenders() {
 					OriginY:      row.OriginY,
 					PlaceholderW: pw,
 					PlaceholderH: ph,
+					Opacity:      1,
 				})
 			}
 		}

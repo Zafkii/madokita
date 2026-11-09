@@ -1,6 +1,9 @@
 package editor
 
 import (
+	"path/filepath"
+	"strings"
+
 	"animprite/internal/project"
 	"animprite/internal/ui"
 )
@@ -89,9 +92,10 @@ func (a *EditorApp) syncAnimBtns() {
 			a.loadAnimFrameProps(i, a.proj.Animations[i].CurrentIdx)
 		}
 		a.animRemoveFrameBtns[i].OnClick = func() {
-			a.saveSnapshot()
+			a.saveSnapshotNoDirty()
 			if len(a.proj.Animations[i].Frames) > 0 {
 				a.proj.Animations[i].Frames = a.proj.Animations[i].Frames[:len(a.proj.Animations[i].Frames)-1]
+				a.dirty = true
 				if a.proj.Animations[i].CurrentIdx >= len(a.proj.Animations[i].Frames) {
 					a.proj.Animations[i].CurrentIdx = max(0, len(a.proj.Animations[i].Frames)-1)
 				}
@@ -102,7 +106,7 @@ func (a *EditorApp) syncAnimBtns() {
 			a.loadAnimFrameProps(i, a.proj.Animations[i].CurrentIdx)
 		}
 		a.animFramePrevBtns[i].OnClick = func() {
-			a.saveSnapshot()
+			a.saveSnapshotNoDirty()
 			a.animTable.SelectedIdx = i
 			if a.proj.Animations[i].CurrentIdx > 0 {
 				a.proj.Animations[i].CurrentIdx--
@@ -112,7 +116,7 @@ func (a *EditorApp) syncAnimBtns() {
 			a.prevSelectedHurtboxIdx = -1
 		}
 		a.animFrameNextBtns[i].OnClick = func() {
-			a.saveSnapshot()
+			a.saveSnapshotNoDirty()
 			a.animTable.SelectedIdx = i
 			if a.proj.Animations[i].CurrentIdx < len(a.proj.Animations[i].Frames)-1 {
 				a.proj.Animations[i].CurrentIdx++
@@ -179,6 +183,15 @@ func (a *EditorApp) syncSpriteBtns() {
 	}
 	for idx := 0; idx < n; idx++ {
 		i := idx
+		if a.proj.Sprites[i].File != "" {
+			ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(a.proj.Sprites[i].File), "."))
+			if ext == "" {
+				ext = "img"
+			}
+			a.spriteBrowseBtns[i].Text = ext
+		} else {
+			a.spriteBrowseBtns[i].Text = "Browse"
+		}
 		a.spriteBrowseBtns[i].OnClick = func() {
 			a.browseSprite(i)
 		}
@@ -191,6 +204,7 @@ func (a *EditorApp) syncSpriteBtns() {
 					if entry != nil {
 						if entry.SpriteFrameIdx > 0 {
 							entry.SpriteFrameIdx--
+							a.dirty = true
 						}
 						a.proj.Sprites[i].CurrentIdx = entry.SpriteFrameIdx
 						a.loadAnimFrameProps(a.animTable.SelectedIdx, anim.CurrentIdx)
@@ -200,6 +214,7 @@ func (a *EditorApp) syncSpriteBtns() {
 			}
 			if a.proj.Sprites[i].CurrentIdx > 0 {
 				a.proj.Sprites[i].CurrentIdx--
+				a.dirty = true
 			}
 		}
 		a.spriteFrameNextBtns[i].OnClick = func() {
@@ -211,6 +226,7 @@ func (a *EditorApp) syncSpriteBtns() {
 					if entry != nil {
 						if entry.SpriteFrameIdx < a.proj.Sprites[i].FrameCount-1 {
 							entry.SpriteFrameIdx++
+							a.dirty = true
 						}
 						a.proj.Sprites[i].CurrentIdx = entry.SpriteFrameIdx
 						a.loadAnimFrameProps(a.animTable.SelectedIdx, anim.CurrentIdx)
@@ -220,6 +236,7 @@ func (a *EditorApp) syncSpriteBtns() {
 			}
 			if a.proj.Sprites[i].CurrentIdx < a.proj.Sprites[i].FrameCount-1 {
 				a.proj.Sprites[i].CurrentIdx++
+				a.dirty = true
 			}
 		}
 		a.spriteWidthInputs[i].SetNumeric(float64(a.proj.Sprites[i].Width))
@@ -268,6 +285,7 @@ func (a *EditorApp) ensureFrameEntry(frame *project.AnimationFrame, spriteIdx in
 		return nil
 	}
 	s := a.proj.Sprites[spriteIdx]
+	a.dirty = true
 	frame.Sprites = append(frame.Sprites, project.FrameSpriteEntry{
 		SpriteIdx:      spriteIdx,
 		SpriteFrameIdx: s.CurrentIdx,
@@ -489,6 +507,11 @@ func (a *EditorApp) recalcSpriteFrameCount(idx int) {
 }
 
 func (a *EditorApp) computeTopPanelHeight() {
+	if a.isStageMode() {
+		a.topPanelH = topPanelMinH
+		return
+	}
+
 	a.animTable.RowCount = len(a.proj.Animations)
 	a.spriteTable.RowCount = len(a.proj.Sprites)
 	hbCount := 0
@@ -516,19 +539,22 @@ func (a *EditorApp) syncLayout() {
 	a.canvas.Width = w - rightPanelW
 	a.canvas.Height = h - canvasTop - statusbarH
 
-	groupH := dropdownH + btnGap + rightBtnH + btnGap + rightBtnH + btnGap + rightBtnH
+	groupH := dropdownH + btnGap + rightBtnH + btnGap + rightBtnH + btnGap + rightBtnH + btnGap + rightBtnH
 	groupTop := modeIndicatorH + (a.topPanelH-groupH)/2
 	a.modeDropdown.Y = groupTop
 
 	btnY0 := groupTop + dropdownH + btnGap
 	btnY1 := btnY0 + rightBtnH + btnGap
 	btnY2 := btnY1 + rightBtnH + btnGap
+	btnY3 := btnY2 + rightBtnH + btnGap
 	a.openBtn.X = panelPad
 	a.openBtn.Y = btnY0
+	a.openDirBtn.X = panelPad
+	a.openDirBtn.Y = btnY1
 	a.saveBtn.X = panelPad
-	a.saveBtn.Y = btnY1
+	a.saveBtn.Y = btnY2
 	a.themeBtn.X = panelPad
-	a.themeBtn.Y = btnY2
+	a.themeBtn.Y = btnY3
 
 	px := w - rightPanelW + rightPanelPad
 	for _, inp := range a.props {
@@ -545,6 +571,10 @@ func (a *EditorApp) syncLayout() {
 		inp.X = px
 	}
 	a.fpsInput.X = px
+	if a.st.opacityInput != nil {
+		a.st.opacityInput.X = px
+	}
+	a.layoutConfirmDialog()
 }
 
 func (a *EditorApp) syncMovementInputs() {

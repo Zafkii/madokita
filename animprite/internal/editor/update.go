@@ -19,6 +19,12 @@ func (a *EditorApp) Update() error {
 	mx, my := ebiten.CursorPosition()
 	justL := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
 
+	if a.confirm.visible {
+		a.updateConfirmDialog(mx, my, justL)
+		a.prevMouseX, a.prevMouseY = mx, my
+		return nil
+	}
+
 	if ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta) {
 		if inpututil.IsKeyJustPressed(ebiten.KeyZ) {
 			if ebiten.IsKeyPressed(ebiten.KeyShift) {
@@ -32,7 +38,18 @@ func (a *EditorApp) Update() error {
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyS) {
 			a.flushInputsToData()
-			if a.currentFilePath != "" {
+			if a.isStageMode() {
+				if a.currentFilePath != "" {
+					if saveErr := a.saveStageFile(a.currentFilePath); saveErr != nil {
+						a.setStatus("Save error: " + saveErr.Error())
+					} else {
+						a.markClean()
+						a.setStatus("Saved: " + a.currentFilePath)
+					}
+				} else {
+					a.saveBtn.OnClick()
+				}
+			} else if a.currentFilePath != "" {
 				var saveErr error
 				if a.mode == modeAttack {
 					saveErr = a.saveAttackFile(a.currentFilePath)
@@ -42,6 +59,7 @@ func (a *EditorApp) Update() error {
 				if saveErr != nil {
 					a.setStatus("Save error: " + saveErr.Error())
 				} else {
+					a.markClean()
 					a.setStatus("Saved: " + a.currentFilePath)
 				}
 			} else {
@@ -65,16 +83,28 @@ func (a *EditorApp) Update() error {
 	popupHit := a.modeDropdown.PopupHit(mx, my)
 	a.themeBtn.HandleMouse(mx, my, justL && !popupHit)
 	a.openBtn.HandleMouse(mx, my, justL && !popupHit)
+	a.openDirBtn.HandleMouse(mx, my, justL && !popupHit)
 	a.saveBtn.HandleMouse(mx, my, justL && !popupHit)
 	a.modeDropdown.HandleMouse(mx, my, justL)
 
+	if a.confirm.visible {
+		a.prevMouseX, a.prevMouseY = mx, my
+		return nil
+	}
+
 	a.handleTopPanelMouse(mx, my, justL)
 	a.handleRightPanelMouse(mx, my, justL)
+	if a.isStageMode() {
+		a.updateStageAssetDrag(mx, my, leftDown)
+	}
 
 	a.handleDragSelect()
 
 	a.handleInputUpdate()
 	a.handleRightPanelKeys()
+	if a.isStageMode() {
+		a.handleStageKeys()
+	}
 
 	a.handleResetView(mx, my, justL)
 
@@ -94,6 +124,31 @@ func (a *EditorApp) Update() error {
 }
 
 func (a *EditorApp) flushInputsToData() {
+	if a.isStageMode() {
+		if a.scaleHandle >= 0 || a.st.draggingObj || a.st.draggingFromPanel {
+			return
+		}
+		obj := a.selectedStageObject()
+		if obj == nil {
+			return
+		}
+		obj.X = a.props[0].NumericValue()
+		obj.Y = a.props[1].NumericValue()
+		obj.Width = a.props[2].NumericValue()
+		if obj.Width < 1 {
+			obj.Width = 1
+		}
+		obj.Height = a.props[3].NumericValue()
+		if obj.Height < 1 {
+			obj.Height = 1
+		}
+		obj.Rotation = a.props[4].NumericValue()
+		if a.st.opacityInput != nil {
+			obj.Opacity = clamp(a.st.opacityInput.NumericValue(), 0, 1)
+		}
+		return
+	}
+
 	sel := a.spriteTable.SelectedIdx
 	mode := a.panelMode
 	if a.scaleHandle >= 0 {
@@ -153,13 +208,41 @@ func (a *EditorApp) handleInputUpdate() {
 	if focused == nil {
 		return
 	}
+	before := focused.Text
 	focused.HandleKeys()
 	if len(runes) > 0 {
 		focused.HandleRunes(runes)
 	}
+	if focused.Text != before && !a.isNavigationInput(focused) {
+		a.dirty = true
+	}
+}
+
+func (a *EditorApp) isNavigationInput(inp *ui.TextInput) bool {
+	for _, nav := range a.animFrameInputs {
+		if nav == inp {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *EditorApp) focusedInput() *ui.TextInput {
+	if a.isStageMode() {
+		if a.selectedStageObject() == nil {
+			return nil
+		}
+		for i := range a.props {
+			if a.props[i].Focused {
+				return a.props[i]
+			}
+		}
+		if a.st.opacityInput != nil && a.st.opacityInput.Focused {
+			return a.st.opacityInput
+		}
+		return nil
+	}
+
 	avs, ave := a.animTable.VisibleRange()
 	for i := avs; i < ave; i++ {
 		if i < len(a.animNameInputs) && a.animNameInputs[i].Focused {
@@ -235,6 +318,18 @@ func (a *EditorApp) focusedInput() *ui.TextInput {
 }
 
 func (a *EditorApp) allInputs() []*ui.TextInput {
+	if a.isStageMode() {
+		if a.selectedStageObject() == nil {
+			return nil
+		}
+		all := make([]*ui.TextInput, 0, len(a.props)+1)
+		all = append(all, a.props[:]...)
+		if a.st.opacityInput != nil {
+			all = append(all, a.st.opacityInput)
+		}
+		return all
+	}
+
 	all := make([]*ui.TextInput, 0, 25)
 	all = append(all, a.props[:]...)
 	all = append(all, a.originInputs[:]...)
@@ -279,6 +374,12 @@ func (a *EditorApp) refreshPanelAfterPreview() {
 
 func (a *EditorApp) advancePreview() {
 	if !a.prev.previewPlaying {
+		return
+	}
+	// Stage mode shares the animation preview's property inputs. Advancing the
+	// preview there would let loadAnimFrameProps overwrite the selected stage
+	// object through flushInputsToData.
+	if a.isStageMode() {
 		return
 	}
 	animIdx := a.animTable.SelectedIdx

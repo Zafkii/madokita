@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"animprite/internal/project"
@@ -23,8 +24,9 @@ func ExportAttack(path string, proj *project.ProjectData) error {
 	fmt.Fprintf(&b, "\tDefaultOriginY: %g,\n", proj.DefaultOriginY)
 	b.WriteString("\tSprites: []SpriteSheetDef{\n")
 	for _, s := range proj.Sprites {
+		file := relativeSpritePath(filepath.Dir(path), s.File)
 		fmt.Fprintf(&b, "\t\t{File: %q, FrameW: %d, FrameH: %d, FrameCount: %d},\n",
-			s.File, s.Width, s.Height, s.FrameCount)
+			file, s.Width, s.Height, s.FrameCount)
 	}
 	b.WriteString("\t},\n")
 	b.WriteString("\tAnimations: map[string]AttackAnimDef{\n")
@@ -100,9 +102,9 @@ func ImportAttack(path string) (*project.ProjectData, error) {
 
 	var assetName string
 	proj := &project.ProjectData{
-		AssetName:      assetName,
-		Animations:     []project.AnimationRow{},
-		Sprites:        []project.SpriteRow{},
+		AssetName:  assetName,
+		Animations: []project.AnimationRow{},
+		Sprites:    []project.SpriteRow{},
 	}
 
 	for _, decl := range f.Decls {
@@ -264,5 +266,3 @@ func phaseFromIdent(name string) project.FramePhase {
 		return project.PhaseWindup
 	}
 }
-
-

@@ -6,6 +6,10 @@ func OpenFile(title, filter string) (string, error) {
 	return openFile(title, filter)
 }
 
+func OpenFolder(title string) (string, error) {
+	return openFolder(title)
+}
+
 func SaveFile(title, filter string) (string, error) {
 	return saveFile(title, filter)
 }

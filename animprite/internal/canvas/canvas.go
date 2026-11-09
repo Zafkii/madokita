@@ -23,6 +23,7 @@ type SpriteRender struct {
 	OriginY      float64
 	PlaceholderW float64
 	PlaceholderH float64
+	Opacity      float64
 }
 
 type SelectionRect struct {
@@ -169,7 +170,11 @@ func (c *Canvas) drawBoundary(screen *ebiten.Image, cam *camera.Camera, p theme.
 
 func (c *Canvas) drawSprites(screen *ebiten.Image, cam *camera.Camera) {
 	for _, s := range c.spriteRenders {
+		opacity := math.Max(0, math.Min(1, s.Opacity))
 		if s.Image != nil {
+			if opacity <= 0 {
+				continue
+			}
 			w := float64(s.Image.Bounds().Dx())
 			h := float64(s.Image.Bounds().Dy())
 			ox := w * s.OriginX
@@ -182,6 +187,7 @@ func (c *Canvas) drawSprites(screen *ebiten.Image, cam *camera.Camera) {
 			op.GeoM.Translate(s.OffsetX, s.OffsetY)
 			op.GeoM.Scale(cam.Zoom, cam.Zoom)
 			op.GeoM.Translate(cam.Width/2+cam.X, cam.Height/2+cam.Y)
+			op.ColorScale.ScaleAlpha(float32(opacity))
 
 			screen.DrawImage(s.Image, op)
 			continue
@@ -194,6 +200,10 @@ func (c *Canvas) drawSprites(screen *ebiten.Image, cam *camera.Camera) {
 }
 
 func (c *Canvas) drawPlaceholderSprite(screen *ebiten.Image, cam *camera.Camera, s SpriteRender) {
+	opacity := math.Max(0, math.Min(1, s.Opacity))
+	if opacity <= 0 {
+		return
+	}
 	w := s.PlaceholderW * s.ScaleX
 	h := s.PlaceholderH * s.ScaleY
 	ox := s.PlaceholderW * s.OriginX * s.ScaleX
@@ -236,7 +246,7 @@ func (c *Canvas) drawPlaceholderSprite(screen *ebiten.Image, cam *camera.Camera,
 
 	// Fill — semi-transparent using drawTriangles
 	fillClr := color.RGBA{100, 100, 200, 60}
-	fillA := float32(fillClr.A) / 255
+	fillA := float32(fillClr.A) / 255 * float32(opacity)
 	verts := [4]ebiten.Vertex{}
 	for i, p := range pts {
 		verts[i] = ebiten.Vertex{
@@ -254,7 +264,7 @@ func (c *Canvas) drawPlaceholderSprite(screen *ebiten.Image, cam *camera.Camera,
 	screen.DrawTriangles(verts[:], indices, c.whitePixel, nil)
 
 	// Dashed outline
-	clr := color.RGBA{120, 120, 200, 255}
+	clr := color.RGBA{120, 120, 200, uint8(255 * opacity)}
 	for i := 0; i < 4; i++ {
 		n := (i + 1) % 4
 		drawDashedLine(screen, float32(pts[i][0]), float32(pts[i][1]),

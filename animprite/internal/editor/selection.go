@@ -38,7 +38,23 @@ func (a *EditorApp) ensureFrameSprites() {
 	}
 }
 
-
+func (a *EditorApp) resetAnimFramePropLabels() {
+	a.props[0].SetLabel("Offset X")
+	a.props[0].Min = -99999
+	a.props[0].Step = 1
+	a.props[1].SetLabel("Offset Y")
+	a.props[1].Min = -99999
+	a.props[1].Step = 1
+	a.props[2].SetLabel("Rotation (°)")
+	a.props[2].Min = -360
+	a.props[2].Step = 0.5
+	a.props[3].SetLabel("Scale X")
+	a.props[3].Min = -99999
+	a.props[3].Step = 0.05
+	a.props[4].SetLabel("Scale Y")
+	a.props[4].Min = -99999
+	a.props[4].Step = 0.05
+}
 
 func (a *EditorApp) loadAnimFrameProps(animIdx, frameIdx int) {
 	if animIdx < 0 || animIdx >= len(a.proj.Animations) {
@@ -47,6 +63,7 @@ func (a *EditorApp) loadAnimFrameProps(animIdx, frameIdx int) {
 	if frameIdx < 0 || frameIdx >= len(a.proj.Animations[animIdx].Frames) {
 		return
 	}
+	a.resetAnimFramePropLabels()
 	a.panelMode = panelModeAnimFrame
 	frame := &a.proj.Animations[animIdx].Frames[frameIdx]
 	if len(frame.Sprites) == 0 {

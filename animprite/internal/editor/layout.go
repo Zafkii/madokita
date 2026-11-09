@@ -8,7 +8,7 @@ const (
 const (
 	modeIndicatorH = 22
 
-	topPanelMinH = 128
+	topPanelMinH = 136
 	topPanelPad  = 6
 	topTableRowH = 22
 	topTableGap  = 4

@@ -40,6 +40,7 @@ func newScaleTestApp() *EditorApp {
 	a.phaseDropdown = ui.NewDropdown(0, 0, 0, 0, th)
 	a.frameSpriteDropdown = ui.NewDropdown(0, 0, 0, 0, th)
 	a.openBtn = ui.NewButton(0, 0, 0, 0, "Open", th)
+	a.openDirBtn = ui.NewButton(0, 0, 0, 0, "Open Dir", th)
 	a.saveBtn = ui.NewButton(0, 0, 0, 0, "Save", th)
 	a.themeBtn = ui.NewButton(0, 0, 0, 0, "Dark", th)
 	a.baseRotInput = ui.NewTextInput(0, 0, 0, 0, th)

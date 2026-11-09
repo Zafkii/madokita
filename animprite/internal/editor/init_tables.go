@@ -67,9 +67,10 @@ func (a *EditorApp) initTables() {
 	delAnimBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
 	delAnimBtn.BtnType = ui.BtnRed
 	delAnimBtn.OnClick = func() {
-		a.saveSnapshot()
+		a.saveSnapshotNoDirty()
 		if idx := a.animTable.SelectedIdx; idx >= 0 && idx < len(a.proj.Animations) {
 			a.proj.Animations = append(a.proj.Animations[:idx], a.proj.Animations[idx+1:]...)
+			a.dirty = true
 			a.syncAnimBtns()
 			a.syncLayout()
 			if a.animTable.SelectedIdx >= 0 {
@@ -263,11 +264,12 @@ func (a *EditorApp) initTables() {
 	addHbBtn.BtnType = ui.BtnBlue
 	addHbBtn.OnClick = func() {
 		a.flushInputsToData()
-		a.saveSnapshot()
+		a.saveSnapshotNoDirty()
 		frame := a.currentFrame()
 		if frame == nil {
 			return
 		}
+		a.dirty = true
 		frame.Hurtboxes = append(frame.Hurtboxes, project.HurtboxRow{Width: 32, Height: 32})
 		a.syncHurtboxBtns()
 		a.navigateToHurtbox(len(frame.Hurtboxes) - 1)
@@ -276,7 +278,7 @@ func (a *EditorApp) initTables() {
 	delHbBtn.BtnType = ui.BtnRed
 	delHbBtn.OnClick = func() {
 		a.flushInputsToData()
-		a.saveSnapshot()
+		a.saveSnapshotNoDirty()
 		idx := a.hurtboxTable.SelectedIdx
 		if idx < 0 {
 			return
@@ -285,6 +287,7 @@ func (a *EditorApp) initTables() {
 		if frame == nil || idx >= len(frame.Hurtboxes) {
 			return
 		}
+		a.dirty = true
 		frame.Hurtboxes = append(frame.Hurtboxes[:idx], frame.Hurtboxes[idx+1:]...)
 		a.syncHurtboxBtns()
 		if idx > 0 {
@@ -297,7 +300,7 @@ func (a *EditorApp) initTables() {
 	}
 	copyHbBtn := ui.NewButton(0, 0, 110, topPanelBtnH, "\U000F04AE Copy Prev", th)
 	copyHbBtn.OnClick = func() {
-		a.saveSnapshot()
+		a.saveSnapshotNoDirty()
 		frame := a.currentFrame()
 		if frame == nil {
 			return
@@ -318,6 +321,7 @@ func (a *EditorApp) initTables() {
 		if len(prev.Hurtboxes) == 0 {
 			return
 		}
+		a.dirty = true
 		frame.Hurtboxes = make([]project.HurtboxRow, len(prev.Hurtboxes))
 		copy(frame.Hurtboxes, prev.Hurtboxes)
 		a.syncHurtboxBtns()
@@ -389,19 +393,21 @@ func (a *EditorApp) initTables() {
 	delHtBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
 	delHtBtn.BtnType = ui.BtnRed
 	delHtBtn.OnClick = func() {
-		a.saveSnapshot()
+		a.saveSnapshotNoDirty()
 		if idx := a.hitboxTable.SelectedIdx; idx >= 0 && idx < len(a.proj.HitDefs) {
 			a.proj.HitDefs = append(a.proj.HitDefs[:idx], a.proj.HitDefs[idx+1:]...)
+			a.dirty = true
 			a.syncHitboxBtns()
 			a.syncLayout()
 		}
 	}
 	copyHtBtn := ui.NewButton(0, 0, 110, topPanelBtnH, "\U000F04AE Copy Prev", th)
 	copyHtBtn.OnClick = func() {
-		a.saveSnapshot()
+		a.saveSnapshotNoDirty()
 		if len(a.proj.HitDefs) >= 2 {
 			last := len(a.proj.HitDefs) - 1
 			a.proj.HitDefs[last] = a.proj.HitDefs[last-1]
+			a.dirty = true
 		}
 	}
 	a.hitboxTable.AddBtn = addHtBtn

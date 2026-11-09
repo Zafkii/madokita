@@ -12,6 +12,10 @@ func (a *EditorApp) handleTopPanelMouse(mx, my int, justL bool) {
 	if my < ty || my >= ty+a.topPanelH {
 		return
 	}
+	if a.isStageMode() {
+		a.handleStageToolbarMouse(mx, my, justL)
+		return
+	}
 
 	ctrl := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
 
@@ -102,6 +106,11 @@ func (a *EditorApp) handleTopPanelMouse(mx, my int, justL bool) {
 }
 
 func (a *EditorApp) handleRightPanelMouse(mx, my int, justL bool) {
+	if a.isStageMode() {
+		a.handleStagePanelMouse(mx, my, justL)
+		return
+	}
+
 	for i := range a.props {
 		a.props[i].HandleMouse(mx, my, justL)
 	}
@@ -142,7 +151,7 @@ func (a *EditorApp) handleRightPanelMouse(mx, my int, justL bool) {
 		my >= a.prev.previewPlusY && my <= a.prev.previewPlusY+btnSize
 
 	if justL {
-		if 		mx >= a.prev.previewPlayX && mx <= a.prev.previewPlayX+28 &&
+		if mx >= a.prev.previewPlayX && mx <= a.prev.previewPlayX+28 &&
 			my >= a.prev.previewPlayY && my <= a.prev.previewPlayY+btnH {
 			a.prev.previewPlaying = !a.prev.previewPlaying
 			if !a.prev.previewPlaying {

@@ -11,10 +11,10 @@ import (
 
 func TestAttackRoundTrip(t *testing.T) {
 	orig := &project.ProjectData{
-		AssetName:       "TestAttack",
-		AssetKey:        "test_attack",
-		DefaultOriginX:  0.506,
-		DefaultOriginY:  0.586,
+		AssetName:      "TestAttack",
+		AssetKey:       "test_attack",
+		DefaultOriginX: 0.506,
+		DefaultOriginY: 0.586,
 		Sprites: []project.SpriteRow{
 			{Name: "base", File: "sprites/players/sayaka_miki/sayaka_miki.png", Width: 256, Height: 256, FrameCount: 25},
 			{Name: "sprite 2", File: "sprites/players/sayaka_miki/weapon.png", Width: 128, Height: 128, FrameCount: 4},

@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -24,8 +25,9 @@ func ExportMovement(path string, proj *project.ProjectData) error {
 	fmt.Fprintf(&b, "\tDefaultOriginY: %g,\n", proj.DefaultOriginY)
 	b.WriteString("\tSprites: []SpriteSheetDef{\n")
 	for _, s := range proj.Sprites {
+		file := relativeSpritePath(filepath.Dir(path), s.File)
 		fmt.Fprintf(&b, "\t\t{File: %q, FrameW: %d, FrameH: %d, FrameCount: %d},\n",
-			s.File, s.Width, s.Height, s.FrameCount)
+			file, s.Width, s.Height, s.FrameCount)
 	}
 	b.WriteString("\t},\n")
 	b.WriteString("\tAnimations: map[string]MovementAnimDef{\n")

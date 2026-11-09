@@ -59,6 +59,7 @@ type EditorApp struct {
 	modeDropdown *ui.Dropdown
 	themeBtn     *ui.Button
 	openBtn      *ui.Button
+	openDirBtn   *ui.Button
 	saveBtn      *ui.Button
 
 	props               [5]*ui.TextInput
@@ -119,7 +120,14 @@ type EditorApp struct {
 	scaleHandle int
 	scaleOrig   scaleOrigData
 
+	st stageState
+
 	currentFilePath string
+
+	dirty         bool
+	confirm       confirmState
+	confirmYesBtn *ui.Button
+	confirmNoBtn  *ui.Button
 
 	undoStack    []project.ProjectData
 	redoStack    []project.ProjectData
@@ -150,10 +158,26 @@ func NewEditorApp() *EditorApp {
 		prevSelectedAnimFrameIdx: -1,
 		spriteEditIdx:            0,
 		loadedSprites:            make(map[int]*ebiten.Image),
+		st: stageState{
+			images:      make(map[string]*ebiten.Image),
+			expanded:    map[string]bool{project.StageCategoryBG: true, project.StageCategoryBlock: true},
+			toolTab:     "build",
+			toolToggles: make(map[string]bool),
+			snap:        true,
+			selectedObj: -1,
+			dragAsset:   -1,
+		},
 	}
 
 	app.win.outsideWidth = DefaultWinW
 	app.win.outsideHeight = DefaultWinH
+
+	app.confirmYesBtn = ui.NewButton(0, 0, 130, 26, "Discard & Open", th)
+	app.confirmYesBtn.BtnType = ui.BtnRed
+	app.confirmYesBtn.OnClick = app.acceptConfirm
+	app.confirmNoBtn = ui.NewButton(0, 0, 130, 26, "Cancel", th)
+	app.confirmNoBtn.BtnType = ui.BtnBlue
+	app.confirmNoBtn.OnClick = app.cancelConfirm
 
 	canvasTop := modeIndicatorH + app.topPanelH
 	app.canvas = canvas.New(
@@ -164,28 +188,32 @@ func NewEditorApp() *EditorApp {
 		th,
 	)
 
-	groupH := dropdownH + btnGap + rightBtnH + btnGap + rightBtnH + btnGap + rightBtnH
+	groupH := dropdownH + btnGap + rightBtnH + btnGap + rightBtnH + btnGap + rightBtnH + btnGap + rightBtnH
 	groupTop := modeIndicatorH + (app.topPanelH-groupH)/2
 	app.modeDropdown = ui.NewDropdown(panelPad, groupTop, dropdownW, dropdownH, th)
-	app.modeDropdown.Options = []string{"Movement Editor", "Attack Editor"}
+	app.modeDropdown.Options = []string{"Movement Editor", "Attack Editor", "Stage Editor"}
 	app.modeDropdown.DisplayText = "Movement Editor"
 	app.modeDropdown.OnChange = func(idx int) {
-		if idx == 0 {
-			app.mode = modeMovement
-			app.modeDropdown.DisplayText = "Movement Editor"
-		} else {
-			app.mode = modeAttack
-			app.modeDropdown.DisplayText = "Attack Editor"
+		switch idx {
+		case 1:
+			app.setEditorMode(modeAttack)
+		case 2:
+			app.setEditorMode(modeStage)
+		default:
+			app.setEditorMode(modeMovement)
 		}
 	}
 
 	btnY0 := groupTop + dropdownH + btnGap
 	btnY1 := btnY0 + rightBtnH + btnGap
 	btnY2 := btnY1 + rightBtnH + btnGap
+	btnY3 := btnY2 + rightBtnH + btnGap
 	app.openBtn = ui.NewButton(panelPad, btnY0, rightBtnW, rightBtnH, "Open", th)
 	app.openBtn.BtnType = ui.BtnOrange
-	app.saveBtn = ui.NewButton(panelPad, btnY1, rightBtnW, rightBtnH, "Save", th)
-	app.themeBtn = ui.NewButton(panelPad, btnY2, rightBtnW, rightBtnH, "Dark", th)
+	app.openDirBtn = ui.NewButton(panelPad, btnY1, rightBtnW, rightBtnH, "Open Dir", th)
+	app.openDirBtn.BtnType = ui.BtnOrange
+	app.saveBtn = ui.NewButton(panelPad, btnY2, rightBtnW, rightBtnH, "Save", th)
+	app.themeBtn = ui.NewButton(panelPad, btnY3, rightBtnW, rightBtnH, "Dark", th)
 
 	app.themeBtn.OnClick = func() {
 		app.th.Toggle()
@@ -198,19 +226,26 @@ func NewEditorApp() *EditorApp {
 
 	app.saveBtn.OnClick = func() {
 		title := "Save Movement"
+		filter := "Go Files\000*.go\000All Files\000*.*"
 		if app.mode == modeAttack {
 			title = "Save Attack"
+		} else if app.mode == modeStage {
+			title = "Save Stage"
+			filter = "Go Files\000*.go\000JSON Files\000*.json\000All Files\000*.*"
 		}
-		path, err := filedialog.SaveFile(title, "Go Files\000*.go\000All Files\000*.*")
+		path, err := filedialog.SaveFile(title, filter)
 		if err != nil {
 			app.setStatus("Save cancelled")
 			return
 		}
 		app.flushInputsToData()
 		var saveErr error
-		if app.mode == modeAttack {
+		switch app.mode {
+		case modeAttack:
 			saveErr = app.saveAttackFile(path)
-		} else {
+		case modeStage:
+			saveErr = app.saveStageFile(path)
+		default:
 			saveErr = app.saveMovementFile(path)
 		}
 		if saveErr != nil {
@@ -218,20 +253,26 @@ func NewEditorApp() *EditorApp {
 			return
 		}
 		app.currentFilePath = path
+		app.markClean()
 		app.setStatus("Saved: " + path)
 	}
 
 	app.openBtn.OnClick = func() {
-		path, err := filedialog.OpenFile("Open File", "Go Files\000*.go\000All Files\000*.*")
+		path, err := filedialog.OpenFile("Open File", "Go Files\000*.go\000JSON Files\000*.json\000All Files\000*.*")
 		if err != nil {
 			app.setStatus("Open cancelled")
 			return
 		}
-		if err := app.openFile(path); err != nil {
-			app.setStatus("Open error: " + err.Error())
+		app.requestOpenFile(path)
+	}
+
+	app.openDirBtn.OnClick = func() {
+		dir, err := filedialog.OpenFolder("Open Project Folder")
+		if err != nil {
+			app.setStatus("Open directory cancelled")
 			return
 		}
-		app.setStatus("Opened: " + path)
+		app.requestOpenFolder(dir)
 	}
 
 	app.proj.AssetName = "MyMovement"
@@ -259,11 +300,13 @@ func NewEditorApp() *EditorApp {
 
 	app.initTables()
 	app.initRightPanelWidgets()
+	app.initStageWidgets()
 	app.syncLayout()
 	app.navigateToAnim(0)
 
 	app.prevSelectedHurtboxIdx = -1
 
+	app.markClean()
 	return app
 }
 
@@ -303,6 +346,7 @@ func (a *EditorApp) initRightPanelWidgets() {
 		if startFrame < 0 {
 			return
 		}
+		a.dirty = true
 		for fi := startFrame; fi < len(anim.Frames); fi++ {
 			anim.Frames[fi].Phase = project.FramePhase(idx)
 		}
@@ -361,4 +405,32 @@ func (a *EditorApp) initRightPanelWidgets() {
 
 	a.prev.previewSpeed = 1.0
 	a.prev.loopChecked = true
+}
+
+func (a *EditorApp) initStageWidgets() {
+	px := DefaultWinW - rightPanelW + rightPanelPad
+	iw := rightPanelInner
+	th := a.th
+
+	opacity := ui.NewTextInput(px, 0, iw, rightPanelInputH, th)
+	opacity.SetLabel("Opacity")
+	opacity.Numeric = true
+	opacity.Min = 0
+	opacity.Max = 1
+	opacity.HasMax = true
+	opacity.Step = 0.05
+	opacity.SetNumeric(1)
+	a.st.opacityInput = opacity
+
+	a.st.deleteBtn = ui.NewButton(0, 0, 1, 22, "Delete", th)
+	a.st.deleteBtn.BtnType = ui.BtnRed
+	a.st.deleteBtn.OnClick = func() {
+		a.deleteSelectedStageObject()
+	}
+
+	a.st.duplicateBtn = ui.NewButton(0, 0, 1, 22, "Duplicate", th)
+	a.st.duplicateBtn.BtnType = ui.BtnBlue
+	a.st.duplicateBtn.OnClick = func() {
+		a.duplicateSelectedStageObject()
+	}
 }

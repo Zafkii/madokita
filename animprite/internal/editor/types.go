@@ -5,6 +5,7 @@ type editorMode int
 const (
 	modeMovement editorMode = iota
 	modeAttack
+	modeStage
 )
 
 type rightPanelMode int
@@ -14,6 +15,7 @@ const (
 	panelModeHurtbox
 	panelModeAnimFrame
 	panelModeHitbox
+	panelModeStage
 )
 
 type scaleOrigData struct {

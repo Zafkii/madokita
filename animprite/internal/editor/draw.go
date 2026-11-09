@@ -20,6 +20,7 @@ func (a *EditorApp) Draw(screen *ebiten.Image) {
 	a.canvas.Draw(screen)
 
 	a.drawRightPanel(screen, p)
+	a.drawConfirmDialog(screen, p)
 }
 
 func (a *EditorApp) drawModeIndicator(screen *ebiten.Image, p theme.Palette) {
@@ -27,6 +28,8 @@ func (a *EditorApp) drawModeIndicator(screen *ebiten.Image, p theme.Palette) {
 	text := "Editing movement frames"
 	if a.isAttackMode() {
 		text = "Editing attack frames"
+	} else if a.isStageMode() {
+		text = "Editing stage layout"
 	}
 	ui.DrawText(screen, text, 12, 4, 0.92, p.TextMuted)
 }
@@ -42,9 +45,15 @@ func (a *EditorApp) drawTopPanel(screen *ebiten.Image, p theme.Palette) {
 
 	a.modeDropdown.Draw(screen)
 	a.openBtn.Draw(screen)
+	a.openDirBtn.Draw(screen)
 	a.saveBtn.Draw(screen)
 	a.themeBtn.Draw(screen)
 	a.modeDropdown.DrawPopup(screen)
+
+	if a.isStageMode() {
+		a.drawStageTopPanelInfo(screen, p)
+		return
+	}
 
 	tgX := a.tableGridX()
 	tgW := a.tableGridW()
@@ -121,15 +130,19 @@ func (a *EditorApp) drawRightPanel(screen *ebiten.Image, p theme.Palette) {
 	px := x + rightPanelPad
 	iy := y + 4 - a.rp.scroll
 
-	iy = a.drawSelectedElementProps(a.rp.buf, p, px, iy)
-	if a.hurtboxTable.SelectedIdx < 0 && a.hitboxTable.SelectedIdx < 0 {
-		iy = a.drawBaseSpriteProps(a.rp.buf, p, px, iy)
+	if a.isStageMode() {
+		iy = a.drawStageRightPanel(a.rp.buf, p, px, iy)
+	} else {
+		iy = a.drawSelectedElementProps(a.rp.buf, p, px, iy)
+		if a.hurtboxTable.SelectedIdx < 0 && a.hitboxTable.SelectedIdx < 0 {
+			iy = a.drawBaseSpriteProps(a.rp.buf, p, px, iy)
+		}
+		if a.animTable.SelectedIdx >= 0 {
+			iy = a.drawFrameSection(a.rp.buf, p, px, iy)
+		}
+		iy = a.drawAnimationSection(a.rp.buf, p, px, iy)
+		iy = a.drawPreviewSection(a.rp.buf, p, px, iy)
 	}
-	if a.animTable.SelectedIdx >= 0 {
-		iy = a.drawFrameSection(a.rp.buf, p, px, iy)
-	}
-	iy = a.drawAnimationSection(a.rp.buf, p, px, iy)
-	iy = a.drawPreviewSection(a.rp.buf, p, px, iy)
 
 	a.rp.contentH = iy - y + a.rp.scroll
 
@@ -316,12 +329,32 @@ func (a *EditorApp) drawPreviewSection(screen *ebiten.Image, p theme.Palette, px
 
 	barW := rightPanelInner
 	barH2 := 8
+	frameLabel := "1 / 0"
+	progress := 0.0
+	if animIdx := a.animTable.SelectedIdx; animIdx >= 0 && animIdx < len(a.proj.Animations) {
+		anim := &a.proj.Animations[animIdx]
+		if n := len(anim.Frames); n > 0 {
+			cur := anim.CurrentIdx
+			if cur < 0 {
+				cur = 0
+			}
+			if cur >= n {
+				cur = n - 1
+			}
+			frameLabel = fmt.Sprintf("%d / %d", cur+1, n)
+			progress = float64(cur+1) / float64(n)
+		}
+	}
 	ui.FillRect(screen, px, iy, barW, barH2, p.InputBG)
 	ui.FillBorder(screen, px, iy, barW, barH2, p.InputBorder)
-	ui.FillRect(screen, px, iy, 1, barH2, p.BtnBlue)
+	fillW := int(float64(barW) * progress)
+	if fillW < 1 {
+		fillW = 1
+	}
+	ui.FillRect(screen, px, iy, fillW, barH2, p.BtnBlue)
 
 	iy += barH2 + 2
-	ui.DrawTextCentered(screen, "1 / 0", px+barW/2, iy, 1, p.TextMuted)
+	ui.DrawTextCentered(screen, frameLabel, px+barW/2, iy, 1, p.TextMuted)
 	return iy
 }
 
