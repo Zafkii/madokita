@@ -10,6 +10,7 @@ import (
 
 func (a *EditorApp) syncAnimBtns() {
 	n := len(a.proj.Animations)
+	a.animTable.RowCount = n
 	for len(a.animNameInputs) < n {
 		inp := ui.NewTextInput(0, 0, 100, topPanelBtnH, a.th)
 		a.animNameInputs = append(a.animNameInputs, inp)
@@ -151,6 +152,7 @@ func (a *EditorApp) syncAnimBtns() {
 
 func (a *EditorApp) syncSpriteBtns() {
 	n := len(a.proj.Sprites)
+	a.spriteTable.RowCount = n
 	for len(a.spriteBrowseBtns) < n {
 		a.spriteBrowseBtns = append(a.spriteBrowseBtns, ui.NewButton(0, 0, 50, topPanelBtnH, "Browse", a.th))
 		a.spriteFramePrevBtns = append(a.spriteFramePrevBtns, ui.NewButton(0, 0, 20, topPanelBtnH, "\U000F04AE", a.th))
@@ -365,6 +367,7 @@ func (a *EditorApp) syncHurtboxBtns() {
 		hbList = *hbListPtr
 	}
 	n := len(hbList)
+	a.hurtboxTable.RowCount = n
 	for len(a.hurtboxXInputs) < n {
 		inp := ui.NewTextInput(0, 0, 50, topPanelBtnH, a.th)
 		inp.Numeric = true
@@ -452,6 +455,7 @@ func (a *EditorApp) syncHurtboxBtns() {
 
 func (a *EditorApp) syncHitboxBtns() {
 	n := len(a.proj.HitDefs)
+	a.hitboxTable.RowCount = n
 	for len(a.hitboxWidthInputs) < n {
 		inp := ui.NewTextInput(0, 0, 50, topPanelBtnH, a.th)
 		inp.Numeric = true

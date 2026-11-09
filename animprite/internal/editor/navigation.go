@@ -86,10 +86,7 @@ func (a *EditorApp) navigateToHurtbox(hbIdx int) {
 			a.props[4].Min = -360
 			a.props[4].Step = 0.5
 		}
-	} else {
-		if a.animTable.SelectedIdx >= 0 && a.animTable.SelectedIdx < len(a.proj.Animations) {
-			return
-		}
+	} else if a.animTable.SelectedIdx < 0 || a.animTable.SelectedIdx >= len(a.proj.Animations) {
 		a.panelMode = panelModeSprite
 		a.props[0].SetLabel("Offset X")
 		a.props[0].Min = -99999
