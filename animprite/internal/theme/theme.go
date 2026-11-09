@@ -8,6 +8,8 @@ type Palette struct {
 	CanvasGridLine       color.Color
 	CanvasGridAxis       color.Color
 	CanvasBoundaryStroke color.Color
+	CanvasRotationGuide  color.Color
+	CanvasRotationHandle color.Color
 
 	// Panels
 	TopPanelBG   color.Color
@@ -63,6 +65,8 @@ var Dark = Palette{
 	CanvasGridLine:       color.RGBA{90, 190, 140, 50},
 	CanvasGridAxis:       color.RGBA{62, 119, 144, 255},
 	CanvasBoundaryStroke: color.RGBA{40, 90, 110, 255},
+	CanvasRotationGuide:  color.RGBA{110, 170, 255, 180},
+	CanvasRotationHandle: color.RGBA{255, 200, 0, 255},
 
 	// Panels
 	TopPanelBG:   color.RGBA{22, 26, 48, 255},
@@ -118,6 +122,8 @@ var Light = Palette{
 	CanvasGridLine:       color.RGBA{180, 190, 200, 255},
 	CanvasGridAxis:       color.RGBA{100, 140, 180, 255},
 	CanvasBoundaryStroke: color.RGBA{120, 140, 160, 255},
+	CanvasRotationGuide:  color.RGBA{40, 90, 150, 160},
+	CanvasRotationHandle: color.RGBA{190, 110, 0, 255},
 
 	// Panels
 	TopPanelBG:   color.RGBA{220, 225, 235, 255},

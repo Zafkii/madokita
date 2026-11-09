@@ -126,6 +126,7 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 	rightDown := ebiten.IsMouseButtonPressed(ebiten.MouseButtonRight)
 	spaceDown := ebiten.IsKeyPressed(ebiten.KeySpace)
 	ctrl := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
+	shift := ebiten.IsKeyPressed(ebiten.KeyShift)
 
 	if a.st.panning {
 		if leftDown || middleDown || rightDown {
@@ -148,6 +149,7 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 
 	if !leftDown {
 		a.scaleHandle = -1
+		a.rotationDrag.active = false
 		a.st.draggingObj = false
 		a.st.dragUndoSaved = false
 		return
@@ -156,11 +158,24 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 		return
 	}
 
+	if a.rotationDrag.active {
+		a.applyRotationDrag(mx, my)
+		return
+	}
+
 	if justPressed {
 		a.clearStageInputFocus()
 		a.st.draggingObj = false
 		a.st.dragUndoSaved = false
 		a.st.panning = false
+
+		if shift && a.canvas.Selection.Visible && a.canvas.RotationHandleHitTest(mx, my) {
+			a.syncPanelToSelection()
+			if a.beginRotationDrag(mx, my) {
+				a.saveSnapshot()
+				return
+			}
+		}
 
 		if ctrl && a.canvas.Selection.Visible {
 			if h := a.canvas.HandleHitTest(mx, my); h >= 0 {

@@ -41,7 +41,11 @@ type HurtboxRender struct {
 	Selected    bool
 }
 
-const handleHitRadius = 8.0
+const (
+	handleHitRadius         = 8.0
+	rotationHandleGap       = 22.0
+	rotationHandleHitRadius = 10.0
+)
 
 type Canvas struct {
 	X, Y, Width, Height int
@@ -51,12 +55,14 @@ type Canvas struct {
 	th                  *theme.Manager
 	drawBuf             *ebiten.Image
 
-	spriteRenders     []SpriteRender
-	Selection         SelectionRect
-	HighlightedHandle int
-	hurtboxRenders    []HurtboxRender
-	whitePixel        *ebiten.Image
-	fillPixel         *ebiten.Image
+	spriteRenders             []SpriteRender
+	Selection                 SelectionRect
+	HighlightedHandle         int
+	RotationHandleVisible     bool
+	HighlightedRotationHandle bool
+	hurtboxRenders            []HurtboxRender
+	whitePixel                *ebiten.Image
+	fillPixel                 *ebiten.Image
 }
 
 func (c *Canvas) SetSpriteRenders(r []SpriteRender) {
@@ -116,6 +122,9 @@ func (c *Canvas) Draw(screen *ebiten.Image) {
 	}
 	if len(c.hurtboxRenders) > 0 {
 		c.drawHurtboxes(c.drawBuf, cam)
+	}
+	if c.Selection.Visible && c.RotationHandleVisible {
+		c.drawRotationGuide(c.drawBuf, p)
 	}
 
 	op := &ebiten.DrawImageOptions{}
@@ -359,6 +368,51 @@ func (c *Canvas) HandleHitTest(mx, my int) int {
 		}
 	}
 	return -1
+}
+
+// RotationGuide returns the canvas-space center, radius, and handle position
+// of the rotation guide for the current selection.
+func (c *Canvas) RotationGuide() (centerX, centerY, radius, handleX, handleY float64, ok bool) {
+	if !c.Selection.Visible {
+		return 0, 0, 0, 0, 0, false
+	}
+	sel := c.Selection
+	cx := sel.X + sel.W/2
+	cy := sel.Y + sel.H/2
+	centerX, centerY = c.Cam.WorldToCanvas(cx, cy)
+	radius = math.Hypot(sel.W*c.Cam.Zoom, sel.H*c.Cam.Zoom)/2 + rotationHandleGap
+	angle := sel.Rotation - math.Pi/2
+	handleX = centerX + radius*math.Cos(angle)
+	handleY = centerY + radius*math.Sin(angle)
+	return centerX, centerY, radius, handleX, handleY, true
+}
+
+func (c *Canvas) RotationHandleHitTest(mx, my int) bool {
+	_, _, _, hx, hy, ok := c.RotationGuide()
+	if !ok {
+		return false
+	}
+	dx := float64(mx-c.X) - hx
+	dy := float64(my-c.Y) - hy
+	return dx*dx+dy*dy <= rotationHandleHitRadius*rotationHandleHitRadius
+}
+
+func (c *Canvas) drawRotationGuide(screen *ebiten.Image, p theme.Palette) {
+	cx, cy, radius, hx, hy, ok := c.RotationGuide()
+	if !ok {
+		return
+	}
+
+	vector.StrokeCircle(screen, float32(cx), float32(cy), float32(radius), 1, p.CanvasRotationGuide, false)
+
+	hR := float32(5)
+	hClr := p.CanvasRotationHandle
+	if c.HighlightedRotationHandle {
+		hR = 7
+		hClr = color.RGBA{255, 255, 255, 255}
+	}
+	vector.DrawFilledCircle(screen, float32(hx), float32(hy), hR+1, color.RGBA{0, 0, 0, 200}, false)
+	vector.DrawFilledCircle(screen, float32(hx), float32(hy), hR, hClr, false)
 }
 
 func strokeLine(screen *ebiten.Image, x1, y1, x2, y2 float32, clr color.Color) {

@@ -94,6 +94,7 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 
 	if !leftDown {
 		a.scaleHandle = -1
+		a.rotationDrag.active = false
 	}
 	if !leftDown {
 		return
@@ -107,8 +108,23 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 	dx := float64(mx - a.prevMouseX)
 	dy := float64(my - a.prevMouseY)
 	ctrl := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
+	shift := ebiten.IsKeyPressed(ebiten.KeyShift)
 	caps := ebiten.IsKeyPressed(ebiten.KeyCapsLock)
 	offset := caps
+
+	if a.rotationDrag.active {
+		a.applyRotationDrag(mx, my)
+		return
+	}
+	if shift && a.canvas.Selection.Visible {
+		if justPressed && a.canvas.RotationHandleHitTest(mx, my) {
+			a.syncPanelToSelection()
+			if a.beginRotationDrag(mx, my) {
+				a.saveSnapshot()
+				return
+			}
+		}
+	}
 
 	if offset {
 		if justPressed {
@@ -176,15 +192,23 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 
 func (a *EditorApp) updateHandleHighlight(mx, my int) {
 	ctrlHeld := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
-	if ctrlHeld && a.canvas.Selection.Visible {
-		cx, cy2, cw, ch := a.canvas.X, a.canvas.Y, a.canvas.Width, a.canvas.Height
-		if mx >= cx && mx <= cx+cw && my >= cy2 && my <= cy2+ch {
-			a.canvas.HighlightedHandle = a.canvas.HandleHitTest(mx, my)
-		} else {
-			a.canvas.HighlightedHandle = -1
-		}
+	shiftHeld := ebiten.IsKeyPressed(ebiten.KeyShift)
+	if !a.canvas.Selection.Visible {
+		a.canvas.HighlightedHandle = -1
+		a.canvas.HighlightedRotationHandle = false
+		return
+	}
+	cx, cy2, cw, ch := a.canvas.X, a.canvas.Y, a.canvas.Width, a.canvas.Height
+	inCanvas := mx >= cx && mx <= cx+cw && my >= cy2 && my <= cy2+ch
+	if ctrlHeld && inCanvas {
+		a.canvas.HighlightedHandle = a.canvas.HandleHitTest(mx, my)
 	} else {
 		a.canvas.HighlightedHandle = -1
+	}
+	if shiftHeld && inCanvas {
+		a.canvas.HighlightedRotationHandle = a.canvas.RotationHandleHitTest(mx, my)
+	} else {
+		a.canvas.HighlightedRotationHandle = false
 	}
 }
 

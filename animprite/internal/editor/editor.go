@@ -117,8 +117,9 @@ type EditorApp struct {
 	prev previewState
 	rp   rightPanelState
 
-	scaleHandle int
-	scaleOrig   scaleOrigData
+	scaleHandle  int
+	scaleOrig    scaleOrigData
+	rotationDrag rotationDragData
 
 	st stageState
 

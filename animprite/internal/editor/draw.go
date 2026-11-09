@@ -17,6 +17,7 @@ func (a *EditorApp) Draw(screen *ebiten.Image) {
 	a.drawStatusbar(screen, p)
 
 	a.buildSpriteRenders()
+	a.canvas.RotationHandleVisible = ebiten.IsKeyPressed(ebiten.KeyShift) || a.rotationDrag.active
 	a.canvas.Draw(screen)
 
 	a.drawRightPanel(screen, p)

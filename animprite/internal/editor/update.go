@@ -156,6 +156,9 @@ func (a *EditorApp) flushInputsToData() {
 		// panel mode changes mid-drag (e.g. the preview advancing frames).
 		mode = a.scaleOrig.target
 	}
+	if a.rotationDrag.active {
+		mode = a.rotationDrag.target
+	}
 
 	if animIdx := a.animTable.SelectedIdx; animIdx >= 0 && animIdx < len(a.proj.Animations) {
 		anim := &a.proj.Animations[animIdx]

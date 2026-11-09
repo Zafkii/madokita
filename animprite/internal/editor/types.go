@@ -36,4 +36,13 @@ type scaleOrigData struct {
 	origOffsetX, origOffsetY float64
 }
 
+type rotationDragData struct {
+	active       bool
+	target       rightPanelMode
+	centerWX     float64
+	centerWY     float64
+	startAngle   float64
+	origRotation float64
+}
+
 var oppositeHandles = [8]int{2, 3, 0, 1, 5, 4, 7, 6}
