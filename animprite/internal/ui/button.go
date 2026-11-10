@@ -39,6 +39,17 @@ func NewButton(x, y, w, h int, text string, th *theme.Manager) *Button {
 	}
 }
 
+// ButtonWidth returns a width that fits text plus horizontal padding.
+// It keeps compact labels such as "+" and "-" from inheriting a wider
+// fixed width.
+func ButtonWidth(text string) int {
+	w := TextWidth(text) + 12
+	if w < 20 {
+		w = 20
+	}
+	return w
+}
+
 func (b *Button) HitTest(cx, cy int) bool {
 	return b.Visible && b.Enabled && cx >= b.X && cx <= b.X+b.W && cy >= b.Y && cy <= b.Y+b.H
 }

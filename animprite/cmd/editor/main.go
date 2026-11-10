@@ -24,6 +24,7 @@ func main() {
 		ebiten.SetWindowPosition(p.WindowX, p.WindowY)
 		ebiten.SetWindowSize(p.WindowW, p.WindowH)
 	}
+	ebiten.SetWindowSizeLimits(editor.MinWinW, editor.MinWinH, -1, -1)
 
 	if err := ebiten.RunGame(app); err != nil && !errors.Is(err, editor.ErrWindowClose) {
 		log.Fatal(err)

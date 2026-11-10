@@ -24,8 +24,8 @@ func (a *EditorApp) syncAnimBtns() {
 		}
 	}
 	for len(a.animAddFrameBtns) < n {
-		a.animAddFrameBtns = append(a.animAddFrameBtns, ui.NewButton(0, 0, 30, topPanelBtnH, "+add", a.th))
-		a.animRemoveFrameBtns = append(a.animRemoveFrameBtns, ui.NewButton(0, 0, 35, topPanelBtnH, "- del", a.th))
+		a.animAddFrameBtns = append(a.animAddFrameBtns, ui.NewButton(0, 0, ui.ButtonWidth("+"), topPanelBtnH, "+", a.th))
+		a.animRemoveFrameBtns = append(a.animRemoveFrameBtns, ui.NewButton(0, 0, ui.ButtonWidth("-"), topPanelBtnH, "-", a.th))
 		a.animFramePrevBtns = append(a.animFramePrevBtns, ui.NewButton(0, 0, 20, topPanelBtnH, "\U000F04AE", a.th))
 		a.animFrameNextBtns = append(a.animFrameNextBtns, ui.NewButton(0, 0, 20, topPanelBtnH, "\U000F04AD", a.th))
 	}

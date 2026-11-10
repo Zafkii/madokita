@@ -136,6 +136,15 @@ type EditorApp struct {
 }
 
 func (a *EditorApp) Layout(w, h int) (int, int) {
+	// Keep the two-column top panel at the width where its fixed controls
+	// fit. If the window manager ignores the size limits, the logical screen
+	// is scaled down instead of letting the columns overlap.
+	if w < MinWinW {
+		w = MinWinW
+	}
+	if h < MinWinH {
+		h = MinWinH
+	}
 	if w != a.win.outsideWidth || h != a.win.outsideHeight {
 		a.win.outsideWidth = w
 		a.win.outsideHeight = h

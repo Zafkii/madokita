@@ -66,7 +66,7 @@ func TestMovementRoundTripPerFrameSprites(t *testing.T) {
 		AssetName:      "TestMulti",
 		AssetKey:       "test_multi",
 		DefaultOriginX: 0.506,
-		DefaultOriginY: 0.586,
+		DefaultOriginY: 0.625,
 		Sprites: []project.SpriteRow{
 			{Name: "base", File: "sprites/players/sayaka_miki/sayaka_miki.png", Width: 256, Height: 256, FrameCount: 25},
 			{Name: "sprite 2", File: "sprites/players/sayaka_miki/weapon.png", Width: 128, Height: 128, FrameCount: 4},
@@ -170,7 +170,7 @@ func TestMovementRoundTrip(t *testing.T) {
 		AssetName:      "TestMovement",
 		AssetKey:       "test_movement",
 		DefaultOriginX: 0.506,
-		DefaultOriginY: 0.586,
+		DefaultOriginY: 0.625,
 		Sprites: []project.SpriteRow{
 			{Name: "Sprite 0", File: "sprites/players/sayaka_miki/sayaka_miki.png", Width: 256, Height: 256, FrameCount: 25},
 			{Name: "Sprite 1", File: "sprites/players/sayaka_miki/weapon.png", Width: 128, Height: 128, FrameCount: 4},

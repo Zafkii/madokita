@@ -171,14 +171,14 @@ import . "madokita-gems/internal/animation"
 var SayakaMovement = Movement{
     AssetKey:       "sayaka_movement",
     DefaultOriginX: 0.506,
-    DefaultOriginY: 0.586,
+    DefaultOriginY: 0.5,
     Sprites: []SpriteSheetDef{
         {File: "sprites/players/sayaka_miki/sayaka_miki.png", FrameW: 256, FrameH: 256, FrameCount: 25},
     },
     Animations: map[string]MovementAnimDef{
         "walk": Anim(10, true,
-            F(S(0, 4, 0, 0, 0, 1, 1, 0.506, 0.586), HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
-            F(S(0, 5, 0, 0, 0, 1, 1, 0.506, 0.586), HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
+            F(S(0, 4, 0, 0, 0, 1, 1, 0.506, 0.5), HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
+            F(S(0, 5, 0, 0, 0, 1, 1, 0.506, 0.5), HB(100, 57, 1, -32.5), HB(52, 130, 1, 61)),
         ),
     },
 }
@@ -187,7 +187,7 @@ var SayakaMovement = Movement{
 Multi-sprite frame (base + weapon rendered together):
 
 ```go
-F(S(0, 4, 0, 0, 0, 1, 1, 0.506, 0.586), S(1, 0, 30, -10, 0, 1, 1, 0.5, 0.5), HB(100, 57, 1, -32.5)),
+F(S(0, 4, 0, 0, 0, 1, 1, 0.506, 0.5), S(1, 0, 30, -10, 0, 1, 1, 0.5, 0.5), HB(100, 57, 1, -32.5)),
 ```
 
 The animprite editor generates exactly this format (`S` with all 9 args) and imports it back — edit data in the editor, never by hand.

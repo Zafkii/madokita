@@ -251,13 +251,13 @@ import . "madokita-gems/internal/animation"
 var SayakaMovement = Movement{
     AssetKey:       "sayaka_movement",
     DefaultOriginX: 0.506,
-    DefaultOriginY: 0.586,
+    DefaultOriginY: 0.5,
     Sprites: []SpriteSheetDef{
         {File: "sprites/players/sayaka_miki/sayaka_miki.png", FrameW: 256, FrameH: 256, FrameCount: 25},
     },
     Animations: map[string]MovementAnimDef{
         "idle": Anim(3, true,
-            F(S(0, 0, 0, 0, 0, 1, 1, 0.506, 0.586), HB(95, 61, 1.5, -32.5), HB(54, 130, 4, 62)),
+            F(S(0, 0, 0, 0, 0, 1, 1, 0.506, 0.5), HB(95, 61, 1.5, -32.5), HB(54, 130, 4, 62)),
         ),
     },
 }

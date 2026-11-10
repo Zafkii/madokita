@@ -171,7 +171,28 @@ func (t *Table) ScrollBy(amount int) {
 func (t *Table) DrawTitleRow(screen *ebiten.Image, p theme.Palette, tx, iy, cw int) int {
 	btnY := iy + (tableTitleH-18)/2
 
-	DrawText(screen, t.Title, tx+4, iy+4, 1.08, p.LabelColor)
+	// Reserve the button strip first so a narrow table truncates its title
+	// instead of drawing the title underneath the controls.
+	titleRight := tx + cw - 2
+	if t.RemoveBtn != nil {
+		titleRight -= t.RemoveBtn.W + tableBtnGap
+	}
+	for _, btn := range t.ExtraBtns {
+		if btn != nil {
+			titleRight -= btn.W + tableBtnGap
+		}
+	}
+	if t.AddBtn != nil {
+		titleRight -= t.AddBtn.W + tableBtnGap
+	}
+	title := t.Title
+	if avail := titleRight - (tx + 4); avail < int(float64(TextWidth(title))*1.08) {
+		if avail < 0 {
+			avail = 0
+		}
+		title = TruncateText(title, int(float64(avail)/1.08))
+	}
+	DrawText(screen, title, tx+4, iy+4, 1.08, p.LabelColor)
 
 	if t.RemoveBtn != nil {
 		t.RemoveBtn.X = tx + cw - 2 - t.RemoveBtn.W

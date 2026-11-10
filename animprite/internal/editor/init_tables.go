@@ -15,22 +15,22 @@ func (a *EditorApp) initTables() {
 
 	a.animTable = ui.NewTable("Animation", []ui.TableColumn{
 		{Label: "Name", Width: 0},
-		{Label: "Frame", Width: 0},
+		{Label: "Frame", Width: animFrameColW},
 	}, 4, th)
 	a.spriteTable = ui.NewTable("Sprite", []ui.TableColumn{
-		{Label: "Grade", Width: 0},
+		{Label: "Grade", Width: spriteNameColW},
 		{Label: "File", Width: 0},
-		{Label: "Width", Width: 0},
-		{Label: "Height", Width: 0},
-		{Label: "Frame", Width: 0},
+		{Label: "W", Width: spriteNumColW},
+		{Label: "H", Width: spriteNumColW},
+		{Label: "Frame", Width: spriteFrameColW},
 	}, 4, th)
 	a.hurtboxTable = ui.NewTable("Hurtbox", []ui.TableColumn{
 		{Label: "No.", Width: 0},
 		{Label: "X", Width: 0},
 		{Label: "Y", Width: 0},
-		{Label: "Width", Width: 0},
-		{Label: "Height", Width: 0},
-		{Label: "dmg-mult", Width: 0},
+		{Label: "W", Width: 0},
+		{Label: "H", Width: 0},
+		{Label: "Dmg", Width: 0},
 	}, 4, th)
 	a.hitboxTable = ui.NewTable("Hitbox", []ui.TableColumn{
 		{Label: "No.", Width: 0},
@@ -39,7 +39,7 @@ func (a *EditorApp) initTables() {
 	}, 4, th)
 
 	// ── Animation table buttons ──
-	addAnimBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "+ Add", th)
+	addAnimBtn := ui.NewButton(0, 0, ui.ButtonWidth("+"), topPanelBtnH, "+", th)
 	addAnimBtn.BtnType = ui.BtnBlue
 	addAnimBtn.OnClick = func() {
 		a.saveSnapshot()
@@ -64,7 +64,7 @@ func (a *EditorApp) initTables() {
 		a.syncLayout()
 		a.navigateToAnim(len(a.proj.Animations) - 1)
 	}
-	delAnimBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
+	delAnimBtn := ui.NewButton(0, 0, ui.ButtonWidth("-"), topPanelBtnH, "-", th)
 	delAnimBtn.BtnType = ui.BtnRed
 	delAnimBtn.OnClick = func() {
 		a.saveSnapshotNoDirty()
@@ -132,7 +132,7 @@ func (a *EditorApp) initTables() {
 	}
 
 	// ── Sprite table buttons ──
-	addSpriteBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "+ Add", th)
+	addSpriteBtn := ui.NewButton(0, 0, ui.ButtonWidth("+"), topPanelBtnH, "+", th)
 	addSpriteBtn.BtnType = ui.BtnBlue
 	addSpriteBtn.OnClick = func() {
 		a.flushInputsToData()
@@ -154,7 +154,7 @@ func (a *EditorApp) initTables() {
 		a.syncSpriteBtns()
 		a.navigateToSprite(newIdx)
 	}
-	delSpriteBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
+	delSpriteBtn := ui.NewButton(0, 0, ui.ButtonWidth("-"), topPanelBtnH, "-", th)
 	delSpriteBtn.BtnType = ui.BtnRed
 	delSpriteBtn.OnClick = func() {
 		a.flushInputsToData()
@@ -211,7 +211,8 @@ func (a *EditorApp) initTables() {
 	a.spriteTable.DrawRow = func(screen *ebiten.Image, p theme.Palette, tx, rowY, cw int, xs []int, idx int) {
 		row := &a.proj.Sprites[idx]
 
-		ui.DrawText(screen, row.Name, tx+xs[0]+2, rowY+4, 1, p.TextPrimary)
+		nameW := xs[1] - xs[0] - 2
+		ui.DrawText(screen, ui.TruncateText(row.Name, nameW), tx+xs[0]+2, rowY+4, 1, p.TextPrimary)
 
 		fileX := tx + xs[1]
 		frameNavY := rowY + (topTableRowH-topPanelBtnH)/2
@@ -260,7 +261,7 @@ func (a *EditorApp) initTables() {
 	}
 
 	// ── Hurtbox table buttons ──
-	addHbBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "+ Add", th)
+	addHbBtn := ui.NewButton(0, 0, ui.ButtonWidth("+"), topPanelBtnH, "+", th)
 	addHbBtn.BtnType = ui.BtnBlue
 	addHbBtn.OnClick = func() {
 		a.flushInputsToData()
@@ -274,7 +275,7 @@ func (a *EditorApp) initTables() {
 		a.syncHurtboxBtns()
 		a.navigateToHurtbox(len(frame.Hurtboxes) - 1)
 	}
-	delHbBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
+	delHbBtn := ui.NewButton(0, 0, ui.ButtonWidth("-"), topPanelBtnH, "-", th)
 	delHbBtn.BtnType = ui.BtnRed
 	delHbBtn.OnClick = func() {
 		a.flushInputsToData()
@@ -298,7 +299,7 @@ func (a *EditorApp) initTables() {
 			a.navigateToHurtbox(-1)
 		}
 	}
-	copyHbBtn := ui.NewButton(0, 0, 110, topPanelBtnH, "\U000F04AE Copy Prev", th)
+	copyHbBtn := ui.NewButton(0, 0, ui.ButtonWidth("\U000F04AE Copy Prev"), topPanelBtnH, "\U000F04AE Copy Prev", th)
 	copyHbBtn.OnClick = func() {
 		a.saveSnapshotNoDirty()
 		frame := a.currentFrame()
@@ -382,7 +383,7 @@ func (a *EditorApp) initTables() {
 	}
 
 	// ── Hitbox table buttons ──
-	addHtBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "+ Add", th)
+	addHtBtn := ui.NewButton(0, 0, ui.ButtonWidth("+"), topPanelBtnH, "+", th)
 	addHtBtn.BtnType = ui.BtnBlue
 	addHtBtn.OnClick = func() {
 		a.saveSnapshot()
@@ -390,7 +391,7 @@ func (a *EditorApp) initTables() {
 		a.syncHitboxBtns()
 		a.syncLayout()
 	}
-	delHtBtn := ui.NewButton(0, 0, 40, topPanelBtnH, "- Del", th)
+	delHtBtn := ui.NewButton(0, 0, ui.ButtonWidth("-"), topPanelBtnH, "-", th)
 	delHtBtn.BtnType = ui.BtnRed
 	delHtBtn.OnClick = func() {
 		a.saveSnapshotNoDirty()
@@ -401,7 +402,7 @@ func (a *EditorApp) initTables() {
 			a.syncLayout()
 		}
 	}
-	copyHtBtn := ui.NewButton(0, 0, 110, topPanelBtnH, "\U000F04AE Copy Prev", th)
+	copyHtBtn := ui.NewButton(0, 0, ui.ButtonWidth("\U000F04AE Copy Prev"), topPanelBtnH, "\U000F04AE Copy Prev", th)
 	copyHtBtn.OnClick = func() {
 		a.saveSnapshotNoDirty()
 		if len(a.proj.HitDefs) >= 2 {
