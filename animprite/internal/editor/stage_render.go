@@ -7,6 +7,8 @@ import (
 	"animprite/internal/project"
 )
 
+const stageInactiveLayerOpacity = 0.25
+
 func (a *EditorApp) buildStageRenders() {
 	stage := &a.proj.Stage
 	if len(stage.Layers) == 0 {
@@ -27,7 +29,7 @@ func (a *EditorApp) buildStageRenders() {
 				if isBlock != wantBlock {
 					continue
 				}
-				renders = append(renders, a.stageObjectRender(obj, obj.Opacity))
+				renders = append(renders, a.stageObjectRender(obj, a.stageObjectOpacity(obj)))
 			}
 		}
 	}
@@ -82,6 +84,14 @@ func (a *EditorApp) buildStageRenders() {
 		return
 	}
 	a.canvas.SetSelectionRect(canvas.SelectionRect{Visible: false})
+}
+
+func (a *EditorApp) stageObjectOpacity(obj *project.StageObject) float64 {
+	opacity := obj.Opacity
+	if a.st.activeLayer != "" && a.proj.Stage.LayerNameFor(*obj) != a.st.activeLayer {
+		opacity *= stageInactiveLayerOpacity
+	}
+	return clamp(opacity, 0, 1)
 }
 
 func (a *EditorApp) stageObjectRender(obj *project.StageObject, opacity float64) canvas.SpriteRender {

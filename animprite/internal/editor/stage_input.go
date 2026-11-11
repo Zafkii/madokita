@@ -138,7 +138,11 @@ func (a *EditorApp) handleStagePanelMouse(mx, my int, justL bool) {
 	for _, row := range a.st.layerRects {
 		if mx >= row.X && mx <= row.X+row.W && my >= row.Y && my <= row.Y+row.H {
 			a.clearStageInputFocus()
-			a.setActiveStageLayer(row.Index)
+			if row.Index < 0 {
+				a.setGeneralStageView()
+			} else {
+				a.setActiveStageLayer(row.Index)
+			}
 			return
 		}
 	}

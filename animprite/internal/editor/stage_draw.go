@@ -355,11 +355,16 @@ func (a *EditorApp) drawStageLayers(screen *ebiten.Image, p theme.Palette, px, i
 	a.st.layerRects = a.st.layerRects[:0]
 	mx, my := ebiten.CursorPosition()
 	iy = a.drawSectionHeader(screen, p, px, iy, "Layers")
-	ui.DrawText(screen, "Top renders in front. Click to activate.", px, iy, 1, p.TextMuted)
-	iy += 16
 
 	a.ensureActiveStageLayer()
 	activeIdx := a.activeStageLayerIndex()
+	general := a.st.activeLayer == ""
+	if general {
+		ui.DrawText(screen, "All layers visible. New objects: "+a.stageWriteLayer(), px, iy, 1, p.TextMuted)
+	} else {
+		ui.DrawText(screen, "Others dimmed. Top renders in front.", px, iy, 1, p.TextMuted)
+	}
+	iy += 16
 
 	if a.st.layerAddBtn != nil && a.st.layerDeleteBtn != nil && a.st.layerUpBtn != nil && a.st.layerDownBtn != nil {
 		buttons := []*ui.Button{a.st.layerAddBtn, a.st.layerDeleteBtn, a.st.layerUpBtn, a.st.layerDownBtn}
@@ -367,9 +372,9 @@ func (a *EditorApp) drawStageLayers(screen *ebiten.Image, p theme.Palette, px, i
 		a.st.layerDeleteBtn.Visible = true
 		a.st.layerUpBtn.Visible = true
 		a.st.layerDownBtn.Visible = true
-		a.st.layerDeleteBtn.Enabled = activeIdx >= 0 && len(a.proj.Stage.Layers) > 1
-		a.st.layerUpBtn.Enabled = activeIdx >= 0 && activeIdx < len(a.proj.Stage.Layers)-1
-		a.st.layerDownBtn.Enabled = activeIdx > 0
+		a.st.layerDeleteBtn.Enabled = !general && len(a.proj.Stage.Layers) > 1
+		a.st.layerUpBtn.Enabled = !general && activeIdx < len(a.proj.Stage.Layers)-1
+		a.st.layerDownBtn.Enabled = !general && activeIdx > 0
 
 		x := px
 		for _, btn := range buttons {
@@ -388,30 +393,37 @@ func (a *EditorApp) drawStageLayers(screen *ebiten.Image, p theme.Palette, px, i
 		return iy + 22
 	}
 
-	for idx := len(a.proj.Stage.Layers) - 1; idx >= 0; idx-- {
-		layer := a.proj.Stage.Layers[idx]
+	drawRow := func(index int, label string, active bool, hovered bool) {
 		rowY := iy
-		hovered := mx >= px && mx <= px+rightPanelInner && my >= rowY && my <= rowY+18
-		if idx == activeIdx {
+		if active {
 			ui.FillRect(screen, px, rowY, rightPanelInner, 18, p.BtnBlue)
 		} else if hovered {
 			ui.FillRect(screen, px, rowY, rightPanelInner, 18, p.BtnHover)
 		}
 		ui.FillBorder(screen, px, rowY, rightPanelInner, 18, p.InputBorder)
+		textClr := p.TextPrimary
+		if active {
+			textClr = p.ButtonText
+		}
+		ui.DrawText(screen, ui.TruncateText(label, rightPanelInner-8), px+4, rowY+2, 1, textClr)
+		a.st.layerRects = append(a.st.layerRects, stageLayerRect{Index: index, X: px, Y: rowY, W: rightPanelInner, H: 18})
+		iy += 20
+	}
+
+	generalHovered := mx >= px && mx <= px+rightPanelInner && my >= iy && my <= iy+18
+	drawRow(-1, fmt.Sprintf("General  (%d)", len(a.proj.Stage.Objects)), general, generalHovered)
+
+	for idx := len(a.proj.Stage.Layers) - 1; idx >= 0; idx-- {
+		layer := a.proj.Stage.Layers[idx]
+		rowY := iy
+		hovered := mx >= px && mx <= px+rightPanelInner && my >= rowY && my <= rowY+18
 		count := 0
 		for _, obj := range a.proj.Stage.Objects {
 			if a.proj.Stage.LayerNameFor(obj) == layer.Name {
 				count++
 			}
 		}
-		label := fmt.Sprintf("%s  (%d)", layer.Name, count)
-		textClr := p.TextPrimary
-		if idx == activeIdx {
-			textClr = p.ButtonText
-		}
-		ui.DrawText(screen, ui.TruncateText(label, rightPanelInner-8), px+4, rowY+2, 1, textClr)
-		a.st.layerRects = append(a.st.layerRects, stageLayerRect{Index: idx, X: px, Y: rowY, W: rightPanelInner, H: 18})
-		iy += 20
+		drawRow(idx, fmt.Sprintf("%s  (%d)", layer.Name, count), !general && idx == activeIdx, hovered)
 	}
 	return iy + 4
 }

@@ -969,3 +969,55 @@ func TestStageClickUsesTopLayer(t *testing.T) {
 		t.Fatalf("hit object = %d, want top-layer object 1", got)
 	}
 }
+
+func TestStageLayerFocusDimsOtherLayers(t *testing.T) {
+	app := newStageObjectApp(2)
+	app.proj.Stage.Layers = []project.StageLayer{{Name: "Back"}, {Name: "Front"}}
+	app.proj.Stage.Objects[0].Layer = "Back"
+	app.proj.Stage.Objects[1].Layer = "Front"
+
+	app.setActiveStageLayer(1)
+
+	if got := app.stageObjectOpacity(&app.proj.Stage.Objects[0]); got != stageInactiveLayerOpacity {
+		t.Fatalf("back opacity = %g, want %g", got, stageInactiveLayerOpacity)
+	}
+	if got := app.stageObjectOpacity(&app.proj.Stage.Objects[1]); got != 1 {
+		t.Fatalf("front opacity = %g, want 1", got)
+	}
+
+	app.setGeneralStageView()
+
+	for i := range app.proj.Stage.Objects {
+		if got := app.stageObjectOpacity(&app.proj.Stage.Objects[i]); got != 1 {
+			t.Fatalf("object %d opacity = %g in General, want 1", i, got)
+		}
+	}
+	if app.st.activeLayer != "" {
+		t.Fatalf("active layer = %q after General, want empty", app.st.activeLayer)
+	}
+}
+
+func TestGeneralViewAddsToTopLayerAndStaysGeneral(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.proj.Stage.Layers = []project.StageLayer{{Name: "Back"}, {Name: "Front"}}
+	app.proj.Stage.Assets = []project.StageAsset{{
+		Category: project.StageCategoryBlock,
+		Name:     "block",
+		File:     "block.png",
+		Width:    50,
+		Height:   50,
+	}}
+	app.st.activeLayer = ""
+
+	app.addStageObjectFromAsset(0, 100, 100)
+
+	if len(app.proj.Stage.Objects) != 1 {
+		t.Fatalf("objects = %d, want 1", len(app.proj.Stage.Objects))
+	}
+	if got := app.proj.Stage.Objects[0].Layer; got != "Front" {
+		t.Fatalf("new object layer = %q, want Front", got)
+	}
+	if app.st.activeLayer != "" {
+		t.Fatalf("active layer = %q after adding in General, want General", app.st.activeLayer)
+	}
+}

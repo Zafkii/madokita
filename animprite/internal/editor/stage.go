@@ -117,8 +117,8 @@ func (a *EditorApp) ensureStageMode() {
 		a.proj.Stage.Objects = []project.StageObject{}
 	}
 	a.proj.Stage.NormalizeLayers()
-	if a.proj.Stage.LayerIndex(a.st.activeLayer) < 0 {
-		a.st.activeLayer = a.proj.Stage.Layers[len(a.proj.Stage.Layers)-1].Name
+	if a.st.activeLayer != "" && a.proj.Stage.LayerIndex(a.st.activeLayer) < 0 {
+		a.st.activeLayer = ""
 	}
 	if a.st.images == nil {
 		a.st.images = make(map[string]*ebiten.Image)
@@ -443,7 +443,7 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 
 	a.clearStageImages()
 	a.proj.Stage = stage
-	a.st.activeLayer = stage.Layers[len(stage.Layers)-1].Name
+	a.st.activeLayer = ""
 	a.currentFilePath = path
 	a.undoStack = nil
 	a.redoStack = nil
@@ -565,9 +565,10 @@ func (a *EditorApp) addStageObjectFromAsset(assetIdx int, wx, wy float64) {
 	wx, wy = snapStagePosition(wx, wy, w, h, a.st.snap)
 
 	a.saveSnapshot()
-	a.ensureActiveStageLayer()
+	general := a.st.activeLayer == ""
+	layer := a.stageWriteLayer()
 	a.proj.Stage.Objects = append(a.proj.Stage.Objects, project.StageObject{
-		Layer:    a.st.activeLayer,
+		Layer:    layer,
 		Category: asset.Category,
 		File:     asset.File,
 		X:        wx,
@@ -578,7 +579,10 @@ func (a *EditorApp) addStageObjectFromAsset(assetIdx int, wx, wy float64) {
 		Opacity:  1,
 	})
 	a.selectStageObject(len(a.proj.Stage.Objects) - 1)
-	a.setStatus("Added " + asset.Name)
+	if general {
+		a.st.activeLayer = ""
+	}
+	a.setStatus("Added " + asset.Name + " to " + layer)
 }
 
 // snapStagePosition snaps an object's top-left corner to the 50px world grid.
@@ -1013,11 +1017,24 @@ func (a *EditorApp) ensureActiveStageLayer() {
 	if len(a.proj.Stage.Layers) == 0 {
 		a.proj.Stage.NormalizeLayers()
 	}
-	if a.proj.Stage.LayerIndex(a.st.activeLayer) >= 0 {
+	if a.st.activeLayer == "" || a.proj.Stage.LayerIndex(a.st.activeLayer) >= 0 {
 		return
 	}
 	a.proj.Stage.NormalizeLayers()
-	a.st.activeLayer = a.proj.Stage.Layers[len(a.proj.Stage.Layers)-1].Name
+	a.st.activeLayer = ""
+}
+
+// stageWriteLayer is the layer that receives new objects. The General view
+// shows every layer; while it is active, new objects go to the top layer.
+func (a *EditorApp) stageWriteLayer() string {
+	a.ensureActiveStageLayer()
+	if a.st.activeLayer != "" {
+		return a.st.activeLayer
+	}
+	if len(a.proj.Stage.Layers) == 0 {
+		a.proj.Stage.NormalizeLayers()
+	}
+	return a.proj.Stage.Layers[len(a.proj.Stage.Layers)-1].Name
 }
 
 func (a *EditorApp) activeStageLayerIndex() int {
@@ -1038,6 +1055,12 @@ func (a *EditorApp) setActiveStageLayer(idx int) {
 	a.st.activeLayer = name
 	a.selectStageObject(-1)
 	a.setStatus("Active layer: " + name)
+}
+
+func (a *EditorApp) setGeneralStageView() {
+	a.st.activeLayer = ""
+	a.selectStageObject(-1)
+	a.setStatus("General view: all layers visible")
 }
 
 func (a *EditorApp) nextStageLayerName() string {
@@ -1063,6 +1086,10 @@ func (a *EditorApp) addStageLayer() {
 
 func (a *EditorApp) deleteActiveStageLayer() {
 	a.ensureActiveStageLayer()
+	if a.st.activeLayer == "" {
+		a.setStatus("Select a layer first")
+		return
+	}
 	idx := a.activeStageLayerIndex()
 	if idx < 0 || len(a.proj.Stage.Layers) <= 1 {
 		a.setStatus("Cannot delete the only layer")
