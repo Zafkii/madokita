@@ -178,6 +178,12 @@ func TestSaveStageFileUsesRelativePaths(t *testing.T) {
 	if saved.Objects[0].File != "assets/block_grassfloor.png" {
 		t.Fatalf("object path = %q, want assets/block_grassfloor.png", saved.Objects[0].File)
 	}
+	if len(saved.Layers) != 1 || saved.Layers[0].Name != project.DefaultStageLayer {
+		t.Fatalf("saved layers = %+v, want default layer", saved.Layers)
+	}
+	if saved.Objects[0].Layer != project.DefaultStageLayer {
+		t.Fatalf("object layer = %q, want %q", saved.Objects[0].Layer, project.DefaultStageLayer)
+	}
 
 	// Saving must not mutate the in-memory project paths.
 	if app.proj.Stage.Assets[0].File != assetPath {
@@ -248,6 +254,12 @@ func TestExportImportStageGo(t *testing.T) {
 	}
 	if saved.Objects[0].Width != 50 || saved.Objects[0].Height != 50 {
 		t.Fatalf("saved object size = %gx%g, want 50x50", saved.Objects[0].Width, saved.Objects[0].Height)
+	}
+	if len(saved.Layers) != 1 || saved.Layers[0].Name != project.DefaultStageLayer {
+		t.Fatalf("saved layers = %+v, want default layer", saved.Layers)
+	}
+	if saved.Objects[0].Layer != project.DefaultStageLayer {
+		t.Fatalf("saved object layer = %q, want %q", saved.Objects[0].Layer, project.DefaultStageLayer)
 	}
 }
 
@@ -390,7 +402,7 @@ func TestStageInfoAutoReturnsToEditAfterIdle(t *testing.T) {
 	}
 }
 
-func TestStageInfoAutoReturnsWhilePropertyFocusedIdle(t *testing.T) {
+func TestStageInfoStaysWhilePropertyFocused(t *testing.T) {
 	app := NewEditorApp()
 	app.mode = modeStage
 	app.proj.Stage = project.NewStageData("Stage1")
@@ -407,11 +419,17 @@ func TestStageInfoAutoReturnsWhilePropertyFocusedIdle(t *testing.T) {
 	app.st.toolInfoHold = 1
 
 	app.tickStageInfoAuto()
-	if app.st.toolTab != "edit" {
-		t.Fatalf("toolTab = %q while property focused but idle, want edit", app.st.toolTab)
+	if app.st.toolTab != "info" {
+		t.Fatalf("toolTab = %q while property focused, want info", app.st.toolTab)
 	}
-	if app.st.toolInfoAuto {
-		t.Fatal("toolInfoAuto = true after idle property focus, want false")
+	if !app.st.toolInfoAuto {
+		t.Fatal("toolInfoAuto = false while property focused, want true")
+	}
+
+	app.props[0].Focused = false
+	app.tickStageInfoAuto()
+	if app.st.toolTab != "edit" {
+		t.Fatalf("toolTab = %q after focus lost, want edit", app.st.toolTab)
 	}
 }
 
@@ -807,5 +825,147 @@ func TestStageDragReturnsToStartingCellWithinSameDrag(t *testing.T) {
 	app.applyStageObjectDrag(125, 125)
 	if obj.X != 125 || obj.Y != 125 {
 		t.Fatalf("object did not return to starting cell within one drag: (%g,%g)", obj.X, obj.Y)
+	}
+}
+
+func TestStageNormalizeLayersMigratesFlatObjects(t *testing.T) {
+	stage := project.NewStageData("Legacy")
+	stage.Layers = nil
+	stage.Objects = []project.StageObject{
+		{Category: project.StageCategoryBG, File: "bg.png"},
+		{Category: project.StageCategoryBlock, File: "block.png"},
+	}
+
+	stage.NormalizeLayers()
+
+	if len(stage.Layers) != 1 || stage.Layers[0].Name != project.DefaultStageLayer {
+		t.Fatalf("layers = %+v, want one default layer", stage.Layers)
+	}
+	for i, obj := range stage.Objects {
+		if obj.Layer != project.DefaultStageLayer {
+			t.Fatalf("object %d layer = %q, want %q", i, obj.Layer, project.DefaultStageLayer)
+		}
+	}
+}
+
+func TestStageNormalizeLayersKeepsReferencedLayers(t *testing.T) {
+	stage := project.NewStageData("Layered")
+	stage.Layers = []project.StageLayer{{Name: "Back"}, {Name: "Back"}, {Name: "Front"}}
+	stage.Objects = []project.StageObject{
+		{Layer: "Front", File: "front.png"},
+		{Layer: "Orphan", File: "orphan.png"},
+		{File: "unassigned.png"},
+	}
+
+	stage.NormalizeLayers()
+
+	if len(stage.Layers) != 3 {
+		t.Fatalf("layers = %+v, want Back, Front, Orphan", stage.Layers)
+	}
+	if stage.Layers[0].Name != "Back" || stage.Layers[1].Name != "Front" || stage.Layers[2].Name != "Orphan" {
+		t.Fatalf("layers = %+v, want Back, Front, Orphan", stage.Layers)
+	}
+	if stage.Objects[0].Layer != "Front" {
+		t.Fatalf("object layer = %q, want Front", stage.Objects[0].Layer)
+	}
+	if stage.Objects[1].Layer != "Orphan" {
+		t.Fatalf("orphan layer = %q, want Orphan", stage.Objects[1].Layer)
+	}
+	if stage.Objects[2].Layer != "Back" {
+		t.Fatalf("unassigned layer = %q, want Back", stage.Objects[2].Layer)
+	}
+}
+
+func TestAddStageLayerAndAssignNewObjects(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.proj.Stage.Assets = []project.StageAsset{{
+		Category: project.StageCategoryBlock,
+		Name:     "block",
+		File:     "block.png",
+		Width:    50,
+		Height:   50,
+	}}
+	app.proj.Stage.Objects[0].Layer = "Layer 1"
+	app.st.activeLayer = "Layer 1"
+
+	app.addStageLayer()
+	if len(app.proj.Stage.Layers) != 2 {
+		t.Fatalf("layers = %+v, want two layers", app.proj.Stage.Layers)
+	}
+	if app.st.activeLayer != "Layer 2" {
+		t.Fatalf("active layer = %q, want Layer 2", app.st.activeLayer)
+	}
+
+	app.addStageObjectFromAsset(0, 100, 100)
+	if got := app.proj.Stage.Objects[1].Layer; got != "Layer 2" {
+		t.Fatalf("new object layer = %q, want Layer 2", got)
+	}
+	if app.proj.Stage.Objects[0].Layer != "Layer 1" {
+		t.Fatalf("old object layer changed to %q", app.proj.Stage.Objects[0].Layer)
+	}
+}
+
+func TestMoveActiveStageLayerReordersLayers(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.addStageLayer()
+	app.addStageLayer()
+	if len(app.proj.Stage.Layers) != 3 || app.st.activeLayer != "Layer 3" {
+		t.Fatalf("setup layers = %+v active=%q", app.proj.Stage.Layers, app.st.activeLayer)
+	}
+
+	app.moveActiveStageLayer(-1)
+	want := []string{"Layer 1", "Layer 3", "Layer 2"}
+	for i, name := range want {
+		if app.proj.Stage.Layers[i].Name != name {
+			t.Fatalf("layers = %+v, want %v", app.proj.Stage.Layers, want)
+		}
+	}
+	if app.activeStageLayerIndex() != 1 {
+		t.Fatalf("active index = %d, want 1", app.activeStageLayerIndex())
+	}
+
+	app.moveActiveStageLayer(-1)
+	if app.proj.Stage.Layers[0].Name != "Layer 3" || app.activeStageLayerIndex() != 0 {
+		t.Fatalf("layers = %+v active index=%d, want Layer 3 at 0", app.proj.Stage.Layers, app.activeStageLayerIndex())
+	}
+
+	app.moveActiveStageLayer(-1) // already at bottom: no-op
+	if app.proj.Stage.Layers[0].Name != "Layer 3" {
+		t.Fatalf("backward past bottom changed layers: %+v", app.proj.Stage.Layers)
+	}
+}
+
+func TestDeleteActiveStageLayerOnlyWhenEmpty(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.proj.Stage.Objects[0].Layer = "Layer 1"
+	app.addStageLayer()
+	app.addStageLayer()
+	app.deleteActiveStageLayer()
+	if len(app.proj.Stage.Layers) != 2 {
+		t.Fatalf("layers after deleting empty layer = %+v, want 2", app.proj.Stage.Layers)
+	}
+	if app.st.activeLayer != "Layer 2" {
+		t.Fatalf("active layer = %q, want Layer 2", app.st.activeLayer)
+	}
+
+	app.setActiveStageLayer(0)
+	app.deleteActiveStageLayer()
+	if len(app.proj.Stage.Layers) != 2 {
+		t.Fatalf("non-empty layer deleted: %+v", app.proj.Stage.Layers)
+	}
+}
+
+func TestStageClickUsesTopLayer(t *testing.T) {
+	app := newStageObjectApp(2)
+	app.proj.Stage.Layers = []project.StageLayer{{Name: "Back"}, {Name: "Front"}}
+	app.proj.Stage.Objects[0].Layer = "Back"
+	app.proj.Stage.Objects[1].Layer = "Front"
+	app.proj.Stage.Objects[0].X, app.proj.Stage.Objects[0].Y = 100, 100
+	app.proj.Stage.Objects[1].X, app.proj.Stage.Objects[1].Y = 100, 100
+	app.proj.Stage.Objects[0].Width, app.proj.Stage.Objects[0].Height = 200, 200
+	app.proj.Stage.Objects[1].Width, app.proj.Stage.Objects[1].Height = 200, 200
+
+	if got := app.stageObjectAtWorld(100, 100); got != 1 {
+		t.Fatalf("hit object = %d, want top-layer object 1", got)
 	}
 }

@@ -9,17 +9,26 @@ import (
 
 func (a *EditorApp) buildStageRenders() {
 	stage := &a.proj.Stage
+	if len(stage.Layers) == 0 {
+		stage.NormalizeLayers()
+	}
 	renders := make([]canvas.SpriteRender, 0, len(stage.Objects))
 
-	// Backgrounds render first; blocks render on top, matching hit-testing.
-	for _, wantBlock := range []bool{false, true} {
-		for i := range stage.Objects {
-			obj := &stage.Objects[i]
-			isBlock := obj.Category == project.StageCategoryBlock
-			if isBlock != wantBlock {
-				continue
+	// Layers render bottom to top. Inside one layer backgrounds render first
+	// and blocks on top, matching hit-testing inside that layer.
+	for _, layer := range stage.Layers {
+		for _, wantBlock := range []bool{false, true} {
+			for i := range stage.Objects {
+				obj := &stage.Objects[i]
+				if stage.LayerNameFor(*obj) != layer.Name {
+					continue
+				}
+				isBlock := obj.Category == project.StageCategoryBlock
+				if isBlock != wantBlock {
+					continue
+				}
+				renders = append(renders, a.stageObjectRender(obj, obj.Opacity))
 			}
-			renders = append(renders, a.stageObjectRender(obj, obj.Opacity))
 		}
 	}
 

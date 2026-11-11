@@ -16,6 +16,7 @@ import (
 // movement and attack files. Image paths are stored relative to the file so
 // the stage folder stays portable.
 func ExportStage(path string, stage project.StageData) error {
+	stage.NormalizeLayers()
 	var b strings.Builder
 
 	b.WriteString("package stages\n\n")
@@ -25,6 +26,11 @@ func ExportStage(path string, stage project.StageData) error {
 	fmt.Fprintf(&b, "\tName:   %q,\n", stage.Name)
 	fmt.Fprintf(&b, "\tWidth:  %g,\n", stage.Width)
 	fmt.Fprintf(&b, "\tHeight: %g,\n", stage.Height)
+	b.WriteString("\tLayers: []Layer{\n")
+	for _, layer := range stage.Layers {
+		fmt.Fprintf(&b, "\t\t{Name: %q},\n", layer.Name)
+	}
+	b.WriteString("\t},\n")
 	b.WriteString("\tAssets: []Asset{\n")
 	dir := filepath.Dir(path)
 	for _, asset := range stage.Assets {
@@ -35,8 +41,8 @@ func ExportStage(path string, stage project.StageData) error {
 	b.WriteString("\t},\n")
 	b.WriteString("\tObjects: []Object{\n")
 	for _, obj := range stage.Objects {
-		fmt.Fprintf(&b, "\t\t{Category: %q, File: %q, X: %g, Y: %g, Width: %g, Height: %g, Rotation: %g, Opacity: %g},\n",
-			obj.Category, relativeSpritePath(dir, obj.File),
+		fmt.Fprintf(&b, "\t\t{Layer: %q, Category: %q, File: %q, X: %g, Y: %g, Width: %g, Height: %g, Rotation: %g, Opacity: %g},\n",
+			obj.Layer, obj.Category, relativeSpritePath(dir, obj.File),
 			obj.X, obj.Y, obj.Width, obj.Height, obj.Rotation, obj.Opacity)
 	}
 	b.WriteString("\t},\n}\n")
@@ -87,6 +93,8 @@ func ImportStage(path string) (project.StageData, error) {
 					stage.Width = floatLit(kv.Value)
 				case "Height":
 					stage.Height = floatLit(kv.Value)
+				case "Layers":
+					stage.Layers = parseStageLayers(kv.Value)
 				case "Assets":
 					stage.Assets = parseStageAssets(kv.Value, dir)
 				case "Objects":
@@ -102,6 +110,7 @@ func ImportStage(path string) (project.StageData, error) {
 			if stage.Height <= 0 {
 				stage.Height = project.DefaultStageHeight
 			}
+			stage.NormalizeLayers()
 			applyStageObjectDefaults(&stage)
 			return stage, nil
 		}
@@ -114,6 +123,34 @@ func isStageType(e ast.Expr) bool {
 	name := exprString(e)
 	return name == "Stage" || name == "StageDef" ||
 		strings.HasSuffix(name, ".Stage") || strings.HasSuffix(name, ".StageDef")
+}
+
+func parseStageLayers(expr ast.Expr) []project.StageLayer {
+	cl, ok := expr.(*ast.CompositeLit)
+	if !ok {
+		return nil
+	}
+	var layers []project.StageLayer
+	for _, elt := range cl.Elts {
+		lit, ok := elt.(*ast.CompositeLit)
+		if !ok {
+			continue
+		}
+		layer := project.StageLayer{}
+		for _, kv := range lit.Elts {
+			kve, ok := kv.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			if exprString(kve.Key) == "Name" {
+				layer.Name = stringLit(kve.Value)
+			}
+		}
+		if layer.Name != "" {
+			layers = append(layers, layer)
+		}
+	}
+	return layers
 }
 
 func parseStageAssets(expr ast.Expr, dir string) []project.StageAsset {
@@ -181,6 +218,8 @@ func parseStageObjects(expr ast.Expr, dir string) []project.StageObject {
 				continue
 			}
 			switch exprString(kve.Key) {
+			case "Layer":
+				obj.Layer = stringLit(kve.Value)
 			case "Category":
 				obj.Category = stringLit(kve.Value)
 			case "File":

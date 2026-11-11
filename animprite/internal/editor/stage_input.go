@@ -33,6 +33,14 @@ func (a *EditorApp) panCanvasByMouse(mx, my int) {
 	a.canvas.Cam.Pan(float64(mx-a.prevMouseX), float64(my-a.prevMouseY))
 }
 
+func stageInfoInputHit(inp *ui.TextInput, mx, my int) bool {
+	if inp == nil || !inp.Visible {
+		return false
+	}
+	ix := inp.InputX()
+	return mx >= ix && mx <= ix+inp.InputW() && my >= inp.Y && my <= inp.Y+inp.H
+}
+
 func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 	if a.st.toolTab == "edit" && a.selectedStageObject() != nil {
 		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn} {
@@ -46,6 +54,29 @@ func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 			}
 		}
 	}
+	if a.st.toolTab == "info" && a.selectedStageObject() != nil {
+		focusedBefore := a.focusedInput()
+		hitInput := false
+		for i := range a.props {
+			if stageInfoInputHit(a.props[i], mx, my) {
+				hitInput = true
+			}
+			a.props[i].HandleMouse(mx, my, justL)
+		}
+		if a.st.opacityInput != nil {
+			if stageInfoInputHit(a.st.opacityInput, mx, my) {
+				hitInput = true
+			}
+			a.st.opacityInput.HandleMouse(mx, my, justL)
+		}
+		if focused := a.focusedInput(); focused != nil && focused != focusedBefore {
+			a.markStageObjectLiveEdit()
+		}
+		if justL && hitInput {
+			return
+		}
+	}
+
 	if !justL {
 		return
 	}
@@ -89,22 +120,27 @@ func (a *EditorApp) handleStagePanelMouse(mx, my int, justL bool) {
 		return
 	}
 
-	hasSelection := a.selectedStageObject() != nil
-	if hasSelection {
-		focusedBefore := a.focusedInput()
-		for i := range a.props {
-			a.props[i].HandleMouse(mx, my, justL)
+	for _, btn := range []*ui.Button{a.st.layerAddBtn, a.st.layerDeleteBtn, a.st.layerUpBtn, a.st.layerDownBtn} {
+		if btn == nil {
+			continue
 		}
-		if a.st.opacityInput != nil {
-			a.st.opacityInput.HandleMouse(mx, my, justL)
-		}
-		if focused := a.focusedInput(); focused != nil && focused != focusedBefore {
-			a.markStageObjectLiveEdit()
+		hit := justL && btn.HitTest(mx, my)
+		btn.HandleMouse(mx, my, justL)
+		if hit {
+			return
 		}
 	}
 
 	if !justL {
 		return
+	}
+
+	for _, row := range a.st.layerRects {
+		if mx >= row.X && mx <= row.X+row.W && my >= row.Y && my <= row.Y+row.H {
+			a.clearStageInputFocus()
+			a.setActiveStageLayer(row.Index)
+			return
+		}
 	}
 
 	chk := a.st.snapRect

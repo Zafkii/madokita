@@ -457,4 +457,28 @@ func (a *EditorApp) initStageWidgets() {
 	a.st.duplicateBtn.OnClick = func() {
 		a.duplicateSelectedStageObject()
 	}
+
+	a.st.layerAddBtn = ui.NewButton(0, 0, 1, 20, "+ Layer", th)
+	a.st.layerAddBtn.BtnType = ui.BtnBlue
+	a.st.layerAddBtn.OnClick = func() {
+		a.addStageLayer()
+	}
+
+	a.st.layerDeleteBtn = ui.NewButton(0, 0, 1, 20, "Delete", th)
+	a.st.layerDeleteBtn.BtnType = ui.BtnRed
+	a.st.layerDeleteBtn.OnClick = func() {
+		a.deleteActiveStageLayer()
+	}
+
+	a.st.layerUpBtn = ui.NewButton(0, 0, 1, 20, "Up", th)
+	a.st.layerUpBtn.BtnType = ui.BtnDefault
+	a.st.layerUpBtn.OnClick = func() {
+		a.moveActiveStageLayer(1)
+	}
+
+	a.st.layerDownBtn = ui.NewButton(0, 0, 1, 20, "Down", th)
+	a.st.layerDownBtn.BtnType = ui.BtnDefault
+	a.st.layerDownBtn.OnClick = func() {
+		a.moveActiveStageLayer(-1)
+	}
 }

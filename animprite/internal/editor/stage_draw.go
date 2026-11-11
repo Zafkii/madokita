@@ -48,36 +48,65 @@ func (a *EditorApp) drawStageTopPanelInfo(screen *ebiten.Image, p theme.Palette)
 	}
 }
 
+func (a *EditorApp) hideStageObjectInputs() {
+	for i := range a.props {
+		if a.props[i] != nil {
+			a.props[i].Visible = false
+		}
+	}
+	if a.st.opacityInput != nil {
+		a.st.opacityInput.Visible = false
+	}
+}
+
+func (a *EditorApp) drawStageInfoInput(screen *ebiten.Image, inp *ui.TextInput, x, y, w int) {
+	inp.Visible = true
+	inp.X = x
+	inp.Y = y
+	inp.W = w
+	inp.Draw(screen)
+}
+
 func (a *EditorApp) drawStageInfo(screen *ebiten.Image, p theme.Palette) {
-	right := a.win.outsideWidth - panelPad
-	y := a.topPanelY() + topPanelPad + stageToolTabsHeight() + 8
+	top := a.topPanelY() + topPanelPad
+	infoX := panelPad + dropdownW + panelPad*2
+	colW := 160
+	colGap := 8
+	rowH := rightPanelInputH + 2
+
 	name := a.proj.Stage.Name
 	if name == "" {
 		name = "Stage1"
 	}
-	info := fmt.Sprintf("Stage: %s    Objects: %d    Assets: %d", name, len(a.proj.Stage.Objects), len(a.proj.Stage.Assets))
-	ui.DrawText(screen, info, right-ui.TextWidth(info), y, 1, p.LabelColor)
-	y += 18
-
 	obj := a.selectedStageObject()
-	if obj != nil {
-		base := ui.TruncateText(filepath.Base(obj.File), 52)
-		selected := fmt.Sprintf("Selected: %s    Category: %s", base, obj.Category)
-		if count := a.stageSelectionCount(); count > 1 {
-			selected = fmt.Sprintf("%d objects selected    Primary: %s    Category: %s", count, base, obj.Category)
-		}
-		ui.DrawText(screen, selected, right-ui.TextWidth(selected), y, 1, p.TextPrimary)
-		y += 18
-		values := fmt.Sprintf(
-			"X %g    Y %g    W %g    H %g    Rot %g°    Opacity %.2f",
-			obj.X, obj.Y, obj.Width, obj.Height, obj.Rotation, obj.Opacity,
-		)
-		ui.DrawText(screen, values, right-ui.TextWidth(values), y, 1, p.TextMuted)
-		y += 18
+	if obj == nil {
+		a.hideStageObjectInputs()
+		ui.DrawText(screen, fmt.Sprintf("Stage: %s    Objects: %d    Assets: %d", name, len(a.proj.Stage.Objects), len(a.proj.Stage.Assets)), infoX, top+2, 1, p.LabelColor)
+		ui.DrawText(screen, "No object selected. Click an object to edit its properties here.", infoX, top+22, 1, p.TextMuted)
+		ui.DrawText(screen, "CapsLock + drag moves. Tab + click or box selects. Wheel zooms.", infoX, top+42, 1, p.TextMuted)
+		return
 	}
 
-	hint := "Move: hold CapsLock + drag. Multi-select: hold Tab + click or drag a box. Pan: middle/right. Zoom: wheel."
-	ui.DrawText(screen, hint, right-ui.TextWidth(hint), y, 1, p.TextMuted)
+	base := ui.TruncateText(filepath.Base(obj.File), 42)
+	selected := fmt.Sprintf("Stage: %s    Objects: %d    Assets: %d", name, len(a.proj.Stage.Objects), len(a.proj.Stage.Assets))
+	if count := a.stageSelectionCount(); count > 1 {
+		selected = fmt.Sprintf("%d selected    Primary: %s", count, base)
+	} else {
+		selected = fmt.Sprintf("Selected: %s    %s", base, obj.Category)
+	}
+	ui.DrawText(screen, selected, infoX, top+2, 1, p.LabelColor)
+
+	a.drawStageInfoInput(screen, a.props[0], infoX, top+22, colW)
+	a.drawStageInfoInput(screen, a.props[1], infoX+colW+colGap, top+22, colW)
+	a.drawStageInfoInput(screen, a.props[2], infoX, top+22+rowH, colW)
+	a.drawStageInfoInput(screen, a.props[3], infoX+colW+colGap, top+22+rowH, colW)
+	a.drawStageInfoInput(screen, a.props[4], infoX, top+22+2*rowH, colW)
+	if a.st.opacityInput != nil {
+		a.drawStageInfoInput(screen, a.st.opacityInput, infoX+colW+colGap, top+22+2*rowH, colW)
+	}
+
+	hintY := top + 22 + 3*rowH + 4
+	ui.DrawText(screen, "CapsLock + drag moves. Tab + click or box selects. Wheel zooms.", infoX, hintY, 1, p.TextMuted)
 }
 
 var stageToolTabs = []struct{ Key, Label, Icon string }{
@@ -221,6 +250,9 @@ func (a *EditorApp) drawStageEditActions(screen *ebiten.Image, p theme.Palette, 
 }
 
 func (a *EditorApp) drawStageToolbar(screen *ebiten.Image, p theme.Palette) {
+	if a.st.toolTab != "info" {
+		a.hideStageObjectInputs()
+	}
 	a.st.toolTabRects = a.st.toolTabRects[:0]
 	a.st.toolToggleRects = a.st.toolToggleRects[:0]
 	a.st.toolPagePrevRect = stageToolRect{}
@@ -317,6 +349,71 @@ func (a *EditorApp) drawStageToolbar(screen *ebiten.Image, p theme.Palette) {
 		a.drawStagePageButton(screen, p, mx, my, nextX, top, stageToolChevronW, stageToolSubH, "chevron-right", a.st.toolPage < pages-1)
 		a.st.toolPageNextRect = stageToolRect{Key: "next", X: nextX, Y: top, W: stageToolChevronW, H: stageToolSubH}
 	}
+}
+
+func (a *EditorApp) drawStageLayers(screen *ebiten.Image, p theme.Palette, px, iy int) int {
+	a.st.layerRects = a.st.layerRects[:0]
+	mx, my := ebiten.CursorPosition()
+	iy = a.drawSectionHeader(screen, p, px, iy, "Layers")
+	ui.DrawText(screen, "Top renders in front. Click to activate.", px, iy, 1, p.TextMuted)
+	iy += 16
+
+	a.ensureActiveStageLayer()
+	activeIdx := a.activeStageLayerIndex()
+
+	if a.st.layerAddBtn != nil && a.st.layerDeleteBtn != nil && a.st.layerUpBtn != nil && a.st.layerDownBtn != nil {
+		buttons := []*ui.Button{a.st.layerAddBtn, a.st.layerDeleteBtn, a.st.layerUpBtn, a.st.layerDownBtn}
+		a.st.layerAddBtn.Visible = true
+		a.st.layerDeleteBtn.Visible = true
+		a.st.layerUpBtn.Visible = true
+		a.st.layerDownBtn.Visible = true
+		a.st.layerDeleteBtn.Enabled = activeIdx >= 0 && len(a.proj.Stage.Layers) > 1
+		a.st.layerUpBtn.Enabled = activeIdx >= 0 && activeIdx < len(a.proj.Stage.Layers)-1
+		a.st.layerDownBtn.Enabled = activeIdx > 0
+
+		x := px
+		for _, btn := range buttons {
+			btn.X = x
+			btn.Y = iy
+			btn.W = ui.ButtonWidth(btn.Text)
+			btn.H = 20
+			btn.Draw(screen)
+			x += btn.W + 4
+		}
+	}
+	iy += 24
+
+	if len(a.proj.Stage.Layers) == 0 {
+		ui.DrawText(screen, "No layers yet.", px, iy, 1, p.TextMuted)
+		return iy + 22
+	}
+
+	for idx := len(a.proj.Stage.Layers) - 1; idx >= 0; idx-- {
+		layer := a.proj.Stage.Layers[idx]
+		rowY := iy
+		hovered := mx >= px && mx <= px+rightPanelInner && my >= rowY && my <= rowY+18
+		if idx == activeIdx {
+			ui.FillRect(screen, px, rowY, rightPanelInner, 18, p.BtnBlue)
+		} else if hovered {
+			ui.FillRect(screen, px, rowY, rightPanelInner, 18, p.BtnHover)
+		}
+		ui.FillBorder(screen, px, rowY, rightPanelInner, 18, p.InputBorder)
+		count := 0
+		for _, obj := range a.proj.Stage.Objects {
+			if a.proj.Stage.LayerNameFor(obj) == layer.Name {
+				count++
+			}
+		}
+		label := fmt.Sprintf("%s  (%d)", layer.Name, count)
+		textClr := p.TextPrimary
+		if idx == activeIdx {
+			textClr = p.ButtonText
+		}
+		ui.DrawText(screen, ui.TruncateText(label, rightPanelInner-8), px+4, rowY+2, 1, textClr)
+		a.st.layerRects = append(a.st.layerRects, stageLayerRect{Index: idx, X: px, Y: rowY, W: rightPanelInner, H: 18})
+		iy += 20
+	}
+	return iy + 4
 }
 
 func (a *EditorApp) drawStageRightPanel(screen *ebiten.Image, p theme.Palette, px, iy int) int {
@@ -435,31 +532,7 @@ func (a *EditorApp) drawStageRightPanel(screen *ebiten.Image, p theme.Palette, p
 	}
 
 	iy += 4
-	header := "Object Properties"
-	if count := a.stageSelectionCount(); count > 1 {
-		header = fmt.Sprintf("Object Properties (%d selected)", count)
-	}
-	iy = a.drawSectionHeader(screen, p, px, iy, header)
-	obj := a.selectedStageObject()
-	if obj == nil {
-		ui.DrawText(screen, "No object selected.", px, iy, 1, p.TextMuted)
-		for i := range a.props {
-			a.props[i].Visible = false
-		}
-		if a.st.opacityInput != nil {
-			a.st.opacityInput.Visible = false
-		}
-		return iy + 22
-	}
-
-	for i := 0; i < 5; i++ {
-		iy = a.drawLabeledInput(screen, a.props[i], iy)
-	}
-	if a.st.opacityInput != nil {
-		iy = a.drawLabeledInput(screen, a.st.opacityInput, iy)
-	}
-
-	iy += 4
+	iy = a.drawStageLayers(screen, p, px, iy)
 	return iy
 }
 

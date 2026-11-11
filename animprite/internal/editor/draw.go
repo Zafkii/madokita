@@ -196,6 +196,8 @@ func (a *EditorApp) drawSelectedElementProps(screen *ebiten.Image, p theme.Palet
 	iy = a.drawSectionHeader(screen, p, px, iy, "Selected Element Properties")
 
 	for i := 0; i < 5; i++ {
+		a.props[i].X = px
+		a.props[i].W = rightPanelInner
 		iy = a.drawLabeledInput(screen, a.props[i], iy)
 	}
 

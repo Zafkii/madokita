@@ -5,8 +5,14 @@ type Stage struct {
 	Name    string
 	Width   float64
 	Height  float64
+	Layers  []Layer
 	Assets  []Asset
 	Objects []Object
+}
+
+// Layer is one named stack of objects. Layers render in slice order.
+type Layer struct {
+	Name string
 }
 
 // Asset is one image available in the stage editor library.
@@ -21,6 +27,7 @@ type Asset struct {
 
 // Object is one image placed in the stage. X/Y are the object center.
 type Object struct {
+	Layer    string
 	Category string
 	File     string
 	X        float64

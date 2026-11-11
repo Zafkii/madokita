@@ -38,12 +38,18 @@ type stageObjectDragStart struct {
 	X, Y  float64
 }
 
+type stageLayerRect struct {
+	Index      int
+	X, Y, W, H int
+}
+
 type stageState struct {
 	images   map[string]*ebiten.Image
 	expanded map[string]bool
 
 	assetRects    []stageAssetRect
 	categoryRects []stageCategoryRect
+	layerRects    []stageLayerRect
 
 	toolTab          string
 	toolInfoAuto     bool
@@ -60,6 +66,7 @@ type stageState struct {
 
 	selectedObj  int
 	selectedObjs map[int]bool
+	activeLayer  string
 
 	dragAsset         int
 	draggingFromPanel bool
@@ -84,9 +91,13 @@ type stageState struct {
 	panning              bool
 	stagePointerOnObject bool
 
-	opacityInput *ui.TextInput
-	deleteBtn    *ui.Button
-	duplicateBtn *ui.Button
+	opacityInput   *ui.TextInput
+	deleteBtn      *ui.Button
+	duplicateBtn   *ui.Button
+	layerAddBtn    *ui.Button
+	layerDeleteBtn *ui.Button
+	layerUpBtn     *ui.Button
+	layerDownBtn   *ui.Button
 }
 
 func (a *EditorApp) ensureStageMode() {
@@ -104,6 +115,10 @@ func (a *EditorApp) ensureStageMode() {
 	}
 	if a.proj.Stage.Objects == nil {
 		a.proj.Stage.Objects = []project.StageObject{}
+	}
+	a.proj.Stage.NormalizeLayers()
+	if a.proj.Stage.LayerIndex(a.st.activeLayer) < 0 {
+		a.st.activeLayer = a.proj.Stage.Layers[len(a.proj.Stage.Layers)-1].Name
 	}
 	if a.st.images == nil {
 		a.st.images = make(map[string]*ebiten.Image)
@@ -424,9 +439,11 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 			stage.Objects[i].Category = project.StageCategoryForFile(stage.Objects[i].File)
 		}
 	}
+	stage.NormalizeLayers()
 
 	a.clearStageImages()
 	a.proj.Stage = stage
+	a.st.activeLayer = stage.Layers[len(stage.Layers)-1].Name
 	a.currentFilePath = path
 	a.undoStack = nil
 	a.redoStack = nil
@@ -476,6 +493,7 @@ func (a *EditorApp) saveStageFile(path string) error {
 	if stage.Height <= 0 {
 		stage.Height = project.DefaultStageHeight
 	}
+	stage.NormalizeLayers()
 	if !strings.EqualFold(filepath.Ext(path), ".json") {
 		return ExportStage(path, stage)
 	}
@@ -547,7 +565,9 @@ func (a *EditorApp) addStageObjectFromAsset(assetIdx int, wx, wy float64) {
 	wx, wy = snapStagePosition(wx, wy, w, h, a.st.snap)
 
 	a.saveSnapshot()
+	a.ensureActiveStageLayer()
 	a.proj.Stage.Objects = append(a.proj.Stage.Objects, project.StageObject{
+		Layer:    a.st.activeLayer,
 		Category: asset.Category,
 		File:     asset.File,
 		X:        wx,
@@ -603,6 +623,9 @@ func (a *EditorApp) tickStageInfoAuto() {
 	if !a.isStageMode() || !a.st.toolInfoAuto {
 		return
 	}
+	if a.focusedInput() != nil {
+		return
+	}
 	if a.st.toolInfoHold > 0 {
 		a.st.toolInfoHold--
 	}
@@ -620,8 +643,17 @@ func (a *EditorApp) selectStageObject(idx int) {
 	a.st.selectedObjs = make(map[int]bool)
 	if idx >= 0 {
 		a.st.selectedObjs[idx] = true
+		a.followStageObjectLayer(idx)
 	}
 	a.syncStageSelectionUI()
+}
+
+func (a *EditorApp) followStageObjectLayer(idx int) {
+	if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+		return
+	}
+	a.ensureActiveStageLayer()
+	a.st.activeLayer = a.proj.Stage.LayerNameFor(a.proj.Stage.Objects[idx])
 }
 
 func (a *EditorApp) syncStageSelectionUI() {
@@ -725,6 +757,7 @@ func (a *EditorApp) addStageObjectSelection(idx int) {
 	}
 	a.st.selectedObjs[idx] = true
 	a.st.selectedObj = idx
+	a.followStageObjectLayer(idx)
 	a.syncStageSelectionUI()
 	a.showStageSelectionCount()
 }
@@ -750,6 +783,7 @@ func (a *EditorApp) toggleStageObjectSelection(idx int) {
 	} else {
 		a.st.selectedObjs[idx] = true
 		a.st.selectedObj = idx
+		a.followStageObjectLayer(idx)
 	}
 	a.syncStageSelectionUI()
 	a.showStageSelectionCount()
@@ -771,6 +805,7 @@ func (a *EditorApp) setStageObjectPrimary(idx int) {
 		return
 	}
 	a.st.selectedObj = idx
+	a.followStageObjectLayer(idx)
 	a.syncStageSelectionUI()
 }
 
@@ -974,25 +1009,127 @@ func (a *EditorApp) duplicateSelectedStageObject() {
 	}
 }
 
+func (a *EditorApp) ensureActiveStageLayer() {
+	if len(a.proj.Stage.Layers) == 0 {
+		a.proj.Stage.NormalizeLayers()
+	}
+	if a.proj.Stage.LayerIndex(a.st.activeLayer) >= 0 {
+		return
+	}
+	a.proj.Stage.NormalizeLayers()
+	a.st.activeLayer = a.proj.Stage.Layers[len(a.proj.Stage.Layers)-1].Name
+}
+
+func (a *EditorApp) activeStageLayerIndex() int {
+	a.ensureActiveStageLayer()
+	return a.proj.Stage.LayerIndex(a.st.activeLayer)
+}
+
+func (a *EditorApp) setActiveStageLayer(idx int) {
+	a.ensureActiveStageLayer()
+	if idx < 0 || idx >= len(a.proj.Stage.Layers) {
+		return
+	}
+	name := a.proj.Stage.Layers[idx].Name
+	if a.st.activeLayer == name {
+		a.setStatus("Active layer: " + name)
+		return
+	}
+	a.st.activeLayer = name
+	a.selectStageObject(-1)
+	a.setStatus("Active layer: " + name)
+}
+
+func (a *EditorApp) nextStageLayerName() string {
+	used := make(map[string]bool, len(a.proj.Stage.Layers))
+	for _, layer := range a.proj.Stage.Layers {
+		used[layer.Name] = true
+	}
+	for n := 1; ; n++ {
+		name := fmt.Sprintf("Layer %d", n)
+		if !used[name] {
+			return name
+		}
+	}
+}
+
+func (a *EditorApp) addStageLayer() {
+	a.saveSnapshot()
+	name := a.nextStageLayerName()
+	a.proj.Stage.Layers = append(a.proj.Stage.Layers, project.StageLayer{Name: name})
+	a.st.activeLayer = name
+	a.setStatus("Added " + name)
+}
+
+func (a *EditorApp) deleteActiveStageLayer() {
+	a.ensureActiveStageLayer()
+	idx := a.activeStageLayerIndex()
+	if idx < 0 || len(a.proj.Stage.Layers) <= 1 {
+		a.setStatus("Cannot delete the only layer")
+		return
+	}
+	layer := a.proj.Stage.Layers[idx]
+	for _, obj := range a.proj.Stage.Objects {
+		if a.proj.Stage.LayerNameFor(obj) == layer.Name {
+			a.setStatus("Layer is not empty")
+			return
+		}
+	}
+	a.saveSnapshot()
+	a.proj.Stage.Layers = append(a.proj.Stage.Layers[:idx], a.proj.Stage.Layers[idx+1:]...)
+	if idx >= len(a.proj.Stage.Layers) {
+		idx = len(a.proj.Stage.Layers) - 1
+	}
+	a.st.activeLayer = a.proj.Stage.Layers[idx].Name
+	a.setStatus("Deleted " + layer.Name)
+}
+
+func (a *EditorApp) moveActiveStageLayer(delta int) {
+	idx := a.activeStageLayerIndex()
+	target := idx + delta
+	if idx < 0 || delta == 0 || target < 0 || target >= len(a.proj.Stage.Layers) {
+		return
+	}
+	a.saveSnapshot()
+	layers := a.proj.Stage.Layers
+	layers[idx], layers[target] = layers[target], layers[idx]
+	a.st.activeLayer = layers[target].Name
+	if delta > 0 {
+		a.setStatus("Layer moved forward")
+	} else {
+		a.setStatus("Layer moved backward")
+	}
+}
+
 func (a *EditorApp) stageObjectAtWorld(wx, wy float64) int {
+	if len(a.proj.Stage.Layers) == 0 {
+		a.proj.Stage.NormalizeLayers()
+	}
 	objects := a.proj.Stage.Objects
-	passes := []bool{true, false} // blocks first, then backgrounds
-	for _, wantBlock := range passes {
-		for i := len(objects) - 1; i >= 0; i-- {
-			obj := &objects[i]
-			isBlock := obj.Category == project.StageCategoryBlock
-			if isBlock != wantBlock {
-				continue
-			}
-			dx := wx - obj.X
-			dy := wy - obj.Y
-			rot := -obj.Rotation * math.Pi / 180
-			cos := math.Cos(rot)
-			sin := math.Sin(rot)
-			lx := dx*cos - dy*sin
-			ly := dx*sin + dy*cos
-			if math.Abs(lx) <= obj.Width/2 && math.Abs(ly) <= obj.Height/2 {
-				return i
+	// Walk layers from front to back. Inside one layer, blocks stay ahead of
+	// backgrounds so a full-stage backdrop does not swallow block clicks.
+	for li := len(a.proj.Stage.Layers) - 1; li >= 0; li-- {
+		layer := a.proj.Stage.Layers[li].Name
+		for _, wantBlock := range []bool{true, false} {
+			for i := len(objects) - 1; i >= 0; i-- {
+				obj := &objects[i]
+				if a.proj.Stage.LayerNameFor(*obj) != layer {
+					continue
+				}
+				isBlock := obj.Category == project.StageCategoryBlock
+				if isBlock != wantBlock {
+					continue
+				}
+				dx := wx - obj.X
+				dy := wy - obj.Y
+				rot := -obj.Rotation * math.Pi / 180
+				cos := math.Cos(rot)
+				sin := math.Sin(rot)
+				lx := dx*cos - dy*sin
+				ly := dx*sin + dy*cos
+				if math.Abs(lx) <= obj.Width/2 && math.Abs(ly) <= obj.Height/2 {
+					return i
+				}
 			}
 		}
 	}
