@@ -26,6 +26,7 @@ type Button struct {
 	th         *theme.Manager
 	BtnType    ButtonType
 	hovered    bool
+	Tooltip    string
 }
 
 func NewButton(x, y, w, h int, text string, th *theme.Manager) *Button {

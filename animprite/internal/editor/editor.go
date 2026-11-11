@@ -2,10 +2,13 @@ package editor
 
 import (
 	"fmt"
+	"log"
 
+	assetIcons "animprite/assets/icons"
 	"animprite/internal/canvas"
 	"animprite/internal/filedialog"
 	animfonts "animprite/internal/fonts"
+	"animprite/internal/icons"
 	"animprite/internal/project"
 	"animprite/internal/theme"
 	"animprite/internal/ui"
@@ -121,7 +124,8 @@ type EditorApp struct {
 	scaleOrig    scaleOrigData
 	rotationDrag rotationDragData
 
-	st stageState
+	st      stageState
+	iconSet *icons.Set
 
 	currentFilePath string
 
@@ -179,6 +183,12 @@ func NewEditorApp() *EditorApp {
 		},
 	}
 
+	iconSet, err := icons.Load(assetIcons.FS, icons.RasterSize)
+	if err != nil {
+		log.Printf("load editor icons: %v", err)
+	}
+	app.iconSet = iconSet
+
 	app.win.outsideWidth = DefaultWinW
 	app.win.outsideHeight = DefaultWinH
 
@@ -220,10 +230,14 @@ func NewEditorApp() *EditorApp {
 	btnY3 := btnY2 + rightBtnH + btnGap
 	app.openBtn = ui.NewButton(panelPad, btnY0, rightBtnW, rightBtnH, "Open", th)
 	app.openBtn.BtnType = ui.BtnOrange
+	app.openBtn.Tooltip = "Open project file"
 	app.openDirBtn = ui.NewButton(panelPad, btnY1, rightBtnW, rightBtnH, "Open Dir", th)
 	app.openDirBtn.BtnType = ui.BtnOrange
+	app.openDirBtn.Tooltip = "Open project folder"
 	app.saveBtn = ui.NewButton(panelPad, btnY2, rightBtnW, rightBtnH, "Save", th)
+	app.saveBtn.Tooltip = "Save project"
 	app.themeBtn = ui.NewButton(panelPad, btnY3, rightBtnW, rightBtnH, "Dark", th)
+	app.themeBtn.Tooltip = "Toggle dark or light theme"
 
 	app.themeBtn.OnClick = func() {
 		app.th.Toggle()

@@ -57,6 +57,7 @@ type Canvas struct {
 
 	spriteRenders             []SpriteRender
 	Selection                 SelectionRect
+	ExtraSelections           []SelectionRect
 	HighlightedHandle         int
 	RotationHandleVisible     bool
 	HighlightedRotationHandle bool
@@ -71,6 +72,10 @@ func (c *Canvas) SetSpriteRenders(r []SpriteRender) {
 
 func (c *Canvas) SetSelectionRect(r SelectionRect) {
 	c.Selection = r
+}
+
+func (c *Canvas) SetExtraSelections(r []SelectionRect) {
+	c.ExtraSelections = r
 }
 
 func (c *Canvas) SetHurtboxRenders(r []HurtboxRender) {
@@ -119,6 +124,9 @@ func (c *Canvas) Draw(screen *ebiten.Image) {
 	}
 	if c.Selection.Visible {
 		c.drawSelection(c.drawBuf, cam, p)
+	}
+	for _, sel := range c.ExtraSelections {
+		c.drawSelectionOutline(c.drawBuf, cam, p, sel)
 	}
 	if len(c.hurtboxRenders) > 0 {
 		c.drawHurtboxes(c.drawBuf, cam)
@@ -278,6 +286,42 @@ func (c *Canvas) drawPlaceholderSprite(screen *ebiten.Image, cam *camera.Camera,
 		n := (i + 1) % 4
 		drawDashedLine(screen, float32(pts[i][0]), float32(pts[i][1]),
 			float32(pts[n][0]), float32(pts[n][1]), 4, 4, clr)
+	}
+}
+
+func (c *Canvas) drawSelectionOutline(screen *ebiten.Image, cam *camera.Camera, p theme.Palette, sel SelectionRect) {
+	if !sel.Visible {
+		return
+	}
+	cx := sel.X + sel.W/2
+	cy := sel.Y + sel.H/2
+	cos := math.Cos(sel.Rotation)
+	sin := math.Sin(sel.Rotation)
+	hw := sel.W / 2
+	hh := sel.H / 2
+	local := [][2]float64{
+		{-hw, -hh},
+		{hw, -hh},
+		{hw, hh},
+		{-hw, hh},
+	}
+	clr := p.CanvasRotationGuide
+	var canvasPts [][2]float64
+	for _, pt := range local {
+		rx := cx + pt[0]*cos - pt[1]*sin
+		ry := cy + pt[0]*sin + pt[1]*cos
+		xx, yy := cam.WorldToCanvas(rx, ry)
+		canvasPts = append(canvasPts, [2]float64{xx, yy})
+	}
+	for i := 0; i < 4; i++ {
+		next := (i + 1) % 4
+		drawDashedLine(screen, float32(canvasPts[i][0]), float32(canvasPts[i][1]),
+			float32(canvasPts[next][0]), float32(canvasPts[next][1]), 5, 4, clr)
+	}
+	hSz := float32(4)
+	hH := hSz / 2
+	for i := 0; i < 4; i++ {
+		vector.DrawFilledRect(screen, float32(canvasPts[i][0])-hH, float32(canvasPts[i][1])-hH, hSz, hSz, clr, false)
 	}
 }
 

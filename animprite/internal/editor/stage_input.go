@@ -11,7 +11,9 @@ import (
 
 func (a *EditorApp) clearStageInputFocus() {
 	for i := range a.props {
-		a.props[i].Focused = false
+		if a.props[i] != nil {
+			a.props[i].Focused = false
+		}
 	}
 	if a.st.opacityInput != nil {
 		a.st.opacityInput.Focused = false
@@ -32,14 +34,43 @@ func (a *EditorApp) panCanvasByMouse(mx, my int) {
 }
 
 func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
+	if a.st.toolTab == "edit" && a.selectedStageObject() != nil {
+		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn} {
+			if btn == nil {
+				continue
+			}
+			hit := justL && btn.HitTest(mx, my)
+			btn.HandleMouse(mx, my, justL)
+			if hit {
+				return
+			}
+		}
+	}
 	if !justL {
 		return
 	}
 	for _, r := range a.st.toolTabRects {
 		if mx >= r.X && mx <= r.X+r.W && my >= r.Y && my <= r.Y+r.H {
+			a.clearStageInputFocus()
 			a.st.toolTab = r.Key
+			a.st.toolInfoAuto = false
+			a.st.toolInfoHold = 0
 			return
 		}
+	}
+	if r := a.st.toolPagePrevRect; r.W > 0 &&
+		mx >= r.X && mx <= r.X+r.W && my >= r.Y && my <= r.Y+r.H {
+		if a.st.toolPage > 0 {
+			a.st.toolPage--
+		}
+		return
+	}
+	if r := a.st.toolPageNextRect; r.W > 0 &&
+		mx >= r.X && mx <= r.X+r.W && my >= r.Y && my <= r.Y+r.H {
+		if a.st.toolPage < stageToolPageCount()-1 {
+			a.st.toolPage++
+		}
+		return
 	}
 	for _, r := range a.st.toolToggleRects {
 		if mx >= r.X && mx <= r.X+r.W && my >= r.Y && my <= r.Y+r.H {
@@ -60,29 +91,19 @@ func (a *EditorApp) handleStagePanelMouse(mx, my int, justL bool) {
 
 	hasSelection := a.selectedStageObject() != nil
 	if hasSelection {
+		focusedBefore := a.focusedInput()
 		for i := range a.props {
 			a.props[i].HandleMouse(mx, my, justL)
 		}
 		if a.st.opacityInput != nil {
 			a.st.opacityInput.HandleMouse(mx, my, justL)
 		}
+		if focused := a.focusedInput(); focused != nil && focused != focusedBefore {
+			a.markStageObjectLiveEdit()
+		}
 	}
 
-	buttons := []*ui.Button{}
-	if hasSelection {
-		buttons = append(buttons, a.st.deleteBtn, a.st.duplicateBtn)
-	}
-	clickedButton := false
-	for _, btn := range buttons {
-		if btn == nil {
-			continue
-		}
-		btn.HandleMouse(mx, my, justL)
-		if justL && btn.HitTest(mx, my) {
-			clickedButton = true
-		}
-	}
-	if clickedButton || !justL {
+	if !justL {
 		return
 	}
 
@@ -117,6 +138,10 @@ func (a *EditorApp) handleStagePanelMouse(mx, my int, justL bool) {
 	}
 }
 
+func stageMoveModifierDown() bool {
+	return ebiten.IsKeyPressed(ebiten.KeyCapsLock)
+}
+
 func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed bool) {
 	if a.st.dragAsset >= 0 {
 		return
@@ -127,6 +152,7 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 	spaceDown := ebiten.IsKeyPressed(ebiten.KeySpace)
 	ctrl := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
 	shift := ebiten.IsKeyPressed(ebiten.KeyShift)
+	tab := ebiten.IsKeyPressed(ebiten.KeyTab)
 
 	if a.st.panning {
 		if leftDown || middleDown || rightDown {
@@ -139,6 +165,8 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 	if middleDown || rightDown || (spaceDown && leftDown) {
 		if a.pointInCanvas(mx, my) {
 			a.st.panning = true
+			a.st.stagePointerOnObject = false
+			a.st.marqueeActive = false
 			a.scaleHandle = -1
 			a.st.draggingObj = false
 			a.st.dragUndoSaved = false
@@ -148,10 +176,30 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 	}
 
 	if !leftDown {
+		if a.st.draggingObj && a.st.dragMoved {
+			if obj := a.selectedStageObject(); obj != nil {
+				wx, wy := a.canvasWorld(mx, my)
+				newX, newY := dragStagePosition(
+					a.st.dragObjStartX, a.st.dragObjStartY,
+					a.st.dragWorldStartX, a.st.dragWorldStartY,
+					wx, wy, obj.Width, obj.Height, a.st.snap,
+				)
+				a.applyStageObjectDrag(newX, newY)
+			}
+		}
+		a.finishStageMarquee()
 		a.scaleHandle = -1
 		a.rotationDrag.active = false
 		a.st.draggingObj = false
+		a.st.dragMoved = false
 		a.st.dragUndoSaved = false
+		a.st.dragObjStarts = a.st.dragObjStarts[:0]
+		a.st.stagePointerOnObject = false
+		return
+	}
+	if a.st.marqueeActive {
+		wx, wy := a.canvasWorld(mx, my)
+		a.updateStageMarquee(wx, wy)
 		return
 	}
 	if !a.pointInCanvas(mx, my) {
@@ -189,17 +237,27 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 
 		wx, wy := a.canvasWorld(mx, my)
 		if idx := a.stageObjectAtWorld(wx, wy); idx >= 0 {
-			a.selectStageObject(idx)
-			if obj := a.selectedStageObject(); obj != nil {
-				a.st.dragObjStartX = obj.X
-				a.st.dragObjStartY = obj.Y
-				a.st.dragWorldStartX = wx
-				a.st.dragWorldStartY = wy
-				a.st.draggingObj = true
+			a.st.stagePointerOnObject = true
+			switch {
+			case tab || ctrl:
+				a.toggleStageObjectSelection(idx)
+				return
+			case shift:
+				a.addStageObjectSelection(idx)
+			case !a.stageObjectSelected(idx):
+				a.selectStageObject(idx)
+			default:
+				a.setStageObjectPrimary(idx)
 			}
+			a.beginStageObjectDrag(wx, wy)
+			return
+		}
+		if tab {
+			a.beginStageMarquee(wx, wy)
 			return
 		}
 		a.selectStageObject(-1)
+		a.st.stagePointerOnObject = false
 		a.st.panning = true
 		return
 	}
@@ -210,6 +268,9 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 	}
 
 	if a.st.draggingObj {
+		if !stageMoveModifierDown() {
+			return
+		}
 		obj := a.selectedStageObject()
 		if obj == nil {
 			a.st.draggingObj = false
@@ -221,19 +282,13 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 			a.st.dragWorldStartX, a.st.dragWorldStartY,
 			wx, wy, obj.Width, obj.Height, a.st.snap,
 		)
-		if newX == obj.X && newY == obj.Y {
-			return
-		}
-		if !a.st.dragUndoSaved {
-			a.saveSnapshot()
-			a.st.dragUndoSaved = true
-		}
-		obj.X = newX
-		obj.Y = newY
-		a.syncStageInputs()
+		a.applyStageObjectDrag(newX, newY)
 		return
 	}
 
+	if a.st.stagePointerOnObject {
+		return
+	}
 	a.panCanvasByMouse(mx, my)
 }
 
@@ -246,6 +301,7 @@ func (a *EditorApp) handleStageCanvasWheel(mx, my int, wy float64, ctrl, shift b
 	case shift && obj != nil:
 		obj.Rotation = math.Round(obj.Rotation + wy*5)
 		a.props[4].SetNumeric(obj.Rotation)
+		a.markStageObjectLiveEdit()
 	case ctrl && obj != nil:
 		factor := 1 + wy*0.05
 		if factor < 0.01 {
@@ -255,6 +311,7 @@ func (a *EditorApp) handleStageCanvasWheel(mx, my int, wy float64, ctrl, shift b
 		obj.Height = math.Max(1, math.Round(obj.Height*factor*100)/100)
 		a.props[2].SetNumeric(obj.Width)
 		a.props[3].SetNumeric(obj.Height)
+		a.markStageObjectLiveEdit()
 	default:
 		a.canvas.Cam.ZoomAt(1+wy*0.1, float64(mx-a.canvas.X), float64(my-a.canvas.Y))
 	}
@@ -265,6 +322,9 @@ func (a *EditorApp) handleStageKeys() {
 		return
 	}
 	ctrl := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
+	if ctrl && inpututil.IsKeyJustPressed(ebiten.KeyA) {
+		a.selectAllStageObjects()
+	}
 	if ctrl && inpututil.IsKeyJustPressed(ebiten.KeyD) {
 		a.duplicateSelectedStageObject()
 	}
@@ -272,6 +332,7 @@ func (a *EditorApp) handleStageKeys() {
 		a.deleteSelectedStageObject()
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+		a.st.marqueeActive = false
 		a.selectStageObject(-1)
 	}
 }

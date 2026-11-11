@@ -33,6 +33,12 @@ func (a *EditorApp) syncAnimBtns() {
 	a.animRemoveFrameBtns = a.animRemoveFrameBtns[:n]
 	a.animFramePrevBtns = a.animFramePrevBtns[:n]
 	a.animFrameNextBtns = a.animFrameNextBtns[:n]
+	for i := 0; i < n; i++ {
+		a.animAddFrameBtns[i].Tooltip = "Add frame"
+		a.animRemoveFrameBtns[i].Tooltip = "Remove frame"
+		a.animFramePrevBtns[i].Tooltip = "Previous frame"
+		a.animFrameNextBtns[i].Tooltip = "Next frame"
+	}
 	for len(a.animFrameInputs) < n {
 		inp := ui.NewTextInput(0, 0, 24, topPanelBtnH, a.th)
 		inp.Numeric = true
@@ -177,6 +183,11 @@ func (a *EditorApp) syncSpriteBtns() {
 	a.spriteFrameNextBtns = a.spriteFrameNextBtns[:n]
 	a.spriteWidthInputs = a.spriteWidthInputs[:n]
 	a.spriteHeightInputs = a.spriteHeightInputs[:n]
+	for i := 0; i < n; i++ {
+		a.spriteBrowseBtns[i].Tooltip = "Browse sprite file"
+		a.spriteFramePrevBtns[i].Tooltip = "Previous sprite frame"
+		a.spriteFrameNextBtns[i].Tooltip = "Next sprite frame"
+	}
 	if a.spriteTable.SelectedIdx >= n {
 		a.spriteTable.SelectedIdx = n - 1
 	}

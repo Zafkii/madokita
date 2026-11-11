@@ -276,6 +276,7 @@ func (a *EditorApp) applyHandleScale(mx, my int) {
 			a.props[1].SetNumeric(obj.Y)
 			a.props[2].SetNumeric(obj.Width)
 			a.props[3].SetNumeric(obj.Height)
+			a.markStageObjectLiveEdit()
 		}
 	}
 }

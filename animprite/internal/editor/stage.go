@@ -33,6 +33,11 @@ type stageToolRect struct {
 	X, Y, W, H int
 }
 
+type stageObjectDragStart struct {
+	Index int
+	X, Y  float64
+}
+
 type stageState struct {
 	images   map[string]*ebiten.Image
 	expanded map[string]bool
@@ -40,15 +45,21 @@ type stageState struct {
 	assetRects    []stageAssetRect
 	categoryRects []stageCategoryRect
 
-	toolTab         string
-	toolToggles     map[string]bool
-	toolTabRects    []stageToolRect
-	toolToggleRects []stageToolRect
+	toolTab          string
+	toolInfoAuto     bool
+	toolInfoHold     int
+	toolToggles      map[string]bool
+	toolTabRects     []stageToolRect
+	toolToggleRects  []stageToolRect
+	toolPage         int
+	toolPagePrevRect stageToolRect
+	toolPageNextRect stageToolRect
 
 	snap     bool
 	snapRect struct{ X, Y, W, H int }
 
-	selectedObj int
+	selectedObj  int
+	selectedObjs map[int]bool
 
 	dragAsset         int
 	draggingFromPanel bool
@@ -57,13 +68,21 @@ type stageState struct {
 	ghostWX           float64
 	ghostWY           float64
 
-	draggingObj     bool
-	dragUndoSaved   bool
-	dragObjStartX   float64
-	dragObjStartY   float64
-	dragWorldStartX float64
-	dragWorldStartY float64
-	panning         bool
+	draggingObj          bool
+	dragMoved            bool
+	dragUndoSaved        bool
+	dragObjStartX        float64
+	dragObjStartY        float64
+	dragWorldStartX      float64
+	dragWorldStartY      float64
+	dragObjStarts        []stageObjectDragStart
+	marqueeActive        bool
+	marqueeStartWX       float64
+	marqueeStartWY       float64
+	marqueeCurWX         float64
+	marqueeCurWY         float64
+	panning              bool
+	stagePointerOnObject bool
 
 	opacityInput *ui.TextInput
 	deleteBtn    *ui.Button
@@ -101,8 +120,24 @@ func (a *EditorApp) ensureStageMode() {
 	if a.st.toolToggles == nil {
 		a.st.toolToggles = make(map[string]bool)
 	}
+	if a.st.toolPage < 0 || a.st.toolPage >= stageToolPageCount() {
+		a.st.toolPage = 0
+	}
+	if a.st.selectedObjs == nil {
+		a.st.selectedObjs = make(map[int]bool)
+	}
 	if a.st.selectedObj < -1 || a.st.selectedObj >= len(a.proj.Stage.Objects) {
 		a.st.selectedObj = -1
+	}
+	for idx := range a.st.selectedObjs {
+		if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+			delete(a.st.selectedObjs, idx)
+		}
+	}
+	if a.st.selectedObj >= 0 {
+		a.st.selectedObjs[a.st.selectedObj] = true
+	} else {
+		a.st.selectedObjs = make(map[int]bool)
 	}
 	if a.st.dragAsset >= len(a.proj.Stage.Assets) {
 		a.st.dragAsset = -1
@@ -397,9 +432,13 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 	a.redoStack = nil
 	a.scaleHandle = -1
 	a.st.selectedObj = -1
+	a.st.selectedObjs = make(map[int]bool)
+	a.st.dragObjStarts = a.st.dragObjStarts[:0]
 	a.st.dragAsset = -1
 	a.st.draggingFromPanel = false
 	a.st.draggingObj = false
+	a.st.dragMoved = false
+	a.st.marqueeActive = false
 	a.st.panning = false
 	a.st.dragUndoSaved = false
 	a.rp.scroll = 0
@@ -536,10 +575,41 @@ func snapStagePosition(wx, wy, w, h float64, enabled bool) (float64, float64) {
 // dragStagePosition applies the world delta accumulated since the drag started
 // instead of the last frame's delta. Snapping the per-frame delta would reset
 // slow drags back to the same grid cell and the object would never move.
+// Snapping the accumulated delta preserves the object's original off-grid
+// position when the cursor returns to where the drag started.
 func dragStagePosition(startX, startY, startWX, startWY, wx, wy, w, h float64, snap bool) (float64, float64) {
-	x := startX + (wx - startWX)
-	y := startY + (wy - startWY)
-	return snapStagePosition(x, y, w, h, snap)
+	dx := wx - startWX
+	dy := wy - startWY
+	if snap {
+		dx = math.Round(dx/project.DefaultBlockSize) * project.DefaultBlockSize
+		dy = math.Round(dy/project.DefaultBlockSize) * project.DefaultBlockSize
+	}
+	return startX + dx, startY + dy
+}
+
+// markStageObjectLiveEdit moves the stage toolbar to Info while the selected
+// object is being changed. tickStageInfoAuto returns to Edit once the edit has
+// been idle for a moment, keeping the write actions close at hand again.
+func (a *EditorApp) markStageObjectLiveEdit() {
+	if a.selectedStageObject() == nil {
+		return
+	}
+	a.st.toolTab = "info"
+	a.st.toolInfoAuto = true
+	a.st.toolInfoHold = stageInfoHoldFrames
+}
+
+func (a *EditorApp) tickStageInfoAuto() {
+	if !a.isStageMode() || !a.st.toolInfoAuto {
+		return
+	}
+	if a.st.toolInfoHold > 0 {
+		a.st.toolInfoHold--
+	}
+	if a.st.toolInfoHold == 0 {
+		a.st.toolTab = "edit"
+		a.st.toolInfoAuto = false
+	}
 }
 
 func (a *EditorApp) selectStageObject(idx int) {
@@ -547,14 +617,27 @@ func (a *EditorApp) selectStageObject(idx int) {
 		idx = -1
 	}
 	a.st.selectedObj = idx
-	a.panelMode = panelModeStage
+	a.st.selectedObjs = make(map[int]bool)
+	if idx >= 0 {
+		a.st.selectedObjs[idx] = true
+	}
+	a.syncStageSelectionUI()
+}
 
-	if idx < 0 {
+func (a *EditorApp) syncStageSelectionUI() {
+	a.panelMode = panelModeStage
+	if a.st.selectedObj >= 0 || a.st.toolTab == "info" {
+		a.st.toolTab = "edit"
+	}
+	a.st.toolInfoAuto = false
+	a.st.toolInfoHold = 0
+
+	obj := a.selectedStageObject()
+	if obj == nil {
 		a.canvas.SetSelectionRect(canvas.SelectionRect{Visible: false})
 		return
 	}
 
-	obj := &a.proj.Stage.Objects[idx]
 	a.props[0].SetLabel("X")
 	a.props[0].SetNumeric(obj.X)
 	a.props[0].Min = -99999
@@ -589,6 +672,247 @@ func (a *EditorApp) selectStageObject(idx int) {
 	})
 }
 
+func (a *EditorApp) stageSelectedIndices() []int {
+	if a.st.selectedObjs == nil {
+		a.st.selectedObjs = make(map[int]bool)
+	}
+	if a.st.selectedObj >= 0 && a.st.selectedObj < len(a.proj.Stage.Objects) {
+		a.st.selectedObjs[a.st.selectedObj] = true
+	}
+	indices := make([]int, 0, len(a.st.selectedObjs))
+	for idx := range a.st.selectedObjs {
+		if idx >= 0 && idx < len(a.proj.Stage.Objects) {
+			indices = append(indices, idx)
+		}
+	}
+	sort.Ints(indices)
+	return indices
+}
+
+func (a *EditorApp) stageObjectSelected(idx int) bool {
+	if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+		return false
+	}
+	if idx == a.st.selectedObj {
+		return true
+	}
+	return a.st.selectedObjs != nil && a.st.selectedObjs[idx]
+}
+
+func (a *EditorApp) stageSelectionCount() int {
+	return len(a.stageSelectedIndices())
+}
+
+func (a *EditorApp) selectAllStageObjects() {
+	if len(a.proj.Stage.Objects) == 0 {
+		return
+	}
+	a.st.selectedObjs = make(map[int]bool, len(a.proj.Stage.Objects))
+	for idx := range a.proj.Stage.Objects {
+		a.st.selectedObjs[idx] = true
+	}
+	a.st.selectedObj = len(a.proj.Stage.Objects) - 1
+	a.syncStageSelectionUI()
+	a.setStatus(fmt.Sprintf("Selected %d objects", len(a.proj.Stage.Objects)))
+}
+
+func (a *EditorApp) addStageObjectSelection(idx int) {
+	if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+		return
+	}
+	if a.st.selectedObjs == nil {
+		a.st.selectedObjs = make(map[int]bool)
+	}
+	a.st.selectedObjs[idx] = true
+	a.st.selectedObj = idx
+	a.syncStageSelectionUI()
+	a.showStageSelectionCount()
+}
+
+func (a *EditorApp) toggleStageObjectSelection(idx int) {
+	if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+		return
+	}
+	if a.st.selectedObjs == nil {
+		a.st.selectedObjs = make(map[int]bool)
+	}
+	if a.stageObjectSelected(idx) {
+		delete(a.st.selectedObjs, idx)
+		if a.st.selectedObj == idx {
+			a.st.selectedObj = -1
+			if len(a.st.selectedObjs) > 0 {
+				indices := a.stageSelectedIndices()
+				if len(indices) > 0 {
+					a.st.selectedObj = indices[0]
+				}
+			}
+		}
+	} else {
+		a.st.selectedObjs[idx] = true
+		a.st.selectedObj = idx
+	}
+	a.syncStageSelectionUI()
+	a.showStageSelectionCount()
+}
+
+func (a *EditorApp) showStageSelectionCount() {
+	switch count := a.stageSelectionCount(); count {
+	case 0:
+		a.setStatus("Selection cleared")
+	case 1:
+		a.setStatus("Selected object")
+	default:
+		a.setStatus(fmt.Sprintf("Selected %d objects", count))
+	}
+}
+
+func (a *EditorApp) setStageObjectPrimary(idx int) {
+	if !a.stageObjectSelected(idx) {
+		return
+	}
+	a.st.selectedObj = idx
+	a.syncStageSelectionUI()
+}
+
+func (a *EditorApp) beginStageObjectDrag(wx, wy float64) {
+	obj := a.selectedStageObject()
+	if obj == nil {
+		return
+	}
+	a.st.dragObjStartX = obj.X
+	a.st.dragObjStartY = obj.Y
+	a.st.dragWorldStartX = wx
+	a.st.dragWorldStartY = wy
+	a.st.dragObjStarts = a.st.dragObjStarts[:0]
+	for _, idx := range a.stageSelectedIndices() {
+		start := &a.proj.Stage.Objects[idx]
+		a.st.dragObjStarts = append(a.st.dragObjStarts, stageObjectDragStart{
+			Index: idx,
+			X:     start.X,
+			Y:     start.Y,
+		})
+	}
+	a.st.draggingObj = true
+	a.st.dragMoved = false
+	a.st.dragUndoSaved = false
+}
+
+func (a *EditorApp) applyStageObjectDrag(newX, newY float64) {
+	dx := newX - a.st.dragObjStartX
+	dy := newY - a.st.dragObjStartY
+	if dx == 0 && dy == 0 && !a.st.dragMoved {
+		return
+	}
+	if !a.st.dragUndoSaved {
+		a.saveSnapshot()
+		a.st.dragUndoSaved = true
+	}
+	for _, start := range a.st.dragObjStarts {
+		if start.Index < 0 || start.Index >= len(a.proj.Stage.Objects) {
+			continue
+		}
+		moved := &a.proj.Stage.Objects[start.Index]
+		moved.X = start.X + dx
+		moved.Y = start.Y + dy
+	}
+	a.st.dragMoved = true
+	a.syncStageInputs()
+	a.markStageObjectLiveEdit()
+}
+
+func (a *EditorApp) beginStageMarquee(wx, wy float64) {
+	a.st.marqueeActive = true
+	a.st.marqueeStartWX = wx
+	a.st.marqueeStartWY = wy
+	a.st.marqueeCurWX = wx
+	a.st.marqueeCurWY = wy
+	a.st.stagePointerOnObject = false
+	a.st.draggingObj = false
+	a.st.panning = false
+	a.selectStageObject(-1)
+}
+
+func (a *EditorApp) updateStageMarquee(wx, wy float64) {
+	if !a.st.marqueeActive {
+		return
+	}
+	a.st.marqueeCurWX = wx
+	a.st.marqueeCurWY = wy
+	a.selectStageObjectsInMarquee()
+}
+
+func (a *EditorApp) finishStageMarquee() {
+	if !a.st.marqueeActive {
+		return
+	}
+	a.st.marqueeActive = false
+	switch count := a.stageSelectionCount(); count {
+	case 0:
+		a.setStatus("No objects selected")
+	case 1:
+		a.setStatus("Selected object")
+	default:
+		a.setStatus(fmt.Sprintf("Selected %d objects", count))
+	}
+}
+
+func (a *EditorApp) selectStageObjectsInMarquee() {
+	if !a.st.marqueeActive {
+		return
+	}
+	minX, maxX := a.st.marqueeStartWX, a.st.marqueeCurWX
+	if minX > maxX {
+		minX, maxX = maxX, minX
+	}
+	minY, maxY := a.st.marqueeStartWY, a.st.marqueeCurWY
+	if minY > maxY {
+		minY, maxY = maxY, minY
+	}
+
+	selected := make(map[int]bool)
+	for idx := range a.proj.Stage.Objects {
+		objMinX, objMinY, objMaxX, objMaxY := stageObjectWorldBounds(&a.proj.Stage.Objects[idx])
+		if objMaxX < minX || objMinX > maxX || objMaxY < minY || objMinY > maxY {
+			continue
+		}
+		selected[idx] = true
+	}
+	a.st.selectedObjs = selected
+	a.st.selectedObj = -1
+	if len(selected) > 0 {
+		indices := a.stageSelectedIndices()
+		if len(indices) > 0 {
+			a.st.selectedObj = indices[0]
+		}
+	}
+	a.syncStageSelectionUI()
+}
+
+func stageObjectWorldBounds(obj *project.StageObject) (minX, minY, maxX, maxY float64) {
+	rot := obj.Rotation * math.Pi / 180
+	cos := math.Cos(rot)
+	sin := math.Sin(rot)
+	hw := obj.Width / 2
+	hh := obj.Height / 2
+	corners := [4][2]float64{
+		{-hw, -hh},
+		{hw, -hh},
+		{hw, hh},
+		{-hw, hh},
+	}
+	minX, minY = math.Inf(1), math.Inf(1)
+	maxX, maxY = math.Inf(-1), math.Inf(-1)
+	for _, corner := range corners {
+		x := obj.X + corner[0]*cos - corner[1]*sin
+		y := obj.Y + corner[0]*sin + corner[1]*cos
+		minX = math.Min(minX, x)
+		minY = math.Min(minY, y)
+		maxX = math.Max(maxX, x)
+		maxY = math.Max(maxY, y)
+	}
+	return minX, minY, maxX, maxY
+}
+
 func (a *EditorApp) selectedStageObject() *project.StageObject {
 	if a.st.selectedObj < 0 || a.st.selectedObj >= len(a.proj.Stage.Objects) {
 		return nil
@@ -597,30 +921,57 @@ func (a *EditorApp) selectedStageObject() *project.StageObject {
 }
 
 func (a *EditorApp) deleteSelectedStageObject() {
-	obj := a.selectedStageObject()
-	if obj == nil {
+	indices := a.stageSelectedIndices()
+	if len(indices) == 0 {
 		return
 	}
 	a.saveSnapshot()
-	idx := a.st.selectedObj
-	a.proj.Stage.Objects = append(a.proj.Stage.Objects[:idx], a.proj.Stage.Objects[idx+1:]...)
+	selected := make(map[int]bool, len(indices))
+	for _, idx := range indices {
+		selected[idx] = true
+	}
+	objects := make([]project.StageObject, 0, len(a.proj.Stage.Objects)-len(indices))
+	for idx, obj := range a.proj.Stage.Objects {
+		if !selected[idx] {
+			objects = append(objects, obj)
+		}
+	}
+	a.proj.Stage.Objects = objects
 	a.selectStageObject(-1)
-	a.setStatus("Deleted object")
+	if len(indices) == 1 {
+		a.setStatus("Deleted object")
+	} else {
+		a.setStatus(fmt.Sprintf("Deleted %d objects", len(indices)))
+	}
 }
 
 func (a *EditorApp) duplicateSelectedStageObject() {
-	obj := a.selectedStageObject()
-	if obj == nil {
+	indices := a.stageSelectedIndices()
+	if len(indices) == 0 {
 		return
 	}
 	a.saveSnapshot()
-	dup := *obj
-	dup.X += project.DefaultBlockSize
-	dup.Y += project.DefaultBlockSize
-	dup.X, dup.Y = snapStagePosition(dup.X, dup.Y, dup.Width, dup.Height, a.st.snap)
-	a.proj.Stage.Objects = append(a.proj.Stage.Objects, dup)
-	a.selectStageObject(len(a.proj.Stage.Objects) - 1)
-	a.setStatus("Duplicated object")
+	newIndices := make([]int, 0, len(indices))
+	for _, idx := range indices {
+		dup := a.proj.Stage.Objects[idx]
+		dup.X += project.DefaultBlockSize
+		dup.Y += project.DefaultBlockSize
+		dup.X, dup.Y = snapStagePosition(dup.X, dup.Y, dup.Width, dup.Height, a.st.snap)
+		newIndices = append(newIndices, len(a.proj.Stage.Objects))
+		a.proj.Stage.Objects = append(a.proj.Stage.Objects, dup)
+	}
+
+	a.st.selectedObjs = make(map[int]bool, len(newIndices))
+	for _, idx := range newIndices {
+		a.st.selectedObjs[idx] = true
+	}
+	a.st.selectedObj = newIndices[len(newIndices)-1]
+	a.syncStageSelectionUI()
+	if len(newIndices) == 1 {
+		a.setStatus("Duplicated object")
+	} else {
+		a.setStatus(fmt.Sprintf("Duplicated %d objects", len(newIndices)))
+	}
 }
 
 func (a *EditorApp) stageObjectAtWorld(wx, wy float64) int {
@@ -688,6 +1039,104 @@ func (a *EditorApp) updateStageAssetDrag(mx, my int, leftDown bool) {
 
 	a.st.dragAsset = -1
 	a.st.draggingFromPanel = false
+}
+
+func (a *EditorApp) flushStageInputs() {
+	if a.scaleHandle >= 0 || a.st.draggingObj || a.st.draggingFromPanel {
+		return
+	}
+	primary := a.selectedStageObject()
+	if primary == nil {
+		return
+	}
+	indices := a.stageSelectedIndices()
+	if len(indices) == 0 {
+		return
+	}
+	focused := a.focusedInput()
+	multi := len(indices) > 1
+	if multi && focused == nil {
+		return
+	}
+
+	x := a.props[0].NumericValue()
+	y := a.props[1].NumericValue()
+	w := a.props[2].NumericValue()
+	if w < 1 {
+		w = 1
+	}
+	h := a.props[3].NumericValue()
+	if h < 1 {
+		h = 1
+	}
+	rot := a.props[4].NumericValue()
+	opacity := primary.Opacity
+	if a.st.opacityInput != nil {
+		opacity = clamp(a.st.opacityInput.NumericValue(), 0, 1)
+	}
+
+	origX := primary.X
+	origY := primary.Y
+	origW := primary.Width
+	origH := primary.Height
+	origRot := primary.Rotation
+	origOpacity := primary.Opacity
+
+	applyX := !multi || x != origX
+	applyY := !multi || y != origY
+	applyW := !multi || w != origW
+	applyH := !multi || h != origH
+	applyRot := !multi || rot != origRot
+	applyOpacity := !multi || opacity != origOpacity
+	if !applyX && !applyY && !applyW && !applyH && !applyRot && !applyOpacity {
+		return
+	}
+
+	dx := x - origX
+	dy := y - origY
+	changed := false
+	for _, idx := range indices {
+		obj := &a.proj.Stage.Objects[idx]
+		if applyX {
+			next := x
+			if idx != a.st.selectedObj {
+				next = obj.X + dx
+			}
+			if obj.X != next {
+				changed = true
+				obj.X = next
+			}
+		}
+		if applyY {
+			next := y
+			if idx != a.st.selectedObj {
+				next = obj.Y + dy
+			}
+			if obj.Y != next {
+				changed = true
+				obj.Y = next
+			}
+		}
+		if applyW && obj.Width != w {
+			changed = true
+			obj.Width = w
+		}
+		if applyH && obj.Height != h {
+			changed = true
+			obj.Height = h
+		}
+		if applyRot && obj.Rotation != rot {
+			changed = true
+			obj.Rotation = rot
+		}
+		if applyOpacity && obj.Opacity != opacity {
+			changed = true
+			obj.Opacity = opacity
+		}
+	}
+	if changed && focused != nil {
+		a.markStageObjectLiveEdit()
+	}
 }
 
 func (a *EditorApp) syncStageInputs() {

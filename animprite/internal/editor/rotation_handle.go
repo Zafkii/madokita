@@ -100,6 +100,7 @@ func (a *EditorApp) setRotationForTarget(target rightPanelMode, deg float64) boo
 		if obj := a.selectedStageObject(); obj != nil {
 			obj.Rotation = deg
 			a.props[4].SetNumeric(deg)
+			a.markStageObjectLiveEdit()
 			return true
 		}
 	}

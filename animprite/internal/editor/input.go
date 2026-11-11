@@ -19,6 +19,7 @@ func (a *EditorApp) handleTopPanelMouse(mx, my int, justL bool) {
 
 	ctrl := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
 
+	a.hoveredFilePath = ""
 	var vs, ve int
 	if !ctrl {
 		for _, tbl := range []*ui.Table{a.animTable, a.spriteTable, a.hurtboxTable, a.hitboxTable} {
@@ -43,6 +44,10 @@ func (a *EditorApp) handleTopPanelMouse(mx, my int, justL bool) {
 			a.spriteBrowseBtns[i].HandleMouse(mx, my, justL)
 			a.spriteFramePrevBtns[i].HandleMouse(mx, my, justL)
 			a.spriteFrameNextBtns[i].HandleMouse(mx, my, justL)
+			if i < len(a.spriteBrowseBtns) && i < len(a.proj.Sprites) &&
+				a.spriteBrowseBtns[i].HitTest(mx, my) && a.proj.Sprites[i].File != "" {
+				a.hoveredFilePath = a.proj.Sprites[i].File
+			}
 			if i < len(a.spriteWidthInputs) {
 				a.spriteWidthInputs[i].HandleMouse(mx, my, justL)
 			}
@@ -76,17 +81,6 @@ func (a *EditorApp) handleTopPanelMouse(mx, my int, justL bool) {
 			if i < len(a.hitboxHeightInputs) {
 				a.hitboxHeightInputs[i].HandleMouse(mx, my, justL)
 			}
-		}
-	}
-
-	a.hoveredFilePath = ""
-	for i := vs; i < ve; i++ {
-		btn := a.spriteBrowseBtns[i]
-		if mx >= btn.X && mx <= btn.X+btn.W && my >= btn.Y && my <= btn.Y+btn.H {
-			if i < len(a.proj.Sprites) && a.proj.Sprites[i].File != "" {
-				a.hoveredFilePath = a.proj.Sprites[i].File
-			}
-			break
 		}
 	}
 

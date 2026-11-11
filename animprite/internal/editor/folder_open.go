@@ -323,6 +323,8 @@ func (a *EditorApp) setEditorMode(mode editorMode) {
 		a.st.dragAsset = -1
 		a.st.draggingFromPanel = false
 		a.st.draggingObj = false
+		a.st.dragMoved = false
+		a.st.marqueeActive = false
 		a.st.panning = false
 		a.st.dragUndoSaved = false
 		a.scaleHandle = -1

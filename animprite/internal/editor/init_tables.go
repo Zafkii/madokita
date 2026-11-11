@@ -41,6 +41,7 @@ func (a *EditorApp) initTables() {
 	// ── Animation table buttons ──
 	addAnimBtn := ui.NewButton(0, 0, ui.ButtonWidth("+"), topPanelBtnH, "+", th)
 	addAnimBtn.BtnType = ui.BtnBlue
+	addAnimBtn.Tooltip = "Add animation"
 	addAnimBtn.OnClick = func() {
 		a.saveSnapshot()
 		n := len(a.proj.Animations)
@@ -66,6 +67,7 @@ func (a *EditorApp) initTables() {
 	}
 	delAnimBtn := ui.NewButton(0, 0, ui.ButtonWidth("-"), topPanelBtnH, "-", th)
 	delAnimBtn.BtnType = ui.BtnRed
+	delAnimBtn.Tooltip = "Remove animation"
 	delAnimBtn.OnClick = func() {
 		a.saveSnapshotNoDirty()
 		if idx := a.animTable.SelectedIdx; idx >= 0 && idx < len(a.proj.Animations) {
@@ -134,6 +136,7 @@ func (a *EditorApp) initTables() {
 	// ── Sprite table buttons ──
 	addSpriteBtn := ui.NewButton(0, 0, ui.ButtonWidth("+"), topPanelBtnH, "+", th)
 	addSpriteBtn.BtnType = ui.BtnBlue
+	addSpriteBtn.Tooltip = "Add sprite"
 	addSpriteBtn.OnClick = func() {
 		a.flushInputsToData()
 		a.saveSnapshot()
@@ -156,6 +159,7 @@ func (a *EditorApp) initTables() {
 	}
 	delSpriteBtn := ui.NewButton(0, 0, ui.ButtonWidth("-"), topPanelBtnH, "-", th)
 	delSpriteBtn.BtnType = ui.BtnRed
+	delSpriteBtn.Tooltip = "Remove sprite"
 	delSpriteBtn.OnClick = func() {
 		a.flushInputsToData()
 		a.saveSnapshot()
@@ -218,14 +222,11 @@ func (a *EditorApp) initTables() {
 		frameNavY := rowY + (topTableRowH-topPanelBtnH)/2
 		a.spriteBrowseBtns[idx].X = fileX
 		a.spriteBrowseBtns[idx].Y = frameNavY
-		a.spriteBrowseBtns[idx].Draw(screen)
+		a.spriteBrowseBtns[idx].Tooltip = "Browse sprite file"
 		if row.File != "" {
-			fileTextX := fileX + a.spriteBrowseBtns[idx].W + 2
-			fileTextW := (tx + xs[2] - 2) - fileTextX
-			if fileTextW > 4 {
-				ui.DrawText(screen, ui.TruncateText(row.File, fileTextW), fileTextX, rowY+3, 1, p.TextPrimary)
-			}
+			a.spriteBrowseBtns[idx].Tooltip = row.File
 		}
+		a.spriteBrowseBtns[idx].Draw(screen)
 
 		iw := xs[3] - xs[2] - 2
 		if iw < 20 {
@@ -263,6 +264,7 @@ func (a *EditorApp) initTables() {
 	// ── Hurtbox table buttons ──
 	addHbBtn := ui.NewButton(0, 0, ui.ButtonWidth("+"), topPanelBtnH, "+", th)
 	addHbBtn.BtnType = ui.BtnBlue
+	addHbBtn.Tooltip = "Add hurtbox"
 	addHbBtn.OnClick = func() {
 		a.flushInputsToData()
 		a.saveSnapshotNoDirty()
@@ -277,6 +279,7 @@ func (a *EditorApp) initTables() {
 	}
 	delHbBtn := ui.NewButton(0, 0, ui.ButtonWidth("-"), topPanelBtnH, "-", th)
 	delHbBtn.BtnType = ui.BtnRed
+	delHbBtn.Tooltip = "Remove hurtbox"
 	delHbBtn.OnClick = func() {
 		a.flushInputsToData()
 		a.saveSnapshotNoDirty()
@@ -299,7 +302,8 @@ func (a *EditorApp) initTables() {
 			a.navigateToHurtbox(-1)
 		}
 	}
-	copyHbBtn := ui.NewButton(0, 0, ui.ButtonWidth("\U000F04AE Copy Prev"), topPanelBtnH, "\U000F04AE Copy Prev", th)
+	copyHbBtn := ui.NewButton(0, 0, ui.ButtonWidth("\U000F04AE"), topPanelBtnH, "\U000F04AE", th)
+	copyHbBtn.Tooltip = "Copy previous hurtbox"
 	copyHbBtn.OnClick = func() {
 		a.saveSnapshotNoDirty()
 		frame := a.currentFrame()
@@ -385,6 +389,7 @@ func (a *EditorApp) initTables() {
 	// ── Hitbox table buttons ──
 	addHtBtn := ui.NewButton(0, 0, ui.ButtonWidth("+"), topPanelBtnH, "+", th)
 	addHtBtn.BtnType = ui.BtnBlue
+	addHtBtn.Tooltip = "Add hitbox"
 	addHtBtn.OnClick = func() {
 		a.saveSnapshot()
 		a.proj.HitDefs = append(a.proj.HitDefs, project.HitboxRow{})
@@ -393,6 +398,7 @@ func (a *EditorApp) initTables() {
 	}
 	delHtBtn := ui.NewButton(0, 0, ui.ButtonWidth("-"), topPanelBtnH, "-", th)
 	delHtBtn.BtnType = ui.BtnRed
+	delHtBtn.Tooltip = "Remove hitbox"
 	delHtBtn.OnClick = func() {
 		a.saveSnapshotNoDirty()
 		if idx := a.hitboxTable.SelectedIdx; idx >= 0 && idx < len(a.proj.HitDefs) {
@@ -402,7 +408,8 @@ func (a *EditorApp) initTables() {
 			a.syncLayout()
 		}
 	}
-	copyHtBtn := ui.NewButton(0, 0, ui.ButtonWidth("\U000F04AE Copy Prev"), topPanelBtnH, "\U000F04AE Copy Prev", th)
+	copyHtBtn := ui.NewButton(0, 0, ui.ButtonWidth("\U000F04AE"), topPanelBtnH, "\U000F04AE", th)
+	copyHtBtn.Tooltip = "Copy previous hitbox"
 	copyHtBtn.OnClick = func() {
 		a.saveSnapshotNoDirty()
 		if len(a.proj.HitDefs) >= 2 {

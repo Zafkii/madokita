@@ -44,6 +44,23 @@ func (a *EditorApp) buildStageRenders() {
 	a.canvas.SetSpriteRenders(renders)
 	a.canvas.SetHurtboxRenders(nil)
 
+	extras := make([]canvas.SelectionRect, 0, a.stageSelectionCount())
+	for _, idx := range a.stageSelectedIndices() {
+		if idx == a.st.selectedObj {
+			continue
+		}
+		obj := &stage.Objects[idx]
+		extras = append(extras, canvas.SelectionRect{
+			X:        obj.X - obj.Width/2,
+			Y:        obj.Y - obj.Height/2,
+			W:        obj.Width,
+			H:        obj.Height,
+			Rotation: obj.Rotation * math.Pi / 180,
+			Visible:  true,
+		})
+	}
+	a.canvas.SetExtraSelections(extras)
+
 	if obj := a.selectedStageObject(); obj != nil {
 		a.canvas.SetSelectionRect(canvas.SelectionRect{
 			X:        obj.X - obj.Width/2,

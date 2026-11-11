@@ -116,6 +116,9 @@ func (a *EditorApp) Update() error {
 	}
 
 	a.flushInputsToData()
+	if a.isStageMode() {
+		a.tickStageInfoAuto()
+	}
 	a.advancePreview()
 
 	a.prevMouseX = mx
@@ -125,27 +128,7 @@ func (a *EditorApp) Update() error {
 
 func (a *EditorApp) flushInputsToData() {
 	if a.isStageMode() {
-		if a.scaleHandle >= 0 || a.st.draggingObj || a.st.draggingFromPanel {
-			return
-		}
-		obj := a.selectedStageObject()
-		if obj == nil {
-			return
-		}
-		obj.X = a.props[0].NumericValue()
-		obj.Y = a.props[1].NumericValue()
-		obj.Width = a.props[2].NumericValue()
-		if obj.Width < 1 {
-			obj.Width = 1
-		}
-		obj.Height = a.props[3].NumericValue()
-		if obj.Height < 1 {
-			obj.Height = 1
-		}
-		obj.Rotation = a.props[4].NumericValue()
-		if a.st.opacityInput != nil {
-			obj.Opacity = clamp(a.st.opacityInput.NumericValue(), 0, 1)
-		}
+		a.flushStageInputs()
 		return
 	}
 
@@ -236,7 +219,7 @@ func (a *EditorApp) focusedInput() *ui.TextInput {
 			return nil
 		}
 		for i := range a.props {
-			if a.props[i].Focused {
+			if a.props[i] != nil && a.props[i].Focused {
 				return a.props[i]
 			}
 		}

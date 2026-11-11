@@ -19,8 +19,10 @@ func (a *EditorApp) Draw(screen *ebiten.Image) {
 	a.buildSpriteRenders()
 	a.canvas.RotationHandleVisible = ebiten.IsKeyPressed(ebiten.KeyShift) || a.rotationDrag.active
 	a.canvas.Draw(screen)
+	a.drawStageMarquee(screen, p)
 
 	a.drawRightPanel(screen, p)
+	a.drawTooltips(screen, p)
 	a.drawConfirmDialog(screen, p)
 }
 
