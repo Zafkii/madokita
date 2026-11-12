@@ -234,6 +234,9 @@ func (a *EditorApp) dispatchWheel(mx, my int, wy float64) {
 	}
 	if my >= ty && my < ty+a.topPanelH {
 		if a.isStageMode() {
+			if a.st.collisionEdit && a.st.collisionTable != nil && a.st.collisionTable.HitTest(mx, my) {
+				a.st.collisionTable.ScrollBy(amt)
+			}
 			return
 		}
 		if !a.handleScrollWheel(mx, my, wy) {

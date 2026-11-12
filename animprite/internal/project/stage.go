@@ -8,6 +8,7 @@ import (
 const (
 	StageVersion       = 1
 	StageCategoryBG    = "bg"
+	StageCategoryProp  = "prop"
 	StageCategoryBlock = "block"
 	DefaultStageLayer  = "Layer 1"
 	DefaultBlockSize   = 50.0
@@ -31,18 +32,83 @@ type StageLayer struct {
 	Name string `json:"name"`
 }
 
-// StageObject is one image placed in the stage. X/Y are the object center.
-// Layer is the name of the StageLayer that owns the object.
-type StageObject struct {
-	Layer    string  `json:"layer,omitempty"`
-	Category string  `json:"category"`
-	File     string  `json:"file"`
+// StageBox is one collision or hit box owned by an object. X/Y are offsets
+// from the object center; Rotation is in degrees and adds to the object angle.
+type StageBox struct {
 	X        float64 `json:"x"`
 	Y        float64 `json:"y"`
 	Width    float64 `json:"width"`
 	Height   float64 `json:"height"`
-	Rotation float64 `json:"rotation"`
-	Opacity  float64 `json:"opacity"`
+	Rotation float64 `json:"rotation,omitempty"`
+}
+
+// StageObject is one image placed in the stage. X/Y are the object center.
+// Layer is the name of the StageLayer that owns the object.
+//
+// Blocks have collision on by default: when CollisionBoxes is empty, a single
+// box matching Width/Height is used. Props keep their image size and have no
+// collision until an authored box is added. CollisionDisabled turns off both
+// the collision and every authored hitbox for the object.
+type StageObject struct {
+	Layer             string     `json:"layer,omitempty"`
+	Category          string     `json:"category"`
+	File              string     `json:"file"`
+	X                 float64    `json:"x"`
+	Y                 float64    `json:"y"`
+	Width             float64    `json:"width"`
+	Height            float64    `json:"height"`
+	Rotation          float64    `json:"rotation"`
+	Opacity           float64    `json:"opacity"`
+	CollisionDisabled bool       `json:"collisionDisabled,omitempty"`
+	CollisionBoxes    []StageBox `json:"collisionBoxes,omitempty"`
+	Hitboxes          []StageBox `json:"hitboxes,omitempty"`
+}
+
+// DeepCopy copies the object and its box slices so undo snapshots stay
+// independent from later edits.
+func (o StageObject) DeepCopy() StageObject {
+	o.CollisionBoxes = append([]StageBox(nil), o.CollisionBoxes...)
+	o.Hitboxes = append([]StageBox(nil), o.Hitboxes...)
+	return o
+}
+
+// DefaultCollisionBox returns the implicit collision box of a block: the box
+// matches the rendered object size and sits at its center.
+func (o StageObject) DefaultCollisionBox() StageBox {
+	w := o.Width
+	h := o.Height
+	if w <= 0 {
+		w = DefaultBlockSize
+	}
+	if h <= 0 {
+		h = DefaultBlockSize
+	}
+	return StageBox{Width: w, Height: h}
+}
+
+// EffectiveCollisionBoxes returns the boxes rendered and exported for this
+// object. Backgrounds and disabled objects have none. Blocks with no authored
+// boxes fall back to the default box; props only collide when a box was
+// authored explicitly.
+func (o StageObject) EffectiveCollisionBoxes() []StageBox {
+	if o.Category == StageCategoryBG || o.CollisionDisabled {
+		return nil
+	}
+	if len(o.CollisionBoxes) > 0 {
+		return o.CollisionBoxes
+	}
+	if o.Category == StageCategoryBlock {
+		return []StageBox{o.DefaultCollisionBox()}
+	}
+	return nil
+}
+
+// EffectiveHitboxes returns the authored damage boxes for this object.
+func (o StageObject) EffectiveHitboxes() []StageBox {
+	if o.Category == StageCategoryBG || o.CollisionDisabled {
+		return nil
+	}
+	return o.Hitboxes
 }
 
 // StageData is the serialized stage document.
@@ -75,7 +141,10 @@ func (l StageData) DeepCopy() StageData {
 	out := l
 	out.Layers = append([]StageLayer(nil), l.Layers...)
 	out.Assets = append([]StageAsset(nil), l.Assets...)
-	out.Objects = append([]StageObject(nil), l.Objects...)
+	out.Objects = make([]StageObject, len(l.Objects))
+	for i := range l.Objects {
+		out.Objects[i] = l.Objects[i].DeepCopy()
+	}
 	return out
 }
 
@@ -141,8 +210,9 @@ func (l StageData) LayerNameFor(obj StageObject) string {
 	return DefaultStageLayer
 }
 
-// StageCategoryForFile classifies an image by its filename. Backgrounds are
-// detected by "bg", "background" or "sky"; everything else is a block asset.
+// StageCategoryForFile classifies an image by its filename or containing
+// folder. Backgrounds are detected by "bg", "background" or "sky"; props by
+// "prop", "decor" or "scenery"; everything else is a block asset.
 func StageCategoryForFile(name string) string {
 	base := filepath.Base(name)
 	base = strings.TrimSuffix(base, filepath.Ext(base))
@@ -150,6 +220,11 @@ func StageCategoryForFile(name string) string {
 	for _, marker := range []string{"bg", "background", "sky"} {
 		if strings.Contains(base, marker) {
 			return StageCategoryBG
+		}
+	}
+	for _, marker := range []string{"prop", "decor", "scenery"} {
+		if strings.Contains(base, marker) {
+			return StageCategoryProp
 		}
 	}
 	return StageCategoryBlock

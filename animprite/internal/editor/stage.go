@@ -51,18 +51,19 @@ type stageState struct {
 	categoryRects []stageCategoryRect
 	layerRects    []stageLayerRect
 
-	toolTab          string
-	toolInfoAuto     bool
-	toolInfoHold     int
-	toolToggles      map[string]bool
-	toolTabRects     []stageToolRect
-	toolToggleRects  []stageToolRect
-	toolPage         int
-	toolPagePrevRect stageToolRect
-	toolPageNextRect stageToolRect
+	toolTab         string
+	toolInfoAuto    bool
+	toolInfoHold    int
+	toolToggles     map[string]bool
+	toolTabRects    []stageToolRect
+	toolToggleRects []stageToolRect
 
 	snap     bool
 	snapRect struct{ X, Y, W, H int }
+
+	showCollisions bool
+	collisionEdit  bool
+	collisionTab   string
 
 	selectedObj  int
 	selectedObjs map[int]bool
@@ -98,6 +99,18 @@ type stageState struct {
 	layerDeleteBtn *ui.Button
 	layerUpBtn     *ui.Button
 	layerDownBtn   *ui.Button
+
+	collisionViewBtn   *ui.Button
+	collisionEditBtn   *ui.Button
+	collisionToggleBtn *ui.Button
+	collisionBackBtn   *ui.Button
+	collisionTabBtns   []*ui.Button
+	collisionTable     *ui.Table
+	collisionXInputs   []*ui.TextInput
+	collisionYInputs   []*ui.TextInput
+	collisionWInputs   []*ui.TextInput
+	collisionHInputs   []*ui.TextInput
+	collisionRotInputs []*ui.TextInput
 }
 
 func (a *EditorApp) ensureStageMode() {
@@ -126,6 +139,7 @@ func (a *EditorApp) ensureStageMode() {
 	if a.st.expanded == nil {
 		a.st.expanded = map[string]bool{
 			project.StageCategoryBG:    true,
+			project.StageCategoryProp:  true,
 			project.StageCategoryBlock: true,
 		}
 	}
@@ -134,9 +148,6 @@ func (a *EditorApp) ensureStageMode() {
 	}
 	if a.st.toolToggles == nil {
 		a.st.toolToggles = make(map[string]bool)
-	}
-	if a.st.toolPage < 0 || a.st.toolPage >= stageToolPageCount() {
-		a.st.toolPage = 0
 	}
 	if a.st.selectedObjs == nil {
 		a.st.selectedObjs = make(map[int]bool)
@@ -262,9 +273,13 @@ func scanStageAssets(dir string) ([]project.StageAsset, error) {
 			continue
 		}
 
+		category := project.StageCategoryForFile(entry.Name())
+		if category == project.StageCategoryBlock {
+			category = project.StageCategoryForFile(filepath.Base(dir))
+		}
 		name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
 		assets = append(assets, project.StageAsset{
-			Category:   project.StageCategoryForFile(entry.Name()),
+			Category:   category,
 			Name:       name,
 			File:       path,
 			Width:      cfg.Width,
@@ -435,8 +450,13 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 		}
 	}
 	for i := range stage.Objects {
-		if stage.Objects[i].Category == "" {
-			stage.Objects[i].Category = project.StageCategoryForFile(stage.Objects[i].File)
+		obj := &stage.Objects[i]
+		if obj.Category == "" {
+			obj.Category = project.StageCategoryForFile(obj.File)
+		}
+		if obj.Category == project.StageCategoryProp &&
+			len(obj.CollisionBoxes) == 0 && len(obj.Hitboxes) == 0 {
+			obj.CollisionDisabled = true
 		}
 	}
 	stage.NormalizeLayers()
@@ -568,15 +588,16 @@ func (a *EditorApp) addStageObjectFromAsset(assetIdx int, wx, wy float64) {
 	general := a.st.activeLayer == ""
 	layer := a.stageWriteLayer()
 	a.proj.Stage.Objects = append(a.proj.Stage.Objects, project.StageObject{
-		Layer:    layer,
-		Category: asset.Category,
-		File:     asset.File,
-		X:        wx,
-		Y:        wy,
-		Width:    w,
-		Height:   h,
-		Rotation: 0,
-		Opacity:  1,
+		Layer:             layer,
+		Category:          asset.Category,
+		File:              asset.File,
+		X:                 wx,
+		Y:                 wy,
+		Width:             w,
+		Height:            h,
+		Rotation:          0,
+		Opacity:           1,
+		CollisionDisabled: asset.Category == project.StageCategoryProp,
 	})
 	a.selectStageObject(len(a.proj.Stage.Objects) - 1)
 	if general {
@@ -671,6 +692,9 @@ func (a *EditorApp) syncStageSelectionUI() {
 	obj := a.selectedStageObject()
 	if obj == nil {
 		a.canvas.SetSelectionRect(canvas.SelectionRect{Visible: false})
+		if a.st.collisionEdit {
+			a.closeStageCollisionEditor()
+		}
 		return
 	}
 
@@ -706,6 +730,9 @@ func (a *EditorApp) syncStageSelectionUI() {
 		Rotation: obj.Rotation * math.Pi / 180,
 		Visible:  true,
 	})
+	if a.st.collisionEdit {
+		a.syncStageCollisionInputs()
+	}
 }
 
 func (a *EditorApp) stageSelectedIndices() []int {
@@ -992,7 +1019,7 @@ func (a *EditorApp) duplicateSelectedStageObject() {
 	a.saveSnapshot()
 	newIndices := make([]int, 0, len(indices))
 	for _, idx := range indices {
-		dup := a.proj.Stage.Objects[idx]
+		dup := a.proj.Stage.Objects[idx].DeepCopy()
 		dup.X += project.DefaultBlockSize
 		dup.Y += project.DefaultBlockSize
 		dup.X, dup.Y = snapStagePosition(dup.X, dup.Y, dup.Width, dup.Height, a.st.snap)
@@ -1134,17 +1161,17 @@ func (a *EditorApp) stageObjectAtWorld(wx, wy float64) int {
 	}
 	objects := a.proj.Stage.Objects
 	// Walk layers from front to back. Inside one layer, blocks stay ahead of
-	// backgrounds so a full-stage backdrop does not swallow block clicks.
+	// props and props ahead of backgrounds so a full-stage backdrop does not
+	// swallow clicks on smaller objects.
 	for li := len(a.proj.Stage.Layers) - 1; li >= 0; li-- {
 		layer := a.proj.Stage.Layers[li].Name
-		for _, wantBlock := range []bool{true, false} {
+		for _, wantCategory := range []string{project.StageCategoryBlock, project.StageCategoryProp, project.StageCategoryBG} {
 			for i := len(objects) - 1; i >= 0; i-- {
 				obj := &objects[i]
 				if a.proj.Stage.LayerNameFor(*obj) != layer {
 					continue
 				}
-				isBlock := obj.Category == project.StageCategoryBlock
-				if isBlock != wantBlock {
+				if obj.Category != wantCategory {
 					continue
 				}
 				dx := wx - obj.X

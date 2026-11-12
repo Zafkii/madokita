@@ -18,6 +18,12 @@ func (a *EditorApp) clearStageInputFocus() {
 	if a.st.opacityInput != nil {
 		a.st.opacityInput.Focused = false
 	}
+	for _, inp := range a.stageCollisionInputList() {
+		if inp != nil {
+			inp.Focused = false
+			inp.Visible = false
+		}
+	}
 }
 
 func (a *EditorApp) pointInCanvas(mx, my int) bool {
@@ -42,8 +48,13 @@ func stageInfoInputHit(inp *ui.TextInput, mx, my int) bool {
 }
 
 func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
+	if a.st.collisionEdit {
+		if a.handleStageCollisionMouse(mx, my, justL) {
+			return
+		}
+	}
 	if a.st.toolTab == "edit" && a.selectedStageObject() != nil {
-		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn} {
+		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.collisionEditBtn, a.st.collisionToggleBtn} {
 			if btn == nil {
 				continue
 			}
@@ -83,25 +94,18 @@ func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 	for _, r := range a.st.toolTabRects {
 		if mx >= r.X && mx <= r.X+r.W && my >= r.Y && my <= r.Y+r.H {
 			a.clearStageInputFocus()
+			if a.st.collisionEdit {
+				a.st.collisionEdit = false
+				if a.st.collisionTable != nil {
+					a.st.collisionTable.Visible = false
+				}
+				a.syncLayout()
+			}
 			a.st.toolTab = r.Key
 			a.st.toolInfoAuto = false
 			a.st.toolInfoHold = 0
 			return
 		}
-	}
-	if r := a.st.toolPagePrevRect; r.W > 0 &&
-		mx >= r.X && mx <= r.X+r.W && my >= r.Y && my <= r.Y+r.H {
-		if a.st.toolPage > 0 {
-			a.st.toolPage--
-		}
-		return
-	}
-	if r := a.st.toolPageNextRect; r.W > 0 &&
-		mx >= r.X && mx <= r.X+r.W && my >= r.Y && my <= r.Y+r.H {
-		if a.st.toolPage < stageToolPageCount()-1 {
-			a.st.toolPage++
-		}
-		return
 	}
 	for _, r := range a.st.toolToggleRects {
 		if mx >= r.X && mx <= r.X+r.W && my >= r.Y && my <= r.Y+r.H {
@@ -120,7 +124,7 @@ func (a *EditorApp) handleStagePanelMouse(mx, my int, justL bool) {
 		return
 	}
 
-	for _, btn := range []*ui.Button{a.st.layerAddBtn, a.st.layerDeleteBtn, a.st.layerUpBtn, a.st.layerDownBtn} {
+	for _, btn := range []*ui.Button{a.st.layerAddBtn, a.st.layerDeleteBtn, a.st.layerUpBtn, a.st.layerDownBtn, a.st.collisionViewBtn} {
 		if btn == nil {
 			continue
 		}

@@ -523,6 +523,10 @@ func (a *EditorApp) recalcSpriteFrameCount(idx int) {
 
 func (a *EditorApp) computeTopPanelHeight() {
 	if a.isStageMode() {
+		if a.st.collisionEdit && a.selectedStageObject() != nil {
+			a.topPanelH = stageCollisionTopPanelH
+			return
+		}
 		a.topPanelH = topPanelMinH
 		return
 	}

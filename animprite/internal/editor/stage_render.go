@@ -16,17 +16,17 @@ func (a *EditorApp) buildStageRenders() {
 	}
 	renders := make([]canvas.SpriteRender, 0, len(stage.Objects))
 
-	// Layers render bottom to top. Inside one layer backgrounds render first
-	// and blocks on top, matching hit-testing inside that layer.
+	// Layers render bottom to top. Inside one layer backgrounds render first,
+	// props above them and blocks on top, matching hit-testing inside that
+	// layer.
 	for _, layer := range stage.Layers {
-		for _, wantBlock := range []bool{false, true} {
+		for _, wantCategory := range []string{project.StageCategoryBG, project.StageCategoryProp, project.StageCategoryBlock} {
 			for i := range stage.Objects {
 				obj := &stage.Objects[i]
 				if stage.LayerNameFor(*obj) != layer.Name {
 					continue
 				}
-				isBlock := obj.Category == project.StageCategoryBlock
-				if isBlock != wantBlock {
+				if obj.Category != wantCategory {
 					continue
 				}
 				renders = append(renders, a.stageObjectRender(obj, a.stageObjectOpacity(obj)))
@@ -53,7 +53,7 @@ func (a *EditorApp) buildStageRenders() {
 		renders = nil
 	}
 	a.canvas.SetSpriteRenders(renders)
-	a.canvas.SetHurtboxRenders(nil)
+	a.canvas.SetHurtboxRenders(a.stageCollisionRenders())
 
 	extras := make([]canvas.SelectionRect, 0, a.stageSelectionCount())
 	for _, idx := range a.stageSelectedIndices() {
@@ -132,4 +132,55 @@ func (a *EditorApp) stageObjectRender(obj *project.StageObject, opacity float64)
 	r.PlaceholderW = w
 	r.PlaceholderH = h
 	return r
+}
+
+// stageBoxRender places an authored box in world space using the object's
+// center and rotation. Box X/Y are offsets from that center.
+func stageBoxRender(obj *project.StageObject, box project.StageBox, kind canvas.RenderKind, selected bool) canvas.HurtboxRender {
+	rot := obj.Rotation * math.Pi / 180
+	cos := math.Cos(rot)
+	sin := math.Sin(rot)
+	return canvas.HurtboxRender{
+		OffsetX:     obj.X + box.X*cos - box.Y*sin,
+		OffsetY:     obj.Y + box.X*sin + box.Y*cos,
+		WorldWidth:  box.Width,
+		WorldHeight: box.Height,
+		Rotation:    rot + box.Rotation*math.Pi/180,
+		Selected:    selected,
+		Kind:        kind,
+	}
+}
+
+// stageCollisionRenders builds the collision and hitbox overlays shown when
+// the Layers panel's show-collisions toggle is on. Disabled blocks produce no
+// overlays; blocks without authored collision fall back to their block size.
+func (a *EditorApp) stageCollisionRenders() []canvas.HurtboxRender {
+	if !a.st.showCollisions {
+		return nil
+	}
+	stage := &a.proj.Stage
+	var out []canvas.HurtboxRender
+	for i := range stage.Objects {
+		obj := &stage.Objects[i]
+		collisions := obj.EffectiveCollisionBoxes()
+		hitboxes := obj.EffectiveHitboxes()
+		if len(collisions) == 0 && len(hitboxes) == 0 {
+			continue
+		}
+
+		selectedObj := a.st.collisionEdit && i == a.st.selectedObj
+		activeIdx := -1
+		if a.st.collisionTable != nil {
+			activeIdx = a.st.collisionTable.SelectedIdx
+		}
+		for j, box := range collisions {
+			selected := selectedObj && a.st.collisionTab == "collision" && j == activeIdx
+			out = append(out, stageBoxRender(obj, box, canvas.RenderCollision, selected))
+		}
+		for j, box := range hitboxes {
+			selected := selectedObj && a.st.collisionTab == "hitbox" && j == activeIdx
+			out = append(out, stageBoxRender(obj, box, canvas.RenderHitbox, selected))
+		}
+	}
+	return out
 }

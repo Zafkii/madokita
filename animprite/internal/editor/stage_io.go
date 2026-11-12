@@ -41,13 +41,37 @@ func ExportStage(path string, stage project.StageData) error {
 	b.WriteString("\t},\n")
 	b.WriteString("\tObjects: []Object{\n")
 	for _, obj := range stage.Objects {
-		fmt.Fprintf(&b, "\t\t{Layer: %q, Category: %q, File: %q, X: %g, Y: %g, Width: %g, Height: %g, Rotation: %g, Opacity: %g},\n",
+		fmt.Fprintf(&b, "\t\t{Layer: %q, Category: %q, File: %q, X: %g, Y: %g, Width: %g, Height: %g, Rotation: %g, Opacity: %g",
 			obj.Layer, obj.Category, relativeSpritePath(dir, obj.File),
 			obj.X, obj.Y, obj.Width, obj.Height, obj.Rotation, obj.Opacity)
+		if obj.CollisionDisabled {
+			b.WriteString(", CollisionDisabled: true")
+		}
+		if len(obj.CollisionBoxes) > 0 {
+			fmt.Fprintf(&b, ", CollisionBoxes: %s", stageBoxLiteral(obj.CollisionBoxes))
+		}
+		if len(obj.Hitboxes) > 0 {
+			fmt.Fprintf(&b, ", Hitboxes: %s", stageBoxLiteral(obj.Hitboxes))
+		}
+		b.WriteString("},\n")
 	}
 	b.WriteString("\t},\n}\n")
 
 	return os.WriteFile(path, []byte(b.String()), 0644)
+}
+
+func stageBoxLiteral(boxes []project.StageBox) string {
+	var b strings.Builder
+	b.WriteString("[]Box{")
+	for i, box := range boxes {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "{X: %g, Y: %g, Width: %g, Height: %g, Rotation: %g}",
+			box.X, box.Y, box.Width, box.Height, box.Rotation)
+	}
+	b.WriteString("}")
+	return b.String()
 }
 
 // ImportStage reads a Go stage data file produced by ExportStage (or written
@@ -237,6 +261,12 @@ func parseStageObjects(expr ast.Expr, dir string) []project.StageObject {
 			case "Opacity":
 				obj.Opacity = floatLit(kve.Value)
 				haveOpacity = true
+			case "CollisionDisabled":
+				obj.CollisionDisabled = exprString(kve.Value) == "true"
+			case "CollisionBoxes":
+				obj.CollisionBoxes = parseStageBoxes(kve.Value)
+			case "Hitboxes":
+				obj.Hitboxes = parseStageBoxes(kve.Value)
 			}
 		}
 		if !haveOpacity {
@@ -248,6 +278,41 @@ func parseStageObjects(expr ast.Expr, dir string) []project.StageObject {
 		objects = append(objects, obj)
 	}
 	return objects
+}
+
+func parseStageBoxes(expr ast.Expr) []project.StageBox {
+	cl, ok := expr.(*ast.CompositeLit)
+	if !ok {
+		return nil
+	}
+	var boxes []project.StageBox
+	for _, elt := range cl.Elts {
+		lit, ok := elt.(*ast.CompositeLit)
+		if !ok {
+			continue
+		}
+		box := project.StageBox{}
+		for _, kv := range lit.Elts {
+			kve, ok := kv.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			switch exprString(kve.Key) {
+			case "X":
+				box.X = floatLit(kve.Value)
+			case "Y":
+				box.Y = floatLit(kve.Value)
+			case "Width":
+				box.Width = floatLit(kve.Value)
+			case "Height":
+				box.Height = floatLit(kve.Value)
+			case "Rotation":
+				box.Rotation = floatLit(kve.Value)
+			}
+		}
+		boxes = append(boxes, box)
+	}
+	return boxes
 }
 
 // applyStageObjectDefaults fills object sizes from the matching asset when a

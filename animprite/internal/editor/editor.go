@@ -173,13 +173,14 @@ func NewEditorApp() *EditorApp {
 		spriteEditIdx:            0,
 		loadedSprites:            make(map[int]*ebiten.Image),
 		st: stageState{
-			images:      make(map[string]*ebiten.Image),
-			expanded:    map[string]bool{project.StageCategoryBG: true, project.StageCategoryBlock: true},
-			toolTab:     "build",
-			toolToggles: make(map[string]bool),
-			snap:        true,
-			selectedObj: -1,
-			dragAsset:   -1,
+			images:       make(map[string]*ebiten.Image),
+			expanded:     map[string]bool{project.StageCategoryBG: true, project.StageCategoryProp: true, project.StageCategoryBlock: true},
+			toolTab:      "build",
+			toolToggles:  make(map[string]bool),
+			snap:         true,
+			collisionTab: "collision",
+			selectedObj:  -1,
+			dragAsset:    -1,
 		},
 	}
 
@@ -481,4 +482,6 @@ func (a *EditorApp) initStageWidgets() {
 	a.st.layerDownBtn.OnClick = func() {
 		a.moveActiveStageLayer(-1)
 	}
+
+	a.initStageCollisionWidgets()
 }

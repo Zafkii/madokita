@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"image"
 	"image/png"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -24,6 +25,10 @@ func TestStageCategoryForFile(t *testing.T) {
 		{"floor.png", project.StageCategoryBlock},
 		{"platform.png", project.StageCategoryBlock},
 		{"random.png", project.StageCategoryBlock},
+		{"prop_tree.png", project.StageCategoryProp},
+		{"decor_rock.png", project.StageCategoryProp},
+		{"scenery_hill.png", project.StageCategoryProp},
+		{"background_prop.png", project.StageCategoryBG},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -314,20 +319,19 @@ func writeTestPNG(t *testing.T, path string, w, h int) {
 	}
 }
 
-func TestStageToolTabsLayoutInTwoColumns(t *testing.T) {
-	if got, want := stageToolTabsHeight(), 2*stageToolTabH+stageToolTabGap; got != want {
+func TestStageToolTabsLayoutInOneRow(t *testing.T) {
+	if got, want := stageToolTabsHeight(), stageToolTabH; got != want {
 		t.Fatalf("stageToolTabsHeight() = %d, want %d", got, want)
 	}
-
-	wantOrigins := []struct{ x, y int }{
-		{100, 50},
-		{100 + stageToolTabW + stageToolTabGap, 50},
-		{100, 50 + stageToolTabH + stageToolTabGap},
+	if got, want := stageToolTabsWidth(), 3*stageToolTabW+2*stageToolTabGap; got != want {
+		t.Fatalf("stageToolTabsWidth() = %d, want %d", got, want)
 	}
-	for i, want := range wantOrigins {
+
+	for i := range stageToolTabs {
 		gotX, gotY := stageToolTabOrigin(i, 100, 50)
-		if gotX != want.x || gotY != want.y {
-			t.Errorf("stageToolTabOrigin(%d) = (%d,%d), want (%d,%d)", i, gotX, gotY, want.x, want.y)
+		wantX := 100 + i*(stageToolTabW+stageToolTabGap)
+		if gotX != wantX || gotY != 50 {
+			t.Errorf("stageToolTabOrigin(%d) = (%d,%d), want (%d,%d)", i, gotX, gotY, wantX, 50)
 		}
 	}
 
@@ -336,6 +340,32 @@ func TestStageToolTabsLayoutInTwoColumns(t *testing.T) {
 		if tab.Icon != wantIcons[i] {
 			t.Errorf("stageToolTabs[%d].Icon = %q, want %q", i, tab.Icon, wantIcons[i])
 		}
+	}
+}
+
+func TestStageBuildGridFillsAvailableWidth(t *testing.T) {
+	width := 900
+	cols := stageBuildColumns(width)
+	if cols != len(stageBuildToggles) {
+		t.Fatalf("stageBuildColumns(%d) = %d, want %d", width, cols, len(stageBuildToggles))
+	}
+	used := 0
+	for col := 0; col < cols; col++ {
+		used += stageBuildColumnWidth(width, cols, col)
+	}
+	used += (cols - 1) * stageToolSubGap
+	if used != width {
+		t.Fatalf("grid uses %d px, want %d", used, width)
+	}
+
+	narrow := 300
+	cols = stageBuildColumns(narrow)
+	if cols < 2 || cols >= len(stageBuildToggles) {
+		t.Fatalf("stageBuildColumns(%d) = %d, want a wrapped grid", narrow, cols)
+	}
+	cellW := stageBuildCellWidth(narrow, cols)
+	if cellW < stageToolSubMinW {
+		t.Fatalf("narrow cell width = %d, want at least %d", cellW, stageToolSubMinW)
 	}
 }
 
@@ -494,22 +524,7 @@ func TestStageEditTabButtonsDeleteAndDuplicate(t *testing.T) {
 	}
 }
 
-func TestStageToolTogglesUseTwoPagesOfSix(t *testing.T) {
-	if got, want := stageToolPageCount(), 2; got != want {
-		t.Fatalf("stageToolPageCount() = %d, want %d", got, want)
-	}
-
-	wantBounds := []struct{ start, end int }{
-		{0, 6},
-		{6, len(stageBuildToggles)},
-	}
-	for page, want := range wantBounds {
-		gotStart, gotEnd := stageToolPageBounds(page)
-		if gotStart != want.start || gotEnd != want.end {
-			t.Errorf("stageToolPageBounds(%d) = (%d,%d), want (%d,%d)", page, gotStart, gotEnd, want.start, want.end)
-		}
-	}
-
+func TestStageBuildToggleIcons(t *testing.T) {
 	wantIcons := []string{
 		"palette", "move", "ban", "heart-pulse", "opacity", "toggle-right",
 		"star", "refresh-cw", "square-dimensions", "circle-chevrons-right", "activity",
@@ -518,24 +533,6 @@ func TestStageToolTogglesUseTwoPagesOfSix(t *testing.T) {
 		if toggle.Icon != wantIcons[i] {
 			t.Errorf("stageBuildToggles[%d].Icon = %q, want %q", i, toggle.Icon, wantIcons[i])
 		}
-	}
-}
-
-func TestStageToolbarPagesToggles(t *testing.T) {
-	app := &EditorApp{st: stageState{
-		toolPage:         0,
-		toolPagePrevRect: stageToolRect{Key: "prev", X: 0, Y: 0, W: 10, H: 10},
-		toolPageNextRect: stageToolRect{Key: "next", X: 20, Y: 0, W: 10, H: 10},
-	}}
-
-	app.handleStageToolbarMouse(25, 5, true)
-	if app.st.toolPage != 1 {
-		t.Fatalf("toolPage = %d after next, want 1", app.st.toolPage)
-	}
-
-	app.handleStageToolbarMouse(5, 5, true)
-	if app.st.toolPage != 0 {
-		t.Fatalf("toolPage = %d after prev, want 0", app.st.toolPage)
 	}
 }
 
@@ -1019,5 +1016,323 @@ func TestGeneralViewAddsToTopLayerAndStaysGeneral(t *testing.T) {
 	}
 	if app.st.activeLayer != "" {
 		t.Fatalf("active layer = %q after adding in General, want General", app.st.activeLayer)
+	}
+}
+
+func TestStageObjectDefaultCollisionMatchesBlock(t *testing.T) {
+	block := project.StageObject{
+		Category: project.StageCategoryBlock,
+		Width:    50,
+		Height:   40,
+	}
+	boxes := block.EffectiveCollisionBoxes()
+	if len(boxes) != 1 {
+		t.Fatalf("default collision boxes = %d, want 1", len(boxes))
+	}
+	if boxes[0].Width != 50 || boxes[0].Height != 40 || boxes[0].X != 0 || boxes[0].Y != 0 {
+		t.Fatalf("default collision box = %+v, want 50x40 at center", boxes[0])
+	}
+
+	block.CollisionDisabled = true
+	if got := block.EffectiveCollisionBoxes(); len(got) != 0 {
+		t.Fatalf("disabled block collision = %+v, want none", got)
+	}
+
+	bg := project.StageObject{Category: project.StageCategoryBG, Width: 50, Height: 40}
+	if got := bg.EffectiveCollisionBoxes(); len(got) != 0 {
+		t.Fatalf("background collision = %+v, want none", got)
+	}
+}
+
+func TestStageCollisionToggleDisablesSelection(t *testing.T) {
+	app := newStageObjectApp(2)
+	app.selectStageObject(0)
+	app.addStageObjectSelection(1)
+
+	app.toggleStageCollisionForSelection()
+	for i := range app.proj.Stage.Objects {
+		if !app.proj.Stage.Objects[i].CollisionDisabled {
+			t.Fatalf("object %d collision still enabled", i)
+		}
+	}
+
+	app.toggleStageCollisionForSelection()
+	for i := range app.proj.Stage.Objects {
+		if app.proj.Stage.Objects[i].CollisionDisabled {
+			t.Fatalf("object %d collision still disabled", i)
+		}
+	}
+}
+
+func TestStageCollisionEditorSeedsDefaultAndManagesHitboxes(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	app.openStageCollisionEditor()
+
+	if !app.st.collisionEdit || !app.st.showCollisions {
+		t.Fatalf("collision editor state edit=%v show=%v", app.st.collisionEdit, app.st.showCollisions)
+	}
+	obj := &app.proj.Stage.Objects[0]
+	if len(obj.CollisionBoxes) != 1 {
+		t.Fatalf("seeded collision boxes = %d, want 1", len(obj.CollisionBoxes))
+	}
+	if obj.CollisionBoxes[0].Width != 50 || obj.CollisionBoxes[0].Height != 40 {
+		t.Fatalf("seeded collision = %+v, want 50x40", obj.CollisionBoxes[0])
+	}
+
+	app.setStageCollisionTab(1)
+	app.addStageCollisionBox()
+	if len(obj.Hitboxes) != 1 {
+		t.Fatalf("hitboxes after add = %d, want 1", len(obj.Hitboxes))
+	}
+	app.removeStageCollisionBox()
+	if len(obj.Hitboxes) != 0 {
+		t.Fatalf("hitboxes after remove = %d, want 0", len(obj.Hitboxes))
+	}
+
+	app.setStageCollisionTab(0)
+	if app.st.collisionTab != "collision" {
+		t.Fatalf("collision tab = %q, want collision", app.st.collisionTab)
+	}
+}
+
+func TestStageBoxRenderTransformsWithObjectRotation(t *testing.T) {
+	obj := &project.StageObject{X: 100, Y: 50, Rotation: 90}
+	box := project.StageBox{X: 10, Y: 0, Width: 20, Height: 10, Rotation: 30}
+
+	got := stageBoxRender(obj, box, 0, true)
+	if math.Abs(got.OffsetX-100) > 1e-9 || math.Abs(got.OffsetY-60) > 1e-9 {
+		t.Fatalf("box offset = (%g, %g), want (100, 60)", got.OffsetX, got.OffsetY)
+	}
+	if math.Abs(got.Rotation-math.Pi*2/3) > 1e-9 {
+		t.Fatalf("box rotation = %g, want %g", got.Rotation, math.Pi*2/3)
+	}
+	if got.WorldWidth != 20 || got.WorldHeight != 10 {
+		t.Fatalf("box size = %gx%g, want 20x10", got.WorldWidth, got.WorldHeight)
+	}
+	if !got.Selected {
+		t.Fatal("box selected flag lost")
+	}
+}
+
+func TestExportImportStageCollisionBoxes(t *testing.T) {
+	dir := t.TempDir()
+	stage := project.NewStageData("Collision Stage")
+	stage.Objects = []project.StageObject{{
+		Category:          project.StageCategoryBlock,
+		File:              filepath.Join(dir, "block.png"),
+		X:                 25,
+		Y:                 25,
+		Width:             50,
+		Height:            50,
+		Opacity:           1,
+		CollisionDisabled: true,
+		CollisionBoxes:    []project.StageBox{{X: 2, Y: 3, Width: 20, Height: 10, Rotation: 15}},
+		Hitboxes:          []project.StageBox{{X: 1, Y: 1, Width: 8, Height: 6}},
+	}}
+
+	outPath := filepath.Join(dir, "stage.go")
+	if err := ExportStage(outPath, stage); err != nil {
+		t.Fatalf("ExportStage() error: %v", err)
+	}
+	saved, err := ImportStage(outPath)
+	if err != nil {
+		t.Fatalf("ImportStage() error: %v", err)
+	}
+	if len(saved.Objects) != 1 {
+		t.Fatalf("saved objects = %d, want 1", len(saved.Objects))
+	}
+	obj := saved.Objects[0]
+	if !obj.CollisionDisabled {
+		t.Fatal("CollisionDisabled lost in round trip")
+	}
+	if len(obj.CollisionBoxes) != 1 || obj.CollisionBoxes[0].Width != 20 || obj.CollisionBoxes[0].Rotation != 15 {
+		t.Fatalf("collision boxes = %+v, want one 20-wide box rotated 15", obj.CollisionBoxes)
+	}
+	if len(obj.Hitboxes) != 1 || obj.Hitboxes[0].Width != 8 || obj.Hitboxes[0].Height != 6 {
+		t.Fatalf("hitboxes = %+v, want one 8x6 box", obj.Hitboxes)
+	}
+}
+
+func TestStageCollisionRendersOnlyWhenEnabled(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+
+	if got := app.stageCollisionRenders(); len(got) != 0 {
+		t.Fatalf("collision renders while hidden = %d, want 0", len(got))
+	}
+
+	app.st.showCollisions = true
+	if got := app.stageCollisionRenders(); len(got) != 1 {
+		t.Fatalf("collision renders while shown = %d, want 1", len(got))
+	}
+
+	app.proj.Stage.Objects[0].CollisionDisabled = true
+	if got := app.stageCollisionRenders(); len(got) != 0 {
+		t.Fatalf("collision renders while disabled = %d, want 0", len(got))
+	}
+}
+
+func TestStageObjectDeepCopyKeepsCollisionSlicesIndependent(t *testing.T) {
+	obj := project.StageObject{
+		CollisionBoxes: []project.StageBox{{X: 1, Width: 20}},
+		Hitboxes:       []project.StageBox{{X: 2, Width: 8}},
+	}
+	cp := obj.DeepCopy()
+	cp.CollisionBoxes[0].X = 99
+	cp.Hitboxes[0].X = 88
+
+	if obj.CollisionBoxes[0].X != 1 || obj.Hitboxes[0].X != 2 {
+		t.Fatalf("original mutated: collision=%+v hitbox=%+v", obj.CollisionBoxes, obj.Hitboxes)
+	}
+}
+
+func TestScanStageAssetsUsesFolderCategory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "props")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create props dir: %v", err)
+	}
+	writeTestPNG(t, filepath.Join(dir, "table.png"), 120, 80)
+	writeTestPNG(t, filepath.Join(dir, "wide_bg.png"), 40, 20)
+
+	assets, err := scanStageAssets(dir)
+	if err != nil {
+		t.Fatalf("scanStageAssets() error: %v", err)
+	}
+	if len(assets) != 2 {
+		t.Fatalf("assets = %d, want 2", len(assets))
+	}
+	byName := map[string]project.StageAsset{}
+	for _, asset := range assets {
+		byName[asset.Name] = asset
+	}
+	if got := byName["table"].Category; got != project.StageCategoryProp {
+		t.Fatalf("table category = %q, want prop", got)
+	}
+	if got := byName["wide_bg"].Category; got != project.StageCategoryBG {
+		t.Fatalf("wide_bg category = %q, want bg", got)
+	}
+}
+
+func TestStagePropKeepsImageSizeAndStartsWithoutCollision(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.proj.Stage.Assets = []project.StageAsset{{
+		Category: project.StageCategoryProp,
+		Name:     "table",
+		File:     "table.png",
+		Width:    120,
+		Height:   80,
+	}}
+
+	app.addStageObjectFromAsset(0, 100, 100)
+
+	if len(app.proj.Stage.Objects) != 1 {
+		t.Fatalf("objects = %d, want 1", len(app.proj.Stage.Objects))
+	}
+	obj := &app.proj.Stage.Objects[0]
+	if obj.Width != 120 || obj.Height != 80 {
+		t.Fatalf("prop size = %gx%g, want 120x80", obj.Width, obj.Height)
+	}
+	if !obj.CollisionDisabled {
+		t.Fatal("new prop collision should start disabled")
+	}
+	if got := obj.EffectiveCollisionBoxes(); len(got) != 0 {
+		t.Fatalf("new prop collision = %+v, want none", got)
+	}
+}
+
+func TestStagePropCanEnableCollisionManually(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.proj.Stage.Objects = append(app.proj.Stage.Objects, project.StageObject{
+		Category:          project.StageCategoryProp,
+		File:              "table.png",
+		X:                 100,
+		Y:                 100,
+		Width:             120,
+		Height:            80,
+		Opacity:           1,
+		CollisionDisabled: true,
+	})
+	app.selectStageObject(0)
+
+	app.toggleStageCollisionForSelection()
+	obj := &app.proj.Stage.Objects[0]
+	if obj.CollisionDisabled {
+		t.Fatal("prop collision still disabled after toggle")
+	}
+	if len(obj.CollisionBoxes) != 1 {
+		t.Fatalf("prop collision boxes = %d, want seeded 1", len(obj.CollisionBoxes))
+	}
+	if obj.CollisionBoxes[0].Width != 120 || obj.CollisionBoxes[0].Height != 80 {
+		t.Fatalf("seeded prop box = %+v, want 120x80", obj.CollisionBoxes[0])
+	}
+	if got := obj.EffectiveCollisionBoxes(); len(got) != 1 {
+		t.Fatalf("effective prop collision = %+v, want 1", got)
+	}
+
+	app.toggleStageCollisionForSelection()
+	if !obj.CollisionDisabled {
+		t.Fatal("prop collision should be disabled after second toggle")
+	}
+	if got := obj.EffectiveCollisionBoxes(); len(got) != 0 {
+		t.Fatalf("disabled prop collision = %+v, want none", got)
+	}
+}
+
+func TestStagePropCollisionEditorDoesNotSeedUntilAdded(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.proj.Stage.Objects = append(app.proj.Stage.Objects, project.StageObject{
+		Category:          project.StageCategoryProp,
+		File:              "table.png",
+		Width:             120,
+		Height:            80,
+		Opacity:           1,
+		CollisionDisabled: true,
+	})
+	app.selectStageObject(0)
+	app.openStageCollisionEditor()
+
+	obj := &app.proj.Stage.Objects[0]
+	if len(obj.CollisionBoxes) != 0 {
+		t.Fatalf("opening prop editor seeded %+v, want none", obj.CollisionBoxes)
+	}
+
+	app.addStageCollisionBox()
+	if len(obj.CollisionBoxes) != 1 {
+		t.Fatalf("prop collision after add = %d, want 1", len(obj.CollisionBoxes))
+	}
+	if obj.CollisionDisabled {
+		t.Fatal("adding a prop collision box should enable collision")
+	}
+
+	app.removeStageCollisionBox()
+	if len(obj.CollisionBoxes) != 0 {
+		t.Fatalf("prop collision after remove = %+v, want none", obj.CollisionBoxes)
+	}
+	if !obj.CollisionDisabled {
+		t.Fatal("removing the last prop box should disable collision again")
+	}
+}
+
+func TestStageClickPrefersBlockThenPropThenBackground(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.proj.Stage.Objects = []project.StageObject{
+		{Category: project.StageCategoryBG, File: "bg.png", X: 50, Y: 50, Width: 200, Height: 200, Opacity: 1},
+		{Category: project.StageCategoryProp, File: "prop.png", X: 50, Y: 50, Width: 100, Height: 100, Opacity: 1},
+		{Category: project.StageCategoryBlock, File: "block.png", X: 50, Y: 50, Width: 50, Height: 50, Opacity: 1},
+	}
+
+	if got := app.stageObjectAtWorld(50, 50); got != 2 {
+		t.Fatalf("hit = %d, want block 2", got)
+	}
+
+	app.proj.Stage.Objects = app.proj.Stage.Objects[:2]
+	if got := app.stageObjectAtWorld(50, 50); got != 1 {
+		t.Fatalf("hit = %d, want prop 1", got)
+	}
+
+	app.proj.Stage.Objects = app.proj.Stage.Objects[:1]
+	if got := app.stageObjectAtWorld(50, 50); got != 0 {
+		t.Fatalf("hit = %d, want background 0", got)
 	}
 }

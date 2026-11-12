@@ -218,6 +218,13 @@ func (a *EditorApp) focusedInput() *ui.TextInput {
 		if a.selectedStageObject() == nil {
 			return nil
 		}
+		if a.st.collisionEdit {
+			for _, inp := range a.stageCollisionInputList() {
+				if inp != nil && inp.Focused {
+					return inp
+				}
+			}
+		}
 		for i := range a.props {
 			if a.props[i] != nil && a.props[i].Focused {
 				return a.props[i]
@@ -312,6 +319,9 @@ func (a *EditorApp) allInputs() []*ui.TextInput {
 		all = append(all, a.props[:]...)
 		if a.st.opacityInput != nil {
 			all = append(all, a.st.opacityInput)
+		}
+		if a.st.collisionEdit {
+			all = append(all, a.stageCollisionInputList()...)
 		}
 		return all
 	}

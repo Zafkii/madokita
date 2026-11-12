@@ -14,10 +14,12 @@ import (
 )
 
 func stageAssetCategory(asset project.StageAsset) string {
-	if asset.Category == project.StageCategoryBG {
-		return project.StageCategoryBG
+	switch asset.Category {
+	case project.StageCategoryBG, project.StageCategoryProp:
+		return asset.Category
+	default:
+		return project.StageCategoryBlock
 	}
-	return project.StageCategoryBlock
 }
 
 func drawImageFit(screen *ebiten.Image, img *ebiten.Image, x, y, w, h int) {
@@ -69,9 +71,9 @@ func (a *EditorApp) drawStageInfoInput(screen *ebiten.Image, inp *ui.TextInput, 
 
 func (a *EditorApp) drawStageInfo(screen *ebiten.Image, p theme.Palette) {
 	top := a.topPanelY() + topPanelPad
-	infoX := panelPad + dropdownW + panelPad*2
-	colW := 160
-	colGap := 8
+	x := a.stageToolContentX()
+	width := a.win.outsideWidth - panelPad - x
+	colGap := 10
 	rowH := rightPanelInputH + 2
 
 	name := a.proj.Stage.Name
@@ -81,9 +83,9 @@ func (a *EditorApp) drawStageInfo(screen *ebiten.Image, p theme.Palette) {
 	obj := a.selectedStageObject()
 	if obj == nil {
 		a.hideStageObjectInputs()
-		ui.DrawText(screen, fmt.Sprintf("Stage: %s    Objects: %d    Assets: %d", name, len(a.proj.Stage.Objects), len(a.proj.Stage.Assets)), infoX, top+2, 1, p.LabelColor)
-		ui.DrawText(screen, "No object selected. Click an object to edit its properties here.", infoX, top+22, 1, p.TextMuted)
-		ui.DrawText(screen, "CapsLock + drag moves. Tab + click or box selects. Wheel zooms.", infoX, top+42, 1, p.TextMuted)
+		ui.DrawText(screen, fmt.Sprintf("Stage: %s    Objects: %d    Assets: %d", name, len(a.proj.Stage.Objects), len(a.proj.Stage.Assets)), x, top+2, 1, p.LabelColor)
+		ui.DrawText(screen, "No object selected. Click an object to edit its properties here.", x, top+22, 1, p.TextMuted)
+		ui.DrawText(screen, "CapsLock + drag moves. Tab + click or box selects. Wheel zooms.", x, top+42, 1, p.TextMuted)
 		return
 	}
 
@@ -94,19 +96,29 @@ func (a *EditorApp) drawStageInfo(screen *ebiten.Image, p theme.Palette) {
 	} else {
 		selected = fmt.Sprintf("Selected: %s    %s", base, obj.Category)
 	}
-	ui.DrawText(screen, selected, infoX, top+2, 1, p.LabelColor)
+	ui.DrawText(screen, selected, x, top+2, 1, p.LabelColor)
 
-	a.drawStageInfoInput(screen, a.props[0], infoX, top+22, colW)
-	a.drawStageInfoInput(screen, a.props[1], infoX+colW+colGap, top+22, colW)
-	a.drawStageInfoInput(screen, a.props[2], infoX, top+22+rowH, colW)
-	a.drawStageInfoInput(screen, a.props[3], infoX+colW+colGap, top+22+rowH, colW)
-	a.drawStageInfoInput(screen, a.props[4], infoX, top+22+2*rowH, colW)
-	if a.st.opacityInput != nil {
-		a.drawStageInfoInput(screen, a.st.opacityInput, infoX+colW+colGap, top+22+2*rowH, colW)
+	cols := 3
+	if width < 620 {
+		cols = 2
+	}
+	cellW := (width - (cols-1)*colGap) / cols
+	if cellW < 80 {
+		cellW = 80
+	}
+	inputs := []*ui.TextInput{a.props[0], a.props[1], a.props[2], a.props[3], a.props[4], a.st.opacityInput}
+	for i, inp := range inputs {
+		if inp == nil {
+			continue
+		}
+		col := i % cols
+		row := i / cols
+		a.drawStageInfoInput(screen, inp, x+col*(cellW+colGap), top+22+row*rowH, cellW)
 	}
 
-	hintY := top + 22 + 3*rowH + 4
-	ui.DrawText(screen, "CapsLock + drag moves. Tab + click or box selects. Wheel zooms.", infoX, hintY, 1, p.TextMuted)
+	rows := (len(inputs) + cols - 1) / cols
+	hintY := top + 22 + rows*rowH + 4
+	ui.DrawText(screen, "CapsLock + drag moves. Tab + click or box selects. Wheel zooms.", x, hintY, 1, p.TextMuted)
 }
 
 var stageToolTabs = []struct{ Key, Label, Icon string }{
@@ -116,13 +128,23 @@ var stageToolTabs = []struct{ Key, Label, Icon string }{
 }
 
 const (
-	stageToolTabCols    = 2
+	stageToolTabCols    = 3
 	stageToolTabW       = 62
 	stageToolTabH       = 20
 	stageToolTabGap     = 4
 	stageToolTabIcon    = 13
 	stageToolTabIconGap = 4
+
+	stageToolSectionGap = 12
 )
+
+func stageToolTabsWidth() int {
+	cols := stageToolTabCols
+	if len(stageToolTabs) < cols {
+		cols = len(stageToolTabs)
+	}
+	return cols*stageToolTabW + (cols-1)*stageToolTabGap
+}
 
 func stageToolTabsHeight() int {
 	rows := (len(stageToolTabs) + stageToolTabCols - 1) / stageToolTabCols
@@ -133,6 +155,16 @@ func stageToolTabOrigin(index, tabsX, top int) (int, int) {
 	col := index % stageToolTabCols
 	row := index / stageToolTabCols
 	return tabsX + col*(stageToolTabW+stageToolTabGap), top + row*(stageToolTabH+stageToolTabGap)
+}
+
+// stageToolAreaX is where the stage toolbar starts: after the left-side
+// project controls (mode dropdown and Open/Open Dir/Save/Theme buttons).
+func (a *EditorApp) stageToolAreaX() int {
+	return panelPad + dropdownW + panelPad
+}
+
+func (a *EditorApp) stageToolContentX() int {
+	return a.stageToolAreaX() + stageToolTabsWidth() + stageToolSectionGap
 }
 
 var stageBuildToggles = []struct{ Key, Label, Icon string }{
@@ -150,39 +182,51 @@ var stageBuildToggles = []struct{ Key, Label, Icon string }{
 }
 
 const (
-	stageToolSubW       = 61
-	stageToolSubH       = 20
-	stageToolSubGap     = 3
-	stageToolPageSize   = 6
-	stageToolChevronW   = 18
-	stageToolChevronGap = 2
+	stageToolSubMinW = 70
+	stageToolSubH    = 20
+	stageToolSubGap  = 3
 
 	// stageInfoHoldFrames keeps the auto-selected Info tab visible for a short
 	// moment after the last live edit before returning to Edit.
 	stageInfoHoldFrames = 45
 )
 
-func stageToolPageCount() int {
-	if len(stageBuildToggles) == 0 {
+// stageBuildColumns returns how many build toggles fit in width. The grid
+// stretches its cells to fill the whole content area, so the toolbar uses the
+// available horizontal space instead of clustering on the right.
+func stageBuildColumns(width int) int {
+	if width <= 0 {
 		return 1
 	}
-	return (len(stageBuildToggles) + stageToolPageSize - 1) / stageToolPageSize
+	cols := (width + stageToolSubGap) / (stageToolSubMinW + stageToolSubGap)
+	if cols < 1 {
+		cols = 1
+	}
+	if cols > len(stageBuildToggles) {
+		cols = len(stageBuildToggles)
+	}
+	return cols
 }
 
-func stageToolPageBounds(page int) (start, end int) {
-	pages := stageToolPageCount()
-	if page < 0 {
-		page = 0
+func stageBuildCellWidth(width, cols int) int {
+	if cols < 1 {
+		cols = 1
 	}
-	if page >= pages {
-		page = pages - 1
+	cellW := (width - (cols-1)*stageToolSubGap) / cols
+	if cellW < 1 {
+		cellW = 1
 	}
-	start = page * stageToolPageSize
-	end = start + stageToolPageSize
-	if end > len(stageBuildToggles) {
-		end = len(stageBuildToggles)
+	return cellW
+}
+
+// stageBuildColumnWidth gives the last column the remainder so the grid ends
+// exactly at the right edge of the content area.
+func stageBuildColumnWidth(width, cols, col int) int {
+	base := stageBuildCellWidth(width, cols)
+	if col == cols-1 {
+		return width - (cols-1)*(base+stageToolSubGap)
 	}
-	return start, end
+	return base
 }
 
 func (a *EditorApp) drawStageToolContent(screen *ebiten.Image, x, y, w, h int, label, icon string, clr color.Color) {
@@ -202,51 +246,95 @@ func (a *EditorApp) drawStageToolContent(screen *ebiten.Image, x, y, w, h int, l
 	ui.DrawText(screen, label, contentX, labelY, 1, clr)
 }
 
-func (a *EditorApp) drawStagePageButton(screen *ebiten.Image, p theme.Palette, mx, my, x, y, w, h int, icon string, enabled bool) {
-	hovered := enabled && mx >= x && mx <= x+w && my >= y && my <= y+h
-	textClr := p.TextMuted
-	if enabled {
-		textClr = p.TextPrimary
-	}
-	ui.FillRect(screen, x, y, w, h, p.InputBG)
-	if hovered {
-		ui.FillRect(screen, x, y, w, h, p.BtnHover)
-	}
-	ui.FillBorder(screen, x, y, w, h, p.InputBorder)
-	if a.iconSet.Draw(screen, icon, x, y, w, h, textClr) {
-		return
-	}
-	fallback := "<"
-	if icon == "chevron-right" {
-		fallback = ">"
-	}
-	ui.DrawTextCentered(screen, fallback, x+w/2, y+h/2, 1, textClr)
-}
-
 func (a *EditorApp) drawStageEditActions(screen *ebiten.Image, p theme.Palette, x, y int) {
 	if a.st.deleteBtn == nil || a.st.duplicateBtn == nil {
 		return
 	}
-	if a.selectedStageObject() == nil {
+	hideCollision := func() {
+		for _, btn := range []*ui.Button{a.st.collisionEditBtn, a.st.collisionToggleBtn} {
+			if btn != nil {
+				btn.Visible = false
+			}
+		}
+	}
+	obj := a.selectedStageObject()
+	if obj == nil {
 		a.st.deleteBtn.Visible = false
 		a.st.duplicateBtn.Visible = false
+		hideCollision()
 		ui.DrawText(screen, "Select one or more objects on the canvas to edit them.", x, y+4, 1, p.TextMuted)
 		return
 	}
 
-	a.st.deleteBtn.X = x
-	a.st.deleteBtn.Y = y
-	a.st.deleteBtn.W = ui.ButtonWidth(a.st.deleteBtn.Text)
-	a.st.deleteBtn.H = 22
-	a.st.deleteBtn.Visible = true
-	a.st.deleteBtn.Draw(screen)
+	buttons := []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn}
+	if obj.Category == project.StageCategoryBlock || obj.Category == project.StageCategoryProp {
+		if a.st.collisionToggleBtn != nil {
+			a.st.collisionToggleBtn.Text = "Collision: On"
+			if obj.CollisionDisabled {
+				a.st.collisionToggleBtn.Text = "Collision: Off"
+			}
+			a.st.collisionToggleBtn.BtnType = ui.BtnDefault
+			if !obj.CollisionDisabled {
+				a.st.collisionToggleBtn.BtnType = ui.BtnBlue
+			}
+		}
+		if a.st.collisionEditBtn != nil {
+			buttons = append(buttons, a.st.collisionEditBtn)
+		}
+		if a.st.collisionToggleBtn != nil {
+			buttons = append(buttons, a.st.collisionToggleBtn)
+		}
+	} else {
+		hideCollision()
+	}
 
-	a.st.duplicateBtn.X = a.st.deleteBtn.X + a.st.deleteBtn.W + 4
-	a.st.duplicateBtn.Y = y
-	a.st.duplicateBtn.W = ui.ButtonWidth(a.st.duplicateBtn.Text)
-	a.st.duplicateBtn.H = 22
-	a.st.duplicateBtn.Visible = true
-	a.st.duplicateBtn.Draw(screen)
+	maxRight := a.win.outsideWidth - panelPad
+	cx, cy := x, y
+	for _, btn := range buttons {
+		if btn == nil {
+			continue
+		}
+		btn.W = ui.ButtonWidth(btn.Text)
+		btn.H = 22
+		if cx > x && cx+btn.W > maxRight {
+			cx = x
+			cy += 26
+		}
+		btn.X = cx
+		btn.Y = cy
+		btn.Visible = true
+		btn.Draw(screen)
+		cx += btn.W + 4
+	}
+}
+
+func (a *EditorApp) drawStageBuildToggles(screen *ebiten.Image, p theme.Palette, mx, my, x, top, width int) {
+	if width <= 0 {
+		return
+	}
+	cols := stageBuildColumns(width)
+	cellW := stageBuildCellWidth(width, cols)
+	for i, toggle := range stageBuildToggles {
+		col := i % cols
+		row := i / cols
+		bx := x + col*(cellW+stageToolSubGap)
+		by := top + row*(stageToolSubH+stageToolSubGap)
+
+		on := a.st.toolToggles[toggle.Key]
+		bg := p.InputBG
+		textClr := p.TextPrimary
+		if on {
+			bg = p.BtnGreen
+			textClr = p.ButtonText
+		}
+		ui.FillRect(screen, bx, by, cellW, stageToolSubH, bg)
+		if mx >= bx && mx <= bx+cellW && my >= by && my <= by+stageToolSubH {
+			ui.FillRect(screen, bx, by, cellW, stageToolSubH, p.BtnHover)
+		}
+		ui.FillBorder(screen, bx, by, cellW, stageToolSubH, p.InputBorder)
+		a.drawStageToolContent(screen, bx, by, cellW, stageToolSubH, toggle.Label, toggle.Icon, textClr)
+		a.st.toolToggleRects = append(a.st.toolToggleRects, stageToolRect{Key: toggle.Key, X: bx, Y: by, W: cellW, H: stageToolSubH})
+	}
 }
 
 func (a *EditorApp) drawStageToolbar(screen *ebiten.Image, p theme.Palette) {
@@ -255,38 +343,26 @@ func (a *EditorApp) drawStageToolbar(screen *ebiten.Image, p theme.Palette) {
 	}
 	a.st.toolTabRects = a.st.toolTabRects[:0]
 	a.st.toolToggleRects = a.st.toolToggleRects[:0]
-	a.st.toolPagePrevRect = stageToolRect{}
-	a.st.toolPageNextRect = stageToolRect{}
 	if a.st.deleteBtn != nil {
 		a.st.deleteBtn.Visible = false
 	}
 	if a.st.duplicateBtn != nil {
 		a.st.duplicateBtn.Visible = false
 	}
-
-	const sectionGap = 8
+	for _, btn := range []*ui.Button{a.st.collisionEditBtn, a.st.collisionToggleBtn, a.st.collisionBackBtn} {
+		if btn != nil {
+			btn.Visible = false
+		}
+	}
+	if a.st.collisionTable != nil {
+		a.st.collisionTable.Visible = false
+	}
 
 	right := a.win.outsideWidth - panelPad
 	top := a.topPanelY() + topPanelPad
-	cols := stageToolTabCols
-	if len(stageToolTabs) < cols {
-		cols = len(stageToolTabs)
-	}
-	tabsW := cols*stageToolTabW + (cols-1)*stageToolTabGap
+	tabsX := a.stageToolAreaX()
+	contentX := a.stageToolContentX()
 	tabsH := stageToolTabsHeight()
-	pages := stageToolPageCount()
-	if a.st.toolPage < 0 {
-		a.st.toolPage = 0
-	}
-	if a.st.toolPage >= pages {
-		a.st.toolPage = pages - 1
-	}
-	pageW := stageToolPageSize*stageToolSubW + (stageToolPageSize-1)*stageToolSubGap
-	subsW := pageW
-	if pages > 1 {
-		subsW += 2*stageToolChevronW + 2*stageToolChevronGap
-	}
-	tabsX := right - (tabsW + sectionGap + subsW)
 
 	mx, my := ebiten.CursorPosition()
 	for i, tab := range stageToolTabs {
@@ -308,46 +384,17 @@ func (a *EditorApp) drawStageToolbar(screen *ebiten.Image, p theme.Palette) {
 		a.st.toolTabRects = append(a.st.toolTabRects, stageToolRect{Key: tab.Key, X: tx, Y: ty, W: stageToolTabW, H: stageToolTabH})
 	}
 
-	if a.st.toolTab == "edit" {
-		a.drawStageEditActions(screen, p, tabsX, top+tabsH+6)
-		return
-	}
-	if a.st.toolTab != "build" {
-		return
-	}
+	ui.FillRect(screen, contentX-stageToolSectionGap/2, top, 1, tabsH, p.InputBorder)
 
-	ui.FillRect(screen, tabsX+tabsW+sectionGap/2, top, 1, tabsH, p.InputBorder)
-	x := tabsX + tabsW + sectionGap
-	if pages > 1 {
-		a.drawStagePageButton(screen, p, mx, my, x, top, stageToolChevronW, stageToolSubH, "chevron-left", a.st.toolPage > 0)
-		a.st.toolPagePrevRect = stageToolRect{Key: "prev", X: x, Y: top, W: stageToolChevronW, H: stageToolSubH}
-		x += stageToolChevronW + stageToolChevronGap
-	}
-
-	start, end := stageToolPageBounds(a.st.toolPage)
-	buttonsX := x
-	for _, toggle := range stageBuildToggles[start:end] {
-		on := a.st.toolToggles[toggle.Key]
-		bg := p.InputBG
-		textClr := p.TextPrimary
-		if on {
-			bg = p.BtnGreen
-			textClr = p.ButtonText
+	switch a.st.toolTab {
+	case "edit":
+		if a.st.collisionEdit && a.selectedStageObject() != nil {
+			a.drawStageCollisionEditor(screen, p, contentX, top, right)
+		} else {
+			a.drawStageEditActions(screen, p, contentX, top)
 		}
-		ui.FillRect(screen, x, top, stageToolSubW, stageToolSubH, bg)
-		if mx >= x && mx <= x+stageToolSubW && my >= top && my <= top+stageToolSubH {
-			ui.FillRect(screen, x, top, stageToolSubW, stageToolSubH, p.BtnHover)
-		}
-		ui.FillBorder(screen, x, top, stageToolSubW, stageToolSubH, p.InputBorder)
-		a.drawStageToolContent(screen, x, top, stageToolSubW, stageToolSubH, toggle.Label, toggle.Icon, textClr)
-		a.st.toolToggleRects = append(a.st.toolToggleRects, stageToolRect{Key: toggle.Key, X: x, Y: top, W: stageToolSubW, H: stageToolSubH})
-		x += stageToolSubW + stageToolSubGap
-	}
-
-	if pages > 1 {
-		nextX := buttonsX + pageW + stageToolChevronGap
-		a.drawStagePageButton(screen, p, mx, my, nextX, top, stageToolChevronW, stageToolSubH, "chevron-right", a.st.toolPage < pages-1)
-		a.st.toolPageNextRect = stageToolRect{Key: "next", X: nextX, Y: top, W: stageToolChevronW, H: stageToolSubH}
+	case "build":
+		a.drawStageBuildToggles(screen, p, mx, my, contentX, top, right-contentX)
 	}
 }
 
@@ -390,40 +437,56 @@ func (a *EditorApp) drawStageLayers(screen *ebiten.Image, p theme.Palette, px, i
 
 	if len(a.proj.Stage.Layers) == 0 {
 		ui.DrawText(screen, "No layers yet.", px, iy, 1, p.TextMuted)
-		return iy + 22
-	}
-
-	drawRow := func(index int, label string, active bool, hovered bool) {
-		rowY := iy
-		if active {
-			ui.FillRect(screen, px, rowY, rightPanelInner, 18, p.BtnBlue)
-		} else if hovered {
-			ui.FillRect(screen, px, rowY, rightPanelInner, 18, p.BtnHover)
-		}
-		ui.FillBorder(screen, px, rowY, rightPanelInner, 18, p.InputBorder)
-		textClr := p.TextPrimary
-		if active {
-			textClr = p.ButtonText
-		}
-		ui.DrawText(screen, ui.TruncateText(label, rightPanelInner-8), px+4, rowY+2, 1, textClr)
-		a.st.layerRects = append(a.st.layerRects, stageLayerRect{Index: index, X: px, Y: rowY, W: rightPanelInner, H: 18})
-		iy += 20
-	}
-
-	generalHovered := mx >= px && mx <= px+rightPanelInner && my >= iy && my <= iy+18
-	drawRow(-1, fmt.Sprintf("General  (%d)", len(a.proj.Stage.Objects)), general, generalHovered)
-
-	for idx := len(a.proj.Stage.Layers) - 1; idx >= 0; idx-- {
-		layer := a.proj.Stage.Layers[idx]
-		rowY := iy
-		hovered := mx >= px && mx <= px+rightPanelInner && my >= rowY && my <= rowY+18
-		count := 0
-		for _, obj := range a.proj.Stage.Objects {
-			if a.proj.Stage.LayerNameFor(obj) == layer.Name {
-				count++
+		iy += 22
+	} else {
+		drawRow := func(index int, label string, active bool, hovered bool) {
+			rowY := iy
+			if active {
+				ui.FillRect(screen, px, rowY, rightPanelInner, 18, p.BtnBlue)
+			} else if hovered {
+				ui.FillRect(screen, px, rowY, rightPanelInner, 18, p.BtnHover)
 			}
+			ui.FillBorder(screen, px, rowY, rightPanelInner, 18, p.InputBorder)
+			textClr := p.TextPrimary
+			if active {
+				textClr = p.ButtonText
+			}
+			ui.DrawText(screen, ui.TruncateText(label, rightPanelInner-8), px+4, rowY+2, 1, textClr)
+			a.st.layerRects = append(a.st.layerRects, stageLayerRect{Index: index, X: px, Y: rowY, W: rightPanelInner, H: 18})
+			iy += 20
 		}
-		drawRow(idx, fmt.Sprintf("%s  (%d)", layer.Name, count), !general && idx == activeIdx, hovered)
+
+		generalHovered := mx >= px && mx <= px+rightPanelInner && my >= iy && my <= iy+18
+		drawRow(-1, fmt.Sprintf("General  (%d)", len(a.proj.Stage.Objects)), general, generalHovered)
+
+		for idx := len(a.proj.Stage.Layers) - 1; idx >= 0; idx-- {
+			layer := a.proj.Stage.Layers[idx]
+			rowY := iy
+			hovered := mx >= px && mx <= px+rightPanelInner && my >= rowY && my <= rowY+18
+			count := 0
+			for _, obj := range a.proj.Stage.Objects {
+				if a.proj.Stage.LayerNameFor(obj) == layer.Name {
+					count++
+				}
+			}
+			drawRow(idx, fmt.Sprintf("%s  (%d)", layer.Name, count), !general && idx == activeIdx, hovered)
+		}
+	}
+
+	if btn := a.st.collisionViewBtn; btn != nil {
+		btn.Text = "Show collisions"
+		btn.BtnType = ui.BtnDefault
+		if a.st.showCollisions {
+			btn.Text = "Hide collisions"
+			btn.BtnType = ui.BtnBlue
+		}
+		btn.X = px
+		btn.Y = iy
+		btn.W = ui.ButtonWidth(btn.Text)
+		btn.H = 20
+		btn.Visible = true
+		btn.Draw(screen)
+		iy += 24
 	}
 	return iy + 4
 }
@@ -464,7 +527,7 @@ func (a *EditorApp) drawStageRightPanel(screen *ebiten.Image, p theme.Palette, p
 
 	iy = a.drawSectionHeader(screen, p, px, iy, "Assets")
 
-	categories := []string{project.StageCategoryBG, project.StageCategoryBlock}
+	categories := []string{project.StageCategoryBG, project.StageCategoryProp, project.StageCategoryBlock}
 	for _, cat := range categories {
 		count := 0
 		for _, asset := range stage.Assets {

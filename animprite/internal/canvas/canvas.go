@@ -32,6 +32,15 @@ type SelectionRect struct {
 	Visible    bool
 }
 
+// RenderKind selects the palette used by a box overlay.
+type RenderKind int
+
+const (
+	RenderHurtbox RenderKind = iota
+	RenderHitbox
+	RenderCollision
+)
+
 type HurtboxRender struct {
 	OffsetX     float64
 	OffsetY     float64
@@ -39,6 +48,7 @@ type HurtboxRender struct {
 	WorldHeight float64
 	Rotation    float64 // radians
 	Selected    bool
+	Kind        RenderKind
 }
 
 const (
@@ -519,11 +529,36 @@ func drawDashedLine(screen *ebiten.Image, x1, y1, x2, y2, dash, gap float32, clr
 	}
 }
 
+func boxColors(kind RenderKind, selected bool) (fill, border color.RGBA) {
+	switch kind {
+	case RenderHitbox:
+		fill = color.RGBA{255, 92, 92, 207}
+		border = color.RGBA{255, 132, 132, 255}
+		if selected {
+			border = color.RGBA{255, 172, 172, 255}
+		}
+	case RenderCollision:
+		fill = color.RGBA{80, 190, 255, 207}
+		border = color.RGBA{126, 214, 255, 255}
+		if selected {
+			border = color.RGBA{176, 236, 255, 255}
+		}
+	default:
+		fill = color.RGBA{255, 255, 0, 207}
+		border = color.RGBA{250, 232, 111, 255}
+		if selected {
+			border = color.RGBA{255, 241, 113, 255}
+		}
+	}
+	return fill, border
+}
+
 func (c *Canvas) drawHurtboxes(screen *ebiten.Image, cam *camera.Camera) {
 	for _, h := range c.hurtboxRenders {
 		if h.WorldWidth <= 0 || h.WorldHeight <= 0 {
 			continue
 		}
+		fillClr, borderClr := boxColors(h.Kind, h.Selected)
 		if h.Selected {
 			hwFull := h.WorldWidth / 2
 			hhFull := h.WorldHeight / 2
@@ -535,7 +570,6 @@ func (c *Canvas) drawHurtboxes(screen *ebiten.Image, cam *camera.Camera) {
 				{-hwFull, hhFull},
 				{hwFull, hhFull},
 			}
-			fillClr := color.RGBA{255, 255, 0, 207}
 			fillA := float32(fillClr.A) / 255
 			verts := [4]ebiten.Vertex{}
 			for i, l := range local {
@@ -562,10 +596,7 @@ func (c *Canvas) drawHurtboxes(screen *ebiten.Image, cam *camera.Camera) {
 		hh := h.WorldHeight/2 - margin
 		cos := math.Cos(h.Rotation)
 		sin := math.Sin(h.Rotation)
-		clr := color.RGBA{250, 232, 111, 255}
-		if h.Selected {
-			clr = color.RGBA{255, 241, 113, 255}
-		}
+		clr := borderClr
 		corners := [4][2]float64{
 			{-hw, -hh},
 			{hw, -hh},
