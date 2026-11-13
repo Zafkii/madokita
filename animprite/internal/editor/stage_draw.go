@@ -269,7 +269,7 @@ func (a *EditorApp) drawStageToolContent(screen *ebiten.Image, x, y, w, h int, l
 }
 
 func (a *EditorApp) drawStageEditActions(screen *ebiten.Image, p theme.Palette, x, y int) {
-	if a.st.deleteBtn == nil || a.st.duplicateBtn == nil {
+	if a.st.deleteBtn == nil || a.st.duplicateBtn == nil || a.st.cutBtn == nil || a.st.pasteBtn == nil {
 		return
 	}
 	hideCollision := func() {
@@ -279,35 +279,45 @@ func (a *EditorApp) drawStageEditActions(screen *ebiten.Image, p theme.Palette, 
 			}
 		}
 	}
+	hideActions := func() {
+		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.cutBtn, a.st.pasteBtn} {
+			if btn != nil {
+				btn.Visible = false
+			}
+		}
+	}
+	hideActions()
+	hideCollision()
+
 	obj := a.selectedStageObject()
-	if obj == nil {
-		a.st.deleteBtn.Visible = false
-		a.st.duplicateBtn.Visible = false
-		hideCollision()
+	buttons := make([]*ui.Button, 0, 6)
+	if obj != nil {
+		buttons = append(buttons, a.st.deleteBtn, a.st.duplicateBtn, a.st.cutBtn)
+		if project.StageCategoryHasCollision(obj.Category) {
+			if a.st.collisionToggleBtn != nil {
+				a.st.collisionToggleBtn.Text = "Collision: On"
+				if obj.CollisionDisabled {
+					a.st.collisionToggleBtn.Text = "Collision: Off"
+				}
+				a.st.collisionToggleBtn.BtnType = ui.BtnDefault
+				if !obj.CollisionDisabled {
+					a.st.collisionToggleBtn.BtnType = ui.BtnBlue
+				}
+			}
+			if a.st.collisionEditBtn != nil {
+				buttons = append(buttons, a.st.collisionEditBtn)
+			}
+			if a.st.collisionToggleBtn != nil {
+				buttons = append(buttons, a.st.collisionToggleBtn)
+			}
+		}
+	}
+	if len(a.st.stageClipboard) > 0 {
+		buttons = append(buttons, a.st.pasteBtn)
+	}
+	if len(buttons) == 0 {
 		ui.DrawText(screen, "Select one or more objects on the canvas to edit them.", x, y+4, 1, p.TextMuted)
 		return
-	}
-
-	buttons := []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn}
-	if project.StageCategoryHasCollision(obj.Category) {
-		if a.st.collisionToggleBtn != nil {
-			a.st.collisionToggleBtn.Text = "Collision: On"
-			if obj.CollisionDisabled {
-				a.st.collisionToggleBtn.Text = "Collision: Off"
-			}
-			a.st.collisionToggleBtn.BtnType = ui.BtnDefault
-			if !obj.CollisionDisabled {
-				a.st.collisionToggleBtn.BtnType = ui.BtnBlue
-			}
-		}
-		if a.st.collisionEditBtn != nil {
-			buttons = append(buttons, a.st.collisionEditBtn)
-		}
-		if a.st.collisionToggleBtn != nil {
-			buttons = append(buttons, a.st.collisionToggleBtn)
-		}
-	} else {
-		hideCollision()
 	}
 
 	maxRight := a.win.outsideWidth - panelPad
@@ -399,6 +409,12 @@ func (a *EditorApp) drawStageToolbar(screen *ebiten.Image, p theme.Palette) {
 	}
 	if a.st.duplicateBtn != nil {
 		a.st.duplicateBtn.Visible = false
+	}
+	if a.st.cutBtn != nil {
+		a.st.cutBtn.Visible = false
+	}
+	if a.st.pasteBtn != nil {
+		a.st.pasteBtn.Visible = false
 	}
 	for _, btn := range []*ui.Button{a.st.collisionEditBtn, a.st.collisionToggleBtn, a.st.collisionBackBtn} {
 		if btn != nil {

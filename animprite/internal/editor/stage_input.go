@@ -119,9 +119,9 @@ func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 			return
 		}
 	}
-	if a.st.toolTab == "edit" && a.selectedStageObject() != nil {
-		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.collisionEditBtn, a.st.collisionToggleBtn} {
-			if btn == nil {
+	if a.st.toolTab == "edit" {
+		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.cutBtn, a.st.pasteBtn, a.st.collisionEditBtn, a.st.collisionToggleBtn} {
+			if btn == nil || !btn.Visible {
 				continue
 			}
 			hit := justL && btn.HitTest(mx, my)
@@ -457,6 +457,12 @@ func (a *EditorApp) handleStageKeys() {
 	}
 	if ctrl && inpututil.IsKeyJustPressed(ebiten.KeyD) {
 		a.duplicateSelectedStageObject()
+	}
+	if ctrl && inpututil.IsKeyJustPressed(ebiten.KeyX) {
+		a.cutSelectedStageObjects()
+	}
+	if ctrl && inpututil.IsKeyJustPressed(ebiten.KeyV) {
+		a.pasteStageObjects()
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyDelete) {
 		a.deleteSelectedStageObject()

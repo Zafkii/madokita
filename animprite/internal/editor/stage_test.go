@@ -514,6 +514,12 @@ func TestStageEditTabButtonsDeleteAndDuplicate(t *testing.T) {
 		app.st.duplicateBtn.X, app.st.duplicateBtn.Y = 200, 0
 		app.st.duplicateBtn.W, app.st.duplicateBtn.H = 20, 20
 		app.st.duplicateBtn.Visible = true
+		app.st.cutBtn.X, app.st.cutBtn.Y = 300, 0
+		app.st.cutBtn.W, app.st.cutBtn.H = 20, 20
+		app.st.cutBtn.Visible = true
+		app.st.pasteBtn.X, app.st.pasteBtn.Y = 400, 0
+		app.st.pasteBtn.W, app.st.pasteBtn.H = 20, 20
+		app.st.pasteBtn.Visible = true
 		return app
 	}
 
@@ -527,6 +533,16 @@ func TestStageEditTabButtonsDeleteAndDuplicate(t *testing.T) {
 	app.handleStageToolbarMouse(205, 5, true)
 	if len(app.proj.Stage.Objects) != 2 {
 		t.Fatalf("objects after duplicate = %d, want 2", len(app.proj.Stage.Objects))
+	}
+
+	app = newApp()
+	app.handleStageToolbarMouse(305, 5, true)
+	if len(app.proj.Stage.Objects) != 0 {
+		t.Fatalf("objects after cut = %d, want 0", len(app.proj.Stage.Objects))
+	}
+	app.handleStageToolbarMouse(405, 5, true)
+	if len(app.proj.Stage.Objects) != 1 {
+		t.Fatalf("objects after paste = %d, want 1", len(app.proj.Stage.Objects))
 	}
 }
 
@@ -674,6 +690,96 @@ func TestExportImportStageKeepsStartMarker(t *testing.T) {
 	}
 	if obj.X != 300 || obj.Y != 420 {
 		t.Fatalf("saved start position = (%g, %g), want (300, 420)", obj.X, obj.Y)
+	}
+}
+
+func newLayeredStageApp() *EditorApp {
+	app := newStageObjectApp(0)
+	app.proj.Stage.Layers = []project.StageLayer{{Name: "Layer 1"}, {Name: "Layer 2"}}
+	app.proj.Stage.Objects = []project.StageObject{
+		{Layer: "Layer 1", Category: project.StageCategoryBlock, File: "a.png", X: 10, Y: 20, Width: 50, Height: 50, Opacity: 1},
+		{Layer: "Layer 2", Category: project.StageCategoryBlock, File: "b.png", X: 200, Y: 200, Width: 50, Height: 50, Opacity: 1},
+	}
+	app.st.selectedObj = -1
+	app.st.selectedObjs = make(map[int]bool)
+	return app
+}
+
+func TestStageActiveLayerRestrictsSelectionAndEditing(t *testing.T) {
+	app := newLayeredStageApp()
+	app.setActiveStageLayer(1)
+
+	if got := app.stageObjectAtWorld(10, 20); got != -1 {
+		t.Fatalf("hit test outside active layer = %d, want -1", got)
+	}
+	if got := app.stageObjectAtWorld(200, 200); got != 1 {
+		t.Fatalf("hit test inside active layer = %d, want 1", got)
+	}
+	app.selectStageObject(0)
+	if app.st.selectedObj != -1 {
+		t.Fatalf("selected object = %d, want none for inactive layer", app.st.selectedObj)
+	}
+	app.selectStageObject(1)
+	app.beginStageObjectDrag(200, 200)
+	app.applyStageObjectDrag(230, 230)
+
+	if app.proj.Stage.Objects[0].X != 10 || app.proj.Stage.Objects[0].Y != 20 {
+		t.Fatalf("inactive object moved to (%g, %g)", app.proj.Stage.Objects[0].X, app.proj.Stage.Objects[0].Y)
+	}
+	if app.proj.Stage.Objects[1].X != 230 || app.proj.Stage.Objects[1].Y != 230 {
+		t.Fatalf("active object = (%g, %g), want (230, 230)", app.proj.Stage.Objects[1].X, app.proj.Stage.Objects[1].Y)
+	}
+}
+
+func TestStageSelectionHelpersStayInsideActiveLayer(t *testing.T) {
+	app := newLayeredStageApp()
+	app.setActiveStageLayer(1)
+
+	app.selectAllStageObjects()
+	if got := app.stageSelectionCount(); got != 1 {
+		t.Fatalf("select-all count = %d, want 1", got)
+	}
+	if app.st.selectedObj != 1 {
+		t.Fatalf("select-all primary = %d, want 1", app.st.selectedObj)
+	}
+
+	app.beginStageMarquee(0, 0)
+	app.updateStageMarquee(300, 300)
+	if got := app.stageSelectionCount(); got != 1 {
+		t.Fatalf("marquee count = %d, want 1", got)
+	}
+	if app.st.selectedObj != 1 {
+		t.Fatalf("marquee primary = %d, want 1", app.st.selectedObj)
+	}
+}
+
+func TestStageCutAndPasteMovesObjectsBetweenLayers(t *testing.T) {
+	app := newLayeredStageApp()
+	app.setActiveStageLayer(0)
+	app.selectStageObject(0)
+
+	app.cutSelectedStageObjects()
+	if len(app.proj.Stage.Objects) != 1 {
+		t.Fatalf("objects after cut = %d, want 1", len(app.proj.Stage.Objects))
+	}
+	if len(app.st.stageClipboard) != 1 {
+		t.Fatalf("clipboard = %d, want 1", len(app.st.stageClipboard))
+	}
+
+	app.setActiveStageLayer(1)
+	app.pasteStageObjects()
+	if len(app.proj.Stage.Objects) != 2 {
+		t.Fatalf("objects after paste = %d, want 2", len(app.proj.Stage.Objects))
+	}
+	pasted := app.proj.Stage.Objects[1]
+	if pasted.Layer != "Layer 2" {
+		t.Fatalf("pasted layer = %q, want Layer 2", pasted.Layer)
+	}
+	if pasted.X != 10 || pasted.Y != 20 {
+		t.Fatalf("pasted position = (%g, %g), want (10, 20)", pasted.X, pasted.Y)
+	}
+	if app.st.selectedObj != 1 {
+		t.Fatalf("pasted selection = %d, want 1", app.st.selectedObj)
 	}
 }
 

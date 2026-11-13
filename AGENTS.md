@@ -216,8 +216,14 @@ The player is locked by phases, derived from `AttackAnimator.Phase()` in `Player
 | **Per-frame sprite frame selection**                | ✅ Done           |
 | **Table exclusive selection**                       | ✅ Done           |
 | **New frame inherits sprite + frame**               | ✅ Done           |
+| **Strict per-layer stage editing**                  | ✅ Done           |
+| **Cut/Paste stage objects**                         | ✅ Done           |
 | **Open/Save project files**                         | ❌ Pending        |
 | **Undo/Redo**                                       | ❌ Pending        |
+
+## Stage Layer Editing
+
+An active layer restricts hit-testing, selection, marquee, select-all, drag, delete, duplicate, and collision edits to that layer. The General view edits every layer. Cut/Paste moves selected objects into the active layer, or into the top layer while in General view; the clipboard is cleared when a stage is loaded.
 
 ## Per-Frame Sprite Composition
 

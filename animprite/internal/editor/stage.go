@@ -67,9 +67,10 @@ type stageState struct {
 	collisionEdit  bool
 	collisionTab   string
 
-	selectedObj  int
-	selectedObjs map[int]bool
-	activeLayer  string
+	selectedObj    int
+	selectedObjs   map[int]bool
+	activeLayer    string
+	stageClipboard []project.StageObject
 
 	dragAsset         int
 	draggingFromPanel bool
@@ -99,6 +100,8 @@ type stageState struct {
 	opacityInput     *ui.TextInput
 	deleteBtn        *ui.Button
 	duplicateBtn     *ui.Button
+	cutBtn           *ui.Button
+	pasteBtn         *ui.Button
 	layerAddBtn      *ui.Button
 	layerDeleteBtn   *ui.Button
 	layerUpBtn       *ui.Button
@@ -522,6 +525,7 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 	a.scaleHandle = -1
 	a.st.selectedObj = -1
 	a.st.selectedObjs = make(map[int]bool)
+	a.st.stageClipboard = nil
 	a.st.dragObjStarts = a.st.dragObjStarts[:0]
 	a.st.dragAsset = -1
 	a.st.draggingFromPanel = false
@@ -775,8 +779,21 @@ func (a *EditorApp) tickStageInfoAuto() {
 	}
 }
 
-func (a *EditorApp) selectStageObject(idx int) {
+// stageObjectInEditableScope reports whether idx may be selected and edited in
+// the current view. The General view edits every layer; an active layer edits
+// only its own objects.
+func (a *EditorApp) stageObjectInEditableScope(idx int) bool {
 	if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+		return false
+	}
+	if a.st.activeLayer == "" {
+		return true
+	}
+	return a.proj.Stage.LayerNameFor(a.proj.Stage.Objects[idx]) == a.st.activeLayer
+}
+
+func (a *EditorApp) selectStageObject(idx int) {
+	if idx < 0 || idx >= len(a.proj.Stage.Objects) || !a.stageObjectInEditableScope(idx) {
 		idx = -1
 	}
 	a.st.selectedObj = idx
@@ -790,6 +807,9 @@ func (a *EditorApp) selectStageObject(idx int) {
 
 func (a *EditorApp) followStageObjectLayer(idx int) {
 	if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+		return
+	}
+	if a.st.activeLayer != "" {
 		return
 	}
 	a.ensureActiveStageLayer()
@@ -860,8 +880,10 @@ func (a *EditorApp) stageSelectedIndices() []int {
 	}
 	indices := make([]int, 0, len(a.st.selectedObjs))
 	for idx := range a.st.selectedObjs {
-		if idx >= 0 && idx < len(a.proj.Stage.Objects) {
+		if a.stageObjectInEditableScope(idx) {
 			indices = append(indices, idx)
+		} else {
+			delete(a.st.selectedObjs, idx)
 		}
 	}
 	sort.Ints(indices)
@@ -883,20 +905,26 @@ func (a *EditorApp) stageSelectionCount() int {
 }
 
 func (a *EditorApp) selectAllStageObjects() {
-	if len(a.proj.Stage.Objects) == 0 {
+	indices := make([]int, 0, len(a.proj.Stage.Objects))
+	for idx := range a.proj.Stage.Objects {
+		if a.stageObjectInEditableScope(idx) {
+			indices = append(indices, idx)
+		}
+	}
+	if len(indices) == 0 {
 		return
 	}
-	a.st.selectedObjs = make(map[int]bool, len(a.proj.Stage.Objects))
-	for idx := range a.proj.Stage.Objects {
+	a.st.selectedObjs = make(map[int]bool, len(indices))
+	for _, idx := range indices {
 		a.st.selectedObjs[idx] = true
 	}
-	a.st.selectedObj = len(a.proj.Stage.Objects) - 1
+	a.st.selectedObj = indices[len(indices)-1]
 	a.syncStageSelectionUI()
-	a.setStatus(fmt.Sprintf("Selected %d objects", len(a.proj.Stage.Objects)))
+	a.setStatus(fmt.Sprintf("Selected %d objects", len(indices)))
 }
 
 func (a *EditorApp) addStageObjectSelection(idx int) {
-	if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+	if !a.stageObjectInEditableScope(idx) {
 		return
 	}
 	if a.st.selectedObjs == nil {
@@ -910,7 +938,7 @@ func (a *EditorApp) addStageObjectSelection(idx int) {
 }
 
 func (a *EditorApp) toggleStageObjectSelection(idx int) {
-	if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+	if !a.stageObjectInEditableScope(idx) {
 		return
 	}
 	if a.st.selectedObjs == nil {
@@ -948,7 +976,7 @@ func (a *EditorApp) showStageSelectionCount() {
 }
 
 func (a *EditorApp) setStageObjectPrimary(idx int) {
-	if !a.stageObjectSelected(idx) {
+	if !a.stageObjectInEditableScope(idx) || !a.stageObjectSelected(idx) {
 		return
 	}
 	a.st.selectedObj = idx
@@ -1053,6 +1081,9 @@ func (a *EditorApp) selectStageObjectsInMarquee() {
 
 	selected := make(map[int]bool)
 	for idx := range a.proj.Stage.Objects {
+		if !a.stageObjectInEditableScope(idx) {
+			continue
+		}
 		objMinX, objMinY, objMaxX, objMaxY := stageObjectWorldBounds(&a.proj.Stage.Objects[idx])
 		if objMaxX < minX || objMinX > maxX || objMaxY < minY || objMinY > maxY {
 			continue
@@ -1096,7 +1127,7 @@ func stageObjectWorldBounds(obj *project.StageObject) (minX, minY, maxX, maxY fl
 }
 
 func (a *EditorApp) selectedStageObject() *project.StageObject {
-	if a.st.selectedObj < 0 || a.st.selectedObj >= len(a.proj.Stage.Objects) {
+	if !a.stageObjectInEditableScope(a.st.selectedObj) {
 		return nil
 	}
 	return &a.proj.Stage.Objects[a.st.selectedObj]
@@ -1160,6 +1191,78 @@ func (a *EditorApp) duplicateSelectedStageObject() {
 		a.setStatus("Duplicated object")
 	} else {
 		a.setStatus(fmt.Sprintf("Duplicated %d objects", len(newIndices)))
+	}
+}
+
+func (a *EditorApp) cutSelectedStageObjects() {
+	indices := a.stageSelectedIndices()
+	if len(indices) == 0 {
+		return
+	}
+	a.saveSnapshot()
+	a.st.stageClipboard = a.st.stageClipboard[:0]
+	selected := make(map[int]bool, len(indices))
+	for _, idx := range indices {
+		selected[idx] = true
+		a.st.stageClipboard = append(a.st.stageClipboard, a.proj.Stage.Objects[idx].DeepCopy())
+	}
+	objects := make([]project.StageObject, 0, len(a.proj.Stage.Objects)-len(indices))
+	for idx, obj := range a.proj.Stage.Objects {
+		if !selected[idx] {
+			objects = append(objects, obj)
+		}
+	}
+	a.proj.Stage.Objects = objects
+	a.selectStageObject(-1)
+	if len(indices) == 1 {
+		a.setStatus("Cut object")
+	} else {
+		a.setStatus(fmt.Sprintf("Cut %d objects", len(indices)))
+	}
+}
+
+func (a *EditorApp) pasteStageObjects() {
+	if len(a.st.stageClipboard) == 0 {
+		return
+	}
+	targetLayer := a.stageWriteLayer()
+	general := a.st.activeLayer == ""
+	copies := make([]project.StageObject, 0, len(a.st.stageClipboard))
+	hasStart := a.stageStartObjectIndex() >= 0
+	for i := range a.st.stageClipboard {
+		obj := a.st.stageClipboard[i].DeepCopy()
+		if project.StageCategoryIsStart(obj.Category) {
+			if hasStart {
+				continue
+			}
+			hasStart = true
+		}
+		obj.Layer = targetLayer
+		copies = append(copies, obj)
+	}
+	if len(copies) == 0 {
+		a.setStatus("Start Pos already exists")
+		return
+	}
+	a.saveSnapshot()
+	newIndices := make([]int, 0, len(copies))
+	for i := range copies {
+		newIndices = append(newIndices, len(a.proj.Stage.Objects))
+		a.proj.Stage.Objects = append(a.proj.Stage.Objects, copies[i])
+	}
+	a.st.selectedObjs = make(map[int]bool, len(newIndices))
+	for _, idx := range newIndices {
+		a.st.selectedObjs[idx] = true
+	}
+	a.st.selectedObj = newIndices[len(newIndices)-1]
+	if general {
+		a.st.activeLayer = ""
+	}
+	a.syncStageSelectionUI()
+	if len(newIndices) == 1 {
+		a.setStatus("Pasted object into " + targetLayer)
+	} else {
+		a.setStatus(fmt.Sprintf("Pasted %d objects into %s", len(newIndices), targetLayer))
 	}
 }
 
@@ -1289,6 +1392,9 @@ func (a *EditorApp) stageObjectAtWorld(wx, wy float64) int {
 	// smaller objects.
 	for li := len(a.proj.Stage.Layers) - 1; li >= 0; li-- {
 		layer := a.proj.Stage.Layers[li].Name
+		if a.st.activeLayer != "" && a.st.activeLayer != layer {
+			continue
+		}
 		for _, wantCategory := range []string{
 			project.StageCategoryStart,
 			project.StageCategoryAnimBlock,

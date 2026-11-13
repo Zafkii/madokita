@@ -488,6 +488,18 @@ func (a *EditorApp) initStageWidgets() {
 		a.duplicateSelectedStageObject()
 	}
 
+	a.st.cutBtn = ui.NewButton(0, 0, 1, 22, "Cut", th)
+	a.st.cutBtn.BtnType = ui.BtnDefault
+	a.st.cutBtn.OnClick = func() {
+		a.cutSelectedStageObjects()
+	}
+
+	a.st.pasteBtn = ui.NewButton(0, 0, 1, 22, "Paste", th)
+	a.st.pasteBtn.BtnType = ui.BtnBlue
+	a.st.pasteBtn.OnClick = func() {
+		a.pasteStageObjects()
+	}
+
 	a.st.layerAddBtn = ui.NewButton(0, 0, 1, 20, "+ Layer", th)
 	a.st.layerAddBtn.BtnType = ui.BtnBlue
 	a.st.layerAddBtn.OnClick = func() {
