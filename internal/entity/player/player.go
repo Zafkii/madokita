@@ -395,6 +395,24 @@ func (p *Player) SetupCombat(def *animation.Attack, configs []combat.AttackConfi
 	}
 }
 
+// ActiveHitboxes returns the world-space hitboxes of the current attack that
+// are active during this frame. Used by the debug overlay; gameplay collision
+// remains owned by the combat controllers.
+func (p *Player) ActiveHitboxes() []math2.Rect {
+	if p.Combat.controllers == nil || p.Combat.currentID == "" {
+		return nil
+	}
+	controller, ok := p.Combat.controllers[p.Combat.currentID]
+	if !ok {
+		return nil
+	}
+	hitbox := controller.Hitbox()
+	if hitbox == nil || !hitbox.Active {
+		return nil
+	}
+	return []math2.Rect{hitbox.Rect(math2.Vec2{X: p.X, Y: p.Y}, p.FlipX)}
+}
+
 // TryAttack starts the given attack if the player is free and the controller
 // allows it (stamina). The AttackAnimator drives the phases; the controller
 // follows via SyncPhase so hitbox activation matches the frames. Movement is

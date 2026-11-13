@@ -339,3 +339,49 @@ func TestPlayerSupportRequiresCurrentSurface(t *testing.T) {
 		t.Fatal("player past the box edge must lose support")
 	}
 }
+
+func TestActiveHitboxesFollowAttackPhase(t *testing.T) {
+	p := commitmentTestPlayer()
+	p.X, p.Y = 100, 200
+	p.Combat.controllers["atk"].Hitbox().Config = combat.HitboxConfig{
+		W: 50, H: 40, OffsetX: 10, OffsetY: 5,
+	}
+
+	if got := p.ActiveHitboxes(); len(got) != 0 {
+		t.Fatalf("idle hitboxes = %v, want none", got)
+	}
+
+	if !p.TryAttack("atk") {
+		t.Fatal("attack should start")
+	}
+	if got := p.ActiveHitboxes(); len(got) != 0 {
+		t.Fatalf("windup hitboxes = %v, want none", got)
+	}
+
+	p.updateAttacking(0.05) // windup frame
+	p.updateAttacking(0.05) // first active frame
+
+	got := p.ActiveHitboxes()
+	if len(got) != 1 {
+		t.Fatalf("active hitboxes = %v, want exactly one", got)
+	}
+	want := math2.NewRect(100+10-25, 200+5-20, 50, 40)
+	if got[0] != want {
+		t.Fatalf("active hitbox = %v, want %v", got[0], want)
+	}
+
+	p.FlipX = true
+	flipped := p.ActiveHitboxes()
+	if len(flipped) != 1 {
+		t.Fatalf("flipped hitboxes = %v, want exactly one", flipped)
+	}
+	wantFlip := math2.NewRect(100-10-25, 200+5-20, 50, 40)
+	if flipped[0] != wantFlip {
+		t.Fatalf("flipped hitbox = %v, want %v", flipped[0], wantFlip)
+	}
+
+	p.updateAttacking(0.1) // recover frame
+	if got := p.ActiveHitboxes(); len(got) != 0 {
+		t.Fatalf("recover hitboxes = %v, want none", got)
+	}
+}

@@ -142,6 +142,7 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 			debug.DrawOrigin(screen, s.Player, s.CameraX)
 			debug.DrawSpriteBBox(screen, s.Player, s.CameraX)
 			debug.DrawHurtboxes(screen, s.Player, s.CameraX)
+			debug.DrawHitboxes(screen, s.Player, s.CameraX)
 		}
 	}
 }

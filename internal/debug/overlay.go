@@ -27,6 +27,34 @@ func drawColoredRect(screen *ebiten.Image, geoM ebiten.GeoM, c colorm.ColorM) {
 	colorm.DrawImage(screen, pixel, c, op)
 }
 
+// drawBox renders a world-space box centered at (cx, cy). Rotation is applied
+// around the box center, matching the hurtbox/hitbox authoring model.
+func drawBox(screen *ebiten.Image, cx, cy, w, h, rotation, cameraX float64, fillCM colorm.ColorM, stroke color.RGBA) {
+	if w <= 0 || h <= 0 {
+		return
+	}
+
+	geoM := ebiten.GeoM{}
+	geoM.Scale(w, h)
+	geoM.Translate(-w/2, -h/2)
+	if rotation != 0 {
+		geoM.Rotate(rotation)
+	}
+	geoM.Translate(cx, cy)
+	geoM.Translate(-cameraX, 0)
+
+	drawColoredRect(screen, geoM, fillCM)
+
+	x0, y0 := geoM.Apply(0, 0)
+	x1, y1 := geoM.Apply(1, 0)
+	x2, y2 := geoM.Apply(1, 1)
+	x3, y3 := geoM.Apply(0, 1)
+	ebitenutil.DrawLine(screen, x0, y0, x1, y1, stroke)
+	ebitenutil.DrawLine(screen, x1, y1, x2, y2, stroke)
+	ebitenutil.DrawLine(screen, x2, y2, x3, y3, stroke)
+	ebitenutil.DrawLine(screen, x3, y3, x0, y0, stroke)
+}
+
 func DrawHurtboxes(screen *ebiten.Image, p *player.Player, cameraX float64) {
 	if p.Animations.Animator == nil {
 		return
@@ -35,6 +63,10 @@ func DrawHurtboxes(screen *ebiten.Image, p *player.Player, cameraX float64) {
 	if frame == nil {
 		return
 	}
+	fillCM := colorm.ColorM{}
+	fillCM.Scale(1, 1, 0, 0.20)
+	stroke := color.RGBA{255, 255, 0, 230}
+
 	for _, hb := range frame.Hurtboxes {
 		ox := hb.OffsetX * p.Scale
 		oy := hb.OffsetY * p.Scale
@@ -44,36 +76,19 @@ func DrawHurtboxes(screen *ebiten.Image, p *player.Player, cameraX float64) {
 
 		w := hb.W * math.Abs(hb.ScaleX) * p.Scale
 		hh := hb.H * math.Abs(hb.ScaleY) * p.Scale
+		rotation := hb.Rotation * math.Pi / 180
 
-		geoM := ebiten.GeoM{}
-		geoM.Translate(-cameraX, 0)
-		geoM.Translate(p.X, p.Y)
-		geoM.Translate(ox, oy)
-		if hb.Rotation != 0 {
-			geoM.Rotate(hb.Rotation * math.Pi / 180)
-		}
-		geoM.Translate(-w/2, -hh/2)
-		geoM.Scale(w, hh)
+		drawBox(screen, p.X+ox, p.Y+oy, w, hh, rotation, cameraX, fillCM, stroke)
+	}
+}
 
-		fillCM := colorm.ColorM{}
-		fillCM.Scale(1, 0, 0, 0.25)
-		drawColoredRect(screen, geoM, fillCM)
+func DrawHitboxes(screen *ebiten.Image, p *player.Player, cameraX float64) {
+	fillCM := colorm.ColorM{}
+	fillCM.Scale(1, 0, 0, 0.30)
+	stroke := color.RGBA{255, 0, 0, 230}
 
-		borders := [][4]float64{
-			{0, 0, w, 1},
-			{0, hh - 1, w, 1},
-			{0, 0, 1, hh},
-			{w - 1, 0, 1, hh},
-		}
-		outCM := colorm.ColorM{}
-		outCM.Scale(1, 0, 0, 0.9)
-		for _, b := range borders {
-			bg := ebiten.GeoM{}
-			bg = geoM
-			bg.Translate(b[0], b[1])
-			bg.Scale(b[2], b[3])
-			drawColoredRect(screen, bg, outCM)
-		}
+	for _, r := range p.ActiveHitboxes() {
+		drawBox(screen, r.X+r.W/2, r.Y+r.H/2, r.W, r.H, 0, cameraX, fillCM, stroke)
 	}
 }
 
