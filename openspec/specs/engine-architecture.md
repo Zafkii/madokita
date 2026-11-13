@@ -146,18 +146,25 @@ type StageDef struct {
     BGM        string
     GroundY    float64   // ground line Y coordinate
     SpawnX     float64   // player horizontal spawn point
+    SpawnY     float64   // player vertical spawn point
 }
 ```
 
-`internal/entity/player/player.go` — `Player.Spawn()` computes the correct grounded position:
+`internal/entity/player/player.go` — `Player.Spawn()` delegates to `Player.SpawnAt()`:
 
 ```go
-func (p *Player) Spawn(x, stageGroundY float64) {
+func (p *Player) SpawnAt(x, y, stageGroundY float64) {
+    if stageGroundY > 0 && y > stageGroundY {
+        y = stageGroundY
+    }
     p.X = x
     p.StageGroundY = stageGroundY
-    p.Y = stageGroundY
-    p.Movement.IsGrounded = true
+    p.Y = y
+    p.Movement.yVelocity = 0
+    p.Movement.IsGrounded = y >= stageGroundY
 }
 ```
 
-`internal/game/scene.go` — `GameScene.SetPlayer(p)` automatically calls `p.Spawn(stage.SpawnX, stage.GroundY)`. The player's **origin** is placed on the logical ground line; there is no automatic visual foot offset. Ground contact must be resolved by collision boxes (or by placing the visual floor independently).
+`internal/game/stages.go` — `NewStageDef` reads the first stage object with `Category == stage.CategoryStart` and uses its X/Y for `SpawnX`/`SpawnY`; without a Start Pos marker, `SpawnY` defaults to `GroundY`.
+
+`internal/game/scene.go` — `GameScene.SetPlayer(p)` calls `p.SpawnAt(stage.SpawnX, spawnY, stage.GroundY)`. The player's **origin** starts at the marker position; there is no automatic visual foot offset. Ground contact must be resolved by collision boxes (or by placing the visual floor independently).

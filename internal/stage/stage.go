@@ -1,5 +1,9 @@
 package stage
 
+// CategoryStart marks the single player start-position marker in a stage
+// layout. The marker has no image; its X/Y define where the player spawns.
+const CategoryStart = "start"
+
 // Stage is a serializable stage layout: the asset catalog plus placed objects.
 type Stage struct {
 	Name    string

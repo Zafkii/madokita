@@ -532,8 +532,8 @@ func TestStageEditTabButtonsDeleteAndDuplicate(t *testing.T) {
 
 func TestStageBuildToggleIcons(t *testing.T) {
 	wantIcons := []string{
-		"palette", "move", "ban", "heart-pulse", "opacity", "toggle-right",
-		"star", "refresh-cw", "square-dimensions", "circle-chevrons-right", "activity",
+		"line-dot-top-vertical", "palette", "move", "ban", "heart-pulse", "opacity",
+		"toggle-right", "star", "refresh-cw", "square-dimensions", "circle-chevrons-right", "activity",
 	}
 	for i, toggle := range stageBuildToggles {
 		if toggle.Icon != wantIcons[i] {
@@ -590,6 +590,91 @@ func newStageObjectApp(count int) *EditorApp {
 		})
 	}
 	return app
+}
+
+func TestStageStartPosCreatesSingleMarker(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.canvas.Width = 800
+	app.canvas.Height = 600
+	app.st.toolToggleRects = []stageToolRect{
+		{Key: "start_pos", X: 0, Y: 0, W: 10, H: 10},
+	}
+
+	app.handleStageToolbarMouse(5, 5, true)
+
+	if len(app.proj.Stage.Objects) != 1 {
+		t.Fatalf("objects after Start Pos = %d, want 1", len(app.proj.Stage.Objects))
+	}
+	obj := app.proj.Stage.Objects[0]
+	if obj.Category != project.StageCategoryStart {
+		t.Fatalf("start category = %q, want %q", obj.Category, project.StageCategoryStart)
+	}
+	if obj.File != "" {
+		t.Fatalf("start marker file = %q, want empty", obj.File)
+	}
+	if obj.Width != project.DefaultStartMarkerSize || obj.Height != project.DefaultStartMarkerSize {
+		t.Fatalf("start marker size = %gx%g, want %g", obj.Width, obj.Height, project.DefaultStartMarkerSize)
+	}
+	if app.st.selectedObj != 0 {
+		t.Fatalf("selected object = %d, want 0", app.st.selectedObj)
+	}
+	if got := app.stageStartObjectIndex(); got != 0 {
+		t.Fatalf("stageStartObjectIndex() = %d, want 0", got)
+	}
+
+	app.handleStageToolbarMouse(5, 5, true)
+	if len(app.proj.Stage.Objects) != 1 {
+		t.Fatalf("objects after second Start Pos = %d, want 1", len(app.proj.Stage.Objects))
+	}
+}
+
+func TestStageStartMarkerHitTestHasPriority(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.proj.Stage.Objects = append(app.proj.Stage.Objects, project.StageObject{
+		Category: project.StageCategoryStart,
+		X:        10,
+		Y:        20,
+		Width:    project.DefaultStartMarkerSize,
+		Height:   project.DefaultStartMarkerSize,
+		Opacity:  1,
+	})
+
+	if got := app.stageObjectAtWorld(10, 20); got != 1 {
+		t.Fatalf("stageObjectAtWorld() = %d, want start marker index 1", got)
+	}
+}
+
+func TestExportImportStageKeepsStartMarker(t *testing.T) {
+	dir := t.TempDir()
+	stage := project.NewStageData("Start Stage")
+	stage.Objects = []project.StageObject{{
+		Category:          project.StageCategoryStart,
+		X:                 300,
+		Y:                 420,
+		Width:             project.DefaultStartMarkerSize,
+		Height:            project.DefaultStartMarkerSize,
+		Opacity:           1,
+		CollisionDisabled: true,
+	}}
+
+	outPath := filepath.Join(dir, "stage.go")
+	if err := ExportStage(outPath, stage); err != nil {
+		t.Fatalf("ExportStage() error: %v", err)
+	}
+	saved, err := ImportStage(outPath)
+	if err != nil {
+		t.Fatalf("ImportStage() error: %v", err)
+	}
+	if len(saved.Objects) != 1 {
+		t.Fatalf("saved objects = %d, want 1", len(saved.Objects))
+	}
+	obj := saved.Objects[0]
+	if obj.Category != project.StageCategoryStart || obj.File != "" {
+		t.Fatalf("saved start marker = %+v", obj)
+	}
+	if obj.X != 300 || obj.Y != 420 {
+		t.Fatalf("saved start position = (%g, %g), want (300, 420)", obj.X, obj.Y)
+	}
 }
 
 func TestStageMultiSelectionAddToggleAndClear(t *testing.T) {
@@ -664,6 +749,28 @@ func TestStageDuplicateSelectedObjects(t *testing.T) {
 		if obj.X != 10+float64(idx-2)*100+project.DefaultBlockSize {
 			t.Fatalf("duplicate %d X = %g, want offset", idx, obj.X)
 		}
+	}
+}
+
+func TestStageStartMarkerCannotBeDuplicated(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.proj.Stage.Objects = append(app.proj.Stage.Objects, project.StageObject{
+		Category: project.StageCategoryStart,
+		X:        100,
+		Y:        200,
+		Width:    project.DefaultStartMarkerSize,
+		Height:   project.DefaultStartMarkerSize,
+		Opacity:  1,
+	})
+	app.selectStageObject(0)
+
+	app.duplicateSelectedStageObject()
+
+	if len(app.proj.Stage.Objects) != 1 {
+		t.Fatalf("objects after duplicating Start Pos = %d, want 1", len(app.proj.Stage.Objects))
+	}
+	if app.st.selectedObj != 0 {
+		t.Fatalf("selected object = %d, want start marker 0", app.st.selectedObj)
 	}
 }
 

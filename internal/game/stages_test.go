@@ -64,6 +64,35 @@ func TestNewStageDefNormalizesLayout(t *testing.T) {
 	}
 }
 
+func TestNewStageDefUsesStartMarkerPosition(t *testing.T) {
+	layout := &stage.Stage{
+		Layers: []stage.Layer{{Name: "Layer 1"}},
+		Objects: []stage.Object{
+			{Category: stage.CategoryStart, X: 320, Y: 480},
+			{Category: "block", File: "../../../assets/images/stages/testStage/floor.png"},
+		},
+	}
+
+	def := NewStageDef("stage-id", "Stage Name", layout, 700, 50)
+
+	if def.SpawnX != 320 || def.SpawnY != 480 {
+		t.Fatalf("spawn = (%v, %v), want (320, 480)", def.SpawnX, def.SpawnY)
+	}
+	if def.GroundY != 700 {
+		t.Fatalf("GroundY = %v, want 700", def.GroundY)
+	}
+}
+
+func TestNewStageDefDefaultsSpawnYToGround(t *testing.T) {
+	layout := &stage.Stage{Layers: []stage.Layer{{Name: "Layer 1"}}}
+
+	def := NewStageDef("stage-id", "Stage Name", layout, 700, 50)
+
+	if def.SpawnX != 50 || def.SpawnY != 700 {
+		t.Fatalf("spawn = (%v, %v), want (50, 700)", def.SpawnX, def.SpawnY)
+	}
+}
+
 func TestNewStageDefRewritesAnimationSpritePaths(t *testing.T) {
 	layout := &stage.Stage{
 		Layers: []stage.Layer{{Name: "Layer 1"}},

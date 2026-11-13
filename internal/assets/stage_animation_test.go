@@ -98,6 +98,29 @@ func TestPreloadStageComposesAnimatedObject(t *testing.T) {
 	}
 }
 
+func TestPreloadStageSkipsStartMarker(t *testing.T) {
+	layout := &stage.Stage{
+		Width:  800,
+		Height: 400,
+		Layers: []stage.Layer{{Name: "Layer 1"}},
+		Objects: []stage.Object{{
+			Category: stage.CategoryStart,
+			X:        320,
+			Y:        480,
+			Width:    32,
+			Height:   32,
+		}},
+	}
+
+	mgr := NewAssetManager(ui.NewImageCache(t.TempDir()))
+	if err := mgr.PreloadStage(&StageDef{ID: "test", Layout: layout}); err != nil {
+		t.Fatalf("PreloadStage() error: %v", err)
+	}
+	if len(mgr.pathRefs) != 0 {
+		t.Fatalf("start marker loaded image paths: %+v", mgr.pathRefs)
+	}
+}
+
 func writeStageSheet(t *testing.T, path string) {
 	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, 800, 400))

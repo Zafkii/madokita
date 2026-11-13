@@ -38,6 +38,48 @@ func TestGameSceneStageBoundsFallback(t *testing.T) {
 	}
 }
 
+func TestGameSceneAppliesStartMarkerSpawnY(t *testing.T) {
+	s := &GameScene{
+		stage: &assets.StageDef{
+			Layout:  &stagepkg.Stage{Width: 4000, Height: 900},
+			SpawnX:  320,
+			SpawnY:  480,
+			GroundY: 700,
+		},
+	}
+	p := &player.Player{}
+	s.SetPlayer(p)
+
+	if p.X != 320 || p.Y != 480 {
+		t.Fatalf("player spawn = (%v, %v), want (320, 480)", p.X, p.Y)
+	}
+	if p.StageGroundY != 700 {
+		t.Fatalf("player ground line = %v, want 700", p.StageGroundY)
+	}
+	if p.Movement.IsGrounded {
+		t.Fatal("player spawned above the ground line must start airborne")
+	}
+}
+
+func TestGameSceneSpawnYFallsBackToGround(t *testing.T) {
+	s := &GameScene{
+		stage: &assets.StageDef{
+			Layout:  &stagepkg.Stage{Width: 4000, Height: 900},
+			SpawnX:  100,
+			GroundY: 700,
+		},
+	}
+	p := &player.Player{}
+	s.SetPlayer(p)
+
+	if p.X != 100 || p.Y != 700 {
+		t.Fatalf("player spawn = (%v, %v), want (100, 700)", p.X, p.Y)
+	}
+	if !p.Movement.IsGrounded {
+		t.Fatal("player spawned on the ground line must start grounded")
+	}
+}
+
 func TestGameSceneAppliesStageBoundsToPlayer(t *testing.T) {
 	s := &GameScene{
 		stage: &assets.StageDef{

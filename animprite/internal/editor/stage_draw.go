@@ -108,6 +108,9 @@ func (a *EditorApp) drawStageInfo(screen *ebiten.Image, p theme.Palette) {
 	}
 
 	base := ui.TruncateText(filepath.Base(obj.File), 42)
+	if project.StageCategoryIsStart(obj.Category) {
+		base = "Start Pos"
+	}
 	selected := fmt.Sprintf("Stage: %s    Objects: %d    Assets: %d", name, len(a.proj.Stage.Objects), len(a.proj.Stage.Assets))
 	if count := a.stageSelectionCount(); count > 1 {
 		selected = fmt.Sprintf("%d selected    Primary: %s", count, base)
@@ -186,6 +189,7 @@ func (a *EditorApp) stageToolContentX() int {
 }
 
 var stageBuildToggles = []struct{ Key, Label, Icon string }{
+	{"start_pos", "Start Pos", "line-dot-top-vertical"},
 	{"col", "Col", "palette"},
 	{"move", "Move", "move"},
 	{"stop", "Stop", "ban"},
@@ -339,6 +343,9 @@ func (a *EditorApp) drawStageBuildToggles(screen *ebiten.Image, p theme.Palette,
 		by := top + row*(stageToolSubH+stageToolSubGap)
 
 		on := a.st.toolToggles[toggle.Key]
+		if toggle.Key == "start_pos" {
+			on = a.stageStartObjectIndex() >= 0
+		}
 		bg := p.InputBG
 		textClr := p.TextPrimary
 		if on {
@@ -353,6 +360,32 @@ func (a *EditorApp) drawStageBuildToggles(screen *ebiten.Image, p theme.Palette,
 		a.drawStageToolContent(screen, bx, by, cellW, stageToolSubH, toggle.Label, toggle.Icon, textClr)
 		a.st.toolToggleRects = append(a.st.toolToggleRects, stageToolRect{Key: toggle.Key, X: bx, Y: by, W: cellW, H: stageToolSubH})
 	}
+}
+
+func (a *EditorApp) drawStageStartMarker(screen *ebiten.Image, p theme.Palette) {
+	if !a.isStageMode() || a.iconSet == nil {
+		return
+	}
+	idx := a.stageStartObjectIndex()
+	if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+		return
+	}
+	obj := &a.proj.Stage.Objects[idx]
+	cx, cy := a.canvas.Cam.WorldToCanvas(obj.X, obj.Y)
+	sx := a.canvas.X + int(math.Round(cx))
+	sy := a.canvas.Y + int(math.Round(cy))
+	if sx < a.canvas.X || sx > a.canvas.X+a.canvas.Width || sy < a.canvas.Y || sy > a.canvas.Y+a.canvas.Height {
+		return
+	}
+	size := int(math.Round(24 * a.canvas.Cam.Zoom))
+	if size < 16 {
+		size = 16
+	}
+	if size > 72 {
+		size = 72
+	}
+	a.iconSet.Draw(screen, "line-dot-top-vertical", sx-size/2, sy-size/2, size, size, p.BtnGreen)
+	ui.DrawTextCentered(screen, "START", sx, sy+size/2+2, 0.8, p.BtnGreen)
 }
 
 func (a *EditorApp) drawStageToolbar(screen *ebiten.Image, p theme.Palette) {

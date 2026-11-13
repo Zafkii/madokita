@@ -49,7 +49,11 @@ func NewGameScene(mgr *scene.Manager, am *assets.AssetManager, stage *assets.Sta
 func (s *GameScene) SetPlayer(p *player.Player) {
 	s.Player = p
 	if s.stage != nil {
-		p.Spawn(s.stage.SpawnX, s.stage.GroundY)
+		spawnY := s.stage.SpawnY
+		if spawnY <= 0 {
+			spawnY = s.stage.GroundY
+		}
+		p.SpawnAt(s.stage.SpawnX, spawnY, s.stage.GroundY)
 	}
 	p.SetWorldBounds(s.stageWidth(), s.stageHeight())
 }

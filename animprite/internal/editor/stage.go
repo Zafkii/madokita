@@ -643,6 +643,52 @@ func (a *EditorApp) stageDefaultSize(asset project.StageAsset) (float64, float64
 	return w, h
 }
 
+// stageStartObjectIndex returns the index of the player start marker, or -1
+// when the stage has no start position yet.
+func (a *EditorApp) stageStartObjectIndex() int {
+	for i := range a.proj.Stage.Objects {
+		if project.StageCategoryIsStart(a.proj.Stage.Objects[i].Category) {
+			return i
+		}
+	}
+	return -1
+}
+
+// createStageStartObject adds the single player start marker at the center of
+// the visible canvas, or selects the existing marker when one is already set.
+func (a *EditorApp) createStageStartObject() {
+	if idx := a.stageStartObjectIndex(); idx >= 0 {
+		a.selectStageObject(idx)
+		a.setStatus("Start position selected")
+		return
+	}
+
+	cw := float64(a.canvas.Width)
+	ch := float64(a.canvas.Height)
+	wx, wy := a.canvas.Cam.CanvasToWorld(cw/2, ch/2)
+	size := project.DefaultStartMarkerSize
+	wx, wy = snapStagePosition(wx, wy, size, size, a.st.snap)
+
+	a.saveSnapshot()
+	general := a.st.activeLayer == ""
+	layer := a.stageWriteLayer()
+	a.proj.Stage.Objects = append(a.proj.Stage.Objects, project.StageObject{
+		Layer:             layer,
+		Category:          project.StageCategoryStart,
+		X:                 wx,
+		Y:                 wy,
+		Width:             size,
+		Height:            size,
+		Opacity:           1,
+		CollisionDisabled: true,
+	})
+	a.selectStageObject(len(a.proj.Stage.Objects) - 1)
+	if general {
+		a.st.activeLayer = ""
+	}
+	a.setStatus("Added Start Pos to " + layer)
+}
+
 func (a *EditorApp) addStageObjectFromAsset(assetIdx int, wx, wy float64) {
 	if assetIdx < 0 || assetIdx >= len(a.proj.Stage.Assets) {
 		return
@@ -1086,9 +1132,11 @@ func (a *EditorApp) duplicateSelectedStageObject() {
 	if len(indices) == 0 {
 		return
 	}
-	a.saveSnapshot()
 	newIndices := make([]int, 0, len(indices))
 	for _, idx := range indices {
+		if project.StageCategoryIsStart(a.proj.Stage.Objects[idx].Category) {
+			continue
+		}
 		dup := a.proj.Stage.Objects[idx].DeepCopy()
 		dup.X += project.DefaultBlockSize
 		dup.Y += project.DefaultBlockSize
@@ -1096,6 +1144,11 @@ func (a *EditorApp) duplicateSelectedStageObject() {
 		newIndices = append(newIndices, len(a.proj.Stage.Objects))
 		a.proj.Stage.Objects = append(a.proj.Stage.Objects, dup)
 	}
+	if len(newIndices) == 0 {
+		a.setStatus("Start Pos cannot be duplicated")
+		return
+	}
+	a.saveSnapshot()
 
 	a.st.selectedObjs = make(map[int]bool, len(newIndices))
 	for _, idx := range newIndices {
@@ -1237,6 +1290,7 @@ func (a *EditorApp) stageObjectAtWorld(wx, wy float64) int {
 	for li := len(a.proj.Stage.Layers) - 1; li >= 0; li-- {
 		layer := a.proj.Stage.Layers[li].Name
 		for _, wantCategory := range []string{
+			project.StageCategoryStart,
 			project.StageCategoryAnimBlock,
 			project.StageCategoryBlock,
 			project.StageCategoryAnimProp,

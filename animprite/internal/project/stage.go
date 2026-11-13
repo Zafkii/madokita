@@ -12,8 +12,10 @@ const (
 	StageCategoryBlock     = "block"
 	StageCategoryAnimProp  = "anim_prop"
 	StageCategoryAnimBlock = "anim_block"
+	StageCategoryStart     = "start"
 	DefaultStageLayer      = "Layer 1"
 	DefaultBlockSize       = 50.0
+	DefaultStartMarkerSize = 32.0
 	DefaultStageWidth      = 2560.0
 	DefaultStageHeight     = 720.0
 )
@@ -99,7 +101,7 @@ func (o StageObject) DefaultCollisionBox() StageBox {
 // animated blocks) with no authored boxes fall back to the default box; props
 // only collide when a box was authored explicitly.
 func (o StageObject) EffectiveCollisionBoxes() []StageBox {
-	if o.Category == StageCategoryBG || o.CollisionDisabled {
+	if o.Category == StageCategoryBG || StageCategoryIsStart(o.Category) || o.CollisionDisabled {
 		return nil
 	}
 	if len(o.CollisionBoxes) > 0 {
@@ -113,7 +115,7 @@ func (o StageObject) EffectiveCollisionBoxes() []StageBox {
 
 // EffectiveHitboxes returns the authored damage boxes for this object.
 func (o StageObject) EffectiveHitboxes() []StageBox {
-	if o.Category == StageCategoryBG || o.CollisionDisabled {
+	if o.Category == StageCategoryBG || StageCategoryIsStart(o.Category) || o.CollisionDisabled {
 		return nil
 	}
 	return o.Hitboxes
@@ -278,6 +280,11 @@ func stageBaseName(name string) string {
 // stage object.
 func StageCategoryIsAnimated(category string) bool {
 	return category == StageCategoryAnimProp || category == StageCategoryAnimBlock
+}
+
+// StageCategoryIsStart reports whether category marks the player start marker.
+func StageCategoryIsStart(category string) bool {
+	return category == StageCategoryStart
 }
 
 // StageCategoryIsBlock reports whether category uses the block collision

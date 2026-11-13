@@ -17,6 +17,7 @@ var TestStageDef = NewStageDef("teststage", "Stage de Prueba", &generated.TestSt
 // Generated files keep image paths relative to the .go file so the editor can
 // reopen them; the runtime needs paths relative to the game asset root.
 func NewStageDef(id, name string, layout *stage.Stage, groundY, spawnX float64) *assets.StageDef {
+	spawnY := groundY
 	if layout != nil {
 		prepareStageLayout(layout)
 		for i := range layout.Assets {
@@ -29,6 +30,9 @@ func NewStageDef(id, name string, layout *stage.Stage, groundY, spawnX float64) 
 		for i := range layout.Objects {
 			layout.Objects[i].File = runtimeStageAssetPath(layout.Objects[i].File)
 		}
+		if x, y, ok := stageStartPosition(layout); ok {
+			spawnX, spawnY = x, y
+		}
 	}
 	return &assets.StageDef{
 		ID:      id,
@@ -36,7 +40,21 @@ func NewStageDef(id, name string, layout *stage.Stage, groundY, spawnX float64) 
 		Layout:  layout,
 		GroundY: groundY,
 		SpawnX:  spawnX,
+		SpawnY:  spawnY,
 	}
+}
+
+// stageStartPosition returns the first player start marker in the layout.
+func stageStartPosition(layout *stage.Stage) (float64, float64, bool) {
+	if layout == nil {
+		return 0, 0, false
+	}
+	for i := range layout.Objects {
+		if layout.Objects[i].Category == stage.CategoryStart {
+			return layout.Objects[i].X, layout.Objects[i].Y, true
+		}
+	}
+	return 0, 0, false
 }
 
 func prepareStageLayout(layout *stage.Stage) {

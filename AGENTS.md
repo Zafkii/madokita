@@ -292,7 +292,7 @@ var SayakaMovement = Movement{
 
 ## Spawn System
 
-Each `StageDef` defines `GroundY` (logical ground line Y) and `SpawnX` (horizontal spawn point). When `GameScene.SetPlayer(p)` is called, it automatically invokes `p.Spawn(stage.SpawnX, stage.GroundY)`. `Player.Spawn()` places the player's **origin** on the logical ground line (`p.Y = stage.GroundY`) and marks it grounded.
+Each `StageDef` defines `GroundY` (logical ground line Y) and optional `SpawnX`/`SpawnY` (player origin). The stage editor can place one **Start Pos** marker (`Category "start"`, no image); `NewStageDef` derives `SpawnX`/`SpawnY` from that marker. Without a marker, `SpawnY` falls back to `GroundY`. When `GameScene.SetPlayer(p)` is called, it invokes `p.SpawnAt(stage.SpawnX, spawnY, stage.GroundY)`. A marker above the ground line starts airborne; one below it is clamped to the ground line.
 
 There is **no automatic visual foot offset**. The game must resolve ground contact through collision boxes (or place the visual floor independently); never derive `p.Y` from `FrameSize`/`DefaultOriginY`.
 

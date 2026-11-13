@@ -371,11 +371,20 @@ func (p *Player) PlayAnim(name string) bool {
 // should resolve ground contact with collision boxes (or place the visual
 // floor independently).
 func (p *Player) Spawn(x, stageGroundY float64) {
+	p.SpawnAt(x, stageGroundY, stageGroundY)
+}
+
+// SpawnAt places the player at an explicit X/Y. A spawn below the stage ground
+// line is clamped to it; a spawn above stays airborne until gravity lands it.
+func (p *Player) SpawnAt(x, y, stageGroundY float64) {
+	if stageGroundY > 0 && y > stageGroundY {
+		y = stageGroundY
+	}
 	p.X = x
 	p.StageGroundY = stageGroundY
-	p.Y = stageGroundY
+	p.Y = y
 	p.Movement.yVelocity = 0
-	p.Movement.IsGrounded = true
+	p.Movement.IsGrounded = y >= stageGroundY
 }
 
 func (p *Player) Draw(screen *ebiten.Image, cameraX float64) {

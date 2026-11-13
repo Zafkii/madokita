@@ -26,4 +26,5 @@ type StageDef struct {
 	BGM        string
 	GroundY    float64
 	SpawnX     float64
+	SpawnY     float64
 }

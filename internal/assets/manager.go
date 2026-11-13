@@ -42,8 +42,8 @@ func NewAssetManager(cache *ui.ImageCache) *AssetManager {
 	}
 }
 
-func (m *AssetManager) PreloadStage(stage *StageDef) error {
-	if _, ok := m.stageLayers[stage.ID]; ok {
+func (m *AssetManager) PreloadStage(def *StageDef) error {
+	if _, ok := m.stageLayers[def.ID]; ok {
 		return nil
 	}
 	images := make(map[string]*ebiten.Image)
@@ -66,19 +66,22 @@ func (m *AssetManager) PreloadStage(stage *StageDef) error {
 	}
 
 	var items []LayerItem
-	for _, entry := range stage.Images {
+	for _, entry := range def.Images {
 		img := load(entry.Path, placeholderImage(entry))
 		if entry.FrameCount > 1 {
 			m.frames[entry.Key] = SliceFrames(img, entry.FrameW, entry.FrameH, entry.FrameCount)
 		}
 		items = append(items, LayerItem{Entry: entry, Image: img})
 	}
-	if stage.Layout != nil {
-		for _, obj := range stage.Layout.Objects {
+	if def.Layout != nil {
+		for _, obj := range def.Layout.Objects {
+			if obj.File == "" || obj.Category == stage.CategoryStart {
+				continue
+			}
 			load(obj.File, objectPlaceholder)
 		}
 		usedAnimated := make(map[string]bool)
-		for _, obj := range stage.Layout.Objects {
+		for _, obj := range def.Layout.Objects {
 			if obj.Category != "anim_prop" && obj.Category != "anim_block" && obj.AnimFile == "" {
 				continue
 			}
@@ -90,8 +93,8 @@ func (m *AssetManager) PreloadStage(stage *StageDef) error {
 			}
 		}
 		anims := make(map[string]*StageAnimation)
-		for i := range stage.Layout.Assets {
-			asset := &stage.Layout.Assets[i]
+		for i := range def.Layout.Assets {
+			asset := &def.Layout.Assets[i]
 			if !usedAnimated[asset.File] && (asset.AnimFile == "" || !usedAnimated[asset.AnimFile]) {
 				continue
 			}
@@ -107,11 +110,11 @@ func (m *AssetManager) PreloadStage(stage *StageDef) error {
 			}
 		}
 		if len(anims) > 0 {
-			m.stageAnims[stage.ID] = anims
+			m.stageAnims[def.ID] = anims
 		}
 	}
-	m.stageLayers[stage.ID] = items
-	m.stageImages[stage.ID] = images
+	m.stageLayers[def.ID] = items
+	m.stageImages[def.ID] = images
 	return nil
 }
 

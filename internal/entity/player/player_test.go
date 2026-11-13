@@ -185,6 +185,30 @@ func TestAttackEndsAfterArmedDuration(t *testing.T) {
 	}
 }
 
+func TestSpawnAtAboveGroundStartsAirborne(t *testing.T) {
+	p := &Player{Scale: 1}
+	p.SpawnAt(320, 480, 700)
+
+	if p.X != 320 || p.Y != 480 {
+		t.Fatalf("spawn = (%v, %v), want (320, 480)", p.X, p.Y)
+	}
+	if p.Movement.IsGrounded {
+		t.Error("spawn above the ground line must start airborne")
+	}
+}
+
+func TestSpawnAtBelowGroundClampsToGround(t *testing.T) {
+	p := &Player{Scale: 1}
+	p.SpawnAt(320, 900, 700)
+
+	if p.Y != 700 {
+		t.Fatalf("Y = %v, want clamp to 700", p.Y)
+	}
+	if !p.Movement.IsGrounded {
+		t.Error("clamped spawn must be grounded")
+	}
+}
+
 func TestSpawnUsesLogicalGroundLine(t *testing.T) {
 	p := &Player{Scale: 1}
 	p.Spawn(123, 700)

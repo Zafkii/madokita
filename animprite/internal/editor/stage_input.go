@@ -175,6 +175,11 @@ func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 	}
 	for _, r := range a.st.toolToggleRects {
 		if mx >= r.X && mx <= r.X+r.W && my >= r.Y && my <= r.Y+r.H {
+			if r.Key == "start_pos" {
+				a.clearStageInputFocus()
+				a.createStageStartObject()
+				return
+			}
 			if a.st.toolToggles == nil {
 				a.st.toolToggles = make(map[string]bool)
 			}
