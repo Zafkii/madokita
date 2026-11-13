@@ -34,9 +34,17 @@ func ExportStage(path string, stage project.StageData) error {
 	b.WriteString("\tAssets: []Asset{\n")
 	dir := filepath.Dir(path)
 	for _, asset := range stage.Assets {
-		fmt.Fprintf(&b, "\t\t{Name: %q, File: %q, Category: %q, Width: %d, Height: %d, FrameCount: %d},\n",
+		fmt.Fprintf(&b, "\t\t{Name: %q, File: %q, Category: %q, Width: %d, Height: %d, FrameCount: %d",
 			asset.Name, relativeSpritePath(dir, asset.File), asset.Category,
 			asset.Width, asset.Height, asset.FrameCount)
+		if asset.AnimFile != "" {
+			fmt.Fprintf(&b, ", AnimFile: %q", relativeSpritePath(dir, asset.AnimFile))
+		}
+		if asset.AnimName != "" {
+			fmt.Fprintf(&b, ", AnimName: %q", asset.AnimName)
+		}
+		b.WriteString(stageAssetAnimationLiteral(asset, dir))
+		b.WriteString("},\n")
 	}
 	b.WriteString("\t},\n")
 	b.WriteString("\tObjects: []Object{\n")
@@ -44,6 +52,12 @@ func ExportStage(path string, stage project.StageData) error {
 		fmt.Fprintf(&b, "\t\t{Layer: %q, Category: %q, File: %q, X: %g, Y: %g, Width: %g, Height: %g, Rotation: %g, Opacity: %g",
 			obj.Layer, obj.Category, relativeSpritePath(dir, obj.File),
 			obj.X, obj.Y, obj.Width, obj.Height, obj.Rotation, obj.Opacity)
+		if obj.AnimFile != "" {
+			fmt.Fprintf(&b, ", AnimFile: %q", relativeSpritePath(dir, obj.AnimFile))
+		}
+		if obj.AnimName != "" {
+			fmt.Fprintf(&b, ", AnimName: %q", obj.AnimName)
+		}
 		if obj.CollisionDisabled {
 			b.WriteString(", CollisionDisabled: true")
 		}
@@ -72,6 +86,74 @@ func stageBoxLiteral(boxes []project.StageBox) string {
 	}
 	b.WriteString("}")
 	return b.String()
+}
+
+// stageAssetAnimationLiteral exports the movement animation that belongs to an
+// animated asset. The runtime game cannot parse the editor's movement source,
+// so the stage file carries the composited frame description directly. It
+// returns an empty string when the movement cannot be loaded; the asset keeps
+// AnimFile/AnimName and the editor can still reopen it.
+func stageAssetAnimationLiteral(asset project.StageAsset, dir string) string {
+	if asset.AnimFile == "" || !project.StageCategoryIsAnimated(asset.Category) {
+		return ""
+	}
+	mv, err := ImportMovement(asset.AnimFile)
+	if err != nil {
+		return ""
+	}
+	anim := pickStageAnimation(mv.Animations, asset.AnimName)
+	if anim == nil || len(anim.Frames) == 0 || len(mv.Sprites) == 0 {
+		return ""
+	}
+	frameW, frameH := stageAnimationSize(mv.Sprites, *anim)
+	if frameW <= 0 || frameH <= 0 {
+		frameW, frameH = asset.Width, asset.Height
+	}
+	if frameW <= 0 || frameH <= 0 {
+		return ""
+	}
+
+	animDir := filepath.Dir(asset.AnimFile)
+	var b strings.Builder
+	b.WriteString(", Sprites: []SpriteSheet{")
+	for i, def := range mv.Sprites {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		sheetPath := resolveStagePath(animDir, def.File)
+		if sheetPath == "" {
+			sheetPath = asset.File
+		}
+		fmt.Fprintf(&b, "{File: %q, FrameW: %d, FrameH: %d, FrameCount: %d}",
+			relativeSpritePath(dir, sheetPath), def.Width, def.Height, def.FrameCount)
+	}
+	fmt.Fprintf(&b, "}, Animation: &Animation{Name: %q, FPS: %g, Loop: %t, FrameW: %d, FrameH: %d, Frames: []AnimFrame{",
+		anim.Name, anim.FPS, anim.Loop, frameW, frameH)
+	for i, frame := range anim.Frames {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString("{Sprites: []AnimSprite{")
+		for j, entry := range frame.Sprites {
+			if j > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(stageAnimSpriteLiteral(entry))
+		}
+		b.WriteString("}}")
+	}
+	b.WriteString("}}")
+	return b.String()
+}
+
+func stageAnimSpriteLiteral(entry project.FrameSpriteEntry) string {
+	// Write every field: a zero-valued ScaleX/ScaleY or OriginX/OriginY in the
+	// generated literal would hide or shift the sprite.
+	return fmt.Sprintf(
+		"{SpriteIdx: %d, SpriteFrameIdx: %d, OffsetX: %g, OffsetY: %g, Rotation: %g, ScaleX: %g, ScaleY: %g, OriginX: %g, OriginY: %g}",
+		entry.SpriteIdx, entry.SpriteFrameIdx, entry.OffsetX, entry.OffsetY,
+		entry.Rotation, entry.ScaleX, entry.ScaleY, entry.OriginX, entry.OriginY,
+	)
 }
 
 // ImportStage reads a Go stage data file produced by ExportStage (or written
@@ -207,13 +289,21 @@ func parseStageAssets(expr ast.Expr, dir string) []project.StageAsset {
 				asset.Height = intLit(kve.Value)
 			case "FrameCount":
 				asset.FrameCount = intLit(kve.Value)
+			case "AnimFile":
+				asset.AnimFile = resolveStagePath(dir, stringLit(kve.Value))
+			case "AnimName":
+				asset.AnimName = stringLit(kve.Value)
 			}
 		}
 		if asset.FrameCount <= 0 {
 			asset.FrameCount = 1
 		}
 		if asset.Category == "" {
-			asset.Category = project.StageCategoryForFile(asset.File)
+			if asset.AnimFile != "" {
+				asset.Category = animatedCategoryHint(asset.Name, asset.File, asset.AnimFile)
+			} else {
+				asset.Category = project.StageCategoryForFile(asset.File)
+			}
 		}
 		if asset.Name == "" {
 			asset.Name = strings.TrimSuffix(filepath.Base(asset.File), filepath.Ext(asset.File))
@@ -261,6 +351,10 @@ func parseStageObjects(expr ast.Expr, dir string) []project.StageObject {
 			case "Opacity":
 				obj.Opacity = floatLit(kve.Value)
 				haveOpacity = true
+			case "AnimFile":
+				obj.AnimFile = resolveStagePath(dir, stringLit(kve.Value))
+			case "AnimName":
+				obj.AnimName = stringLit(kve.Value)
 			case "CollisionDisabled":
 				obj.CollisionDisabled = exprString(kve.Value) == "true"
 			case "CollisionBoxes":
@@ -273,7 +367,11 @@ func parseStageObjects(expr ast.Expr, dir string) []project.StageObject {
 			obj.Opacity = 1
 		}
 		if obj.Category == "" {
-			obj.Category = project.StageCategoryForFile(obj.File)
+			if obj.AnimFile != "" {
+				obj.Category = animatedCategoryHint("", obj.File, obj.AnimFile)
+			} else {
+				obj.Category = project.StageCategoryForFile(obj.File)
+			}
 		}
 		objects = append(objects, obj)
 	}
@@ -319,20 +417,42 @@ func parseStageBoxes(expr ast.Expr) []project.StageBox {
 // hand-written config omits Width/Height.
 func applyStageObjectDefaults(stage *project.StageData) {
 	byFile := make(map[string]project.StageAsset, len(stage.Assets))
+	byAnim := make(map[string]project.StageAsset, len(stage.Assets))
 	for _, asset := range stage.Assets {
-		byFile[filepath.Clean(asset.File)] = asset
+		if asset.File != "" {
+			byFile[filepath.Clean(asset.File)] = asset
+		}
+		if asset.AnimFile != "" {
+			byAnim[filepath.Clean(asset.AnimFile)] = asset
+		}
 	}
 	for i := range stage.Objects {
 		obj := &stage.Objects[i]
-		asset, ok := byFile[filepath.Clean(obj.File)]
+		var asset project.StageAsset
+		var ok bool
+		if obj.File != "" {
+			asset, ok = byFile[filepath.Clean(obj.File)]
+		}
+		if !ok && obj.AnimFile != "" {
+			asset, ok = byAnim[filepath.Clean(obj.AnimFile)]
+		}
 		if !ok {
 			continue
+		}
+		if obj.File == "" {
+			obj.File = asset.File
 		}
 		if obj.Width <= 0 && asset.Width > 0 {
 			obj.Width = float64(asset.Width)
 		}
 		if obj.Height <= 0 && asset.Height > 0 {
 			obj.Height = float64(asset.Height)
+		}
+		if obj.AnimFile == "" {
+			obj.AnimFile = asset.AnimFile
+		}
+		if obj.AnimName == "" {
+			obj.AnimName = asset.AnimName
 		}
 	}
 }

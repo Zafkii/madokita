@@ -5,6 +5,7 @@ import (
 
 	"madokita-gems/internal/animation"
 	"madokita-gems/internal/data"
+	"madokita-gems/internal/stage"
 	"madokita-gems/internal/ui"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -22,6 +23,8 @@ type AssetManager struct {
 	charPaths   map[string][]string
 	pathRefs    map[string]int
 	stageLayers map[string][]LayerItem
+	stageImages map[string]map[string]*ebiten.Image
+	stageAnims  map[string]map[string]*StageAnimation
 	tint        *TintController
 }
 
@@ -33,6 +36,8 @@ func NewAssetManager(cache *ui.ImageCache) *AssetManager {
 		charPaths:   make(map[string][]string),
 		pathRefs:    make(map[string]int),
 		stageLayers: make(map[string][]LayerItem),
+		stageImages: make(map[string]map[string]*ebiten.Image),
+		stageAnims:  make(map[string]map[string]*StageAnimation),
 		tint:        NewTintController(),
 	}
 }
@@ -41,19 +46,72 @@ func (m *AssetManager) PreloadStage(stage *StageDef) error {
 	if _, ok := m.stageLayers[stage.ID]; ok {
 		return nil
 	}
+	images := make(map[string]*ebiten.Image)
+	objectPlaceholder := ebiten.NewImage(50, 50)
+	objectPlaceholder.Fill(color.RGBA{90, 90, 90, 255})
+	load := func(path string, fallback *ebiten.Image) *ebiten.Image {
+		if path == "" {
+			return fallback
+		}
+		if img, ok := images[path]; ok {
+			return img
+		}
+		img, err := m.imgCache.Load(path)
+		if err != nil {
+			img = fallback
+		}
+		images[path] = img
+		m.pathRefs[path]++
+		return img
+	}
+
 	var items []LayerItem
 	for _, entry := range stage.Images {
-		img, err := m.imgCache.Load(entry.Path)
-		if err != nil {
-			img = placeholderImage(entry)
-		}
+		img := load(entry.Path, placeholderImage(entry))
 		if entry.FrameCount > 1 {
 			m.frames[entry.Key] = SliceFrames(img, entry.FrameW, entry.FrameH, entry.FrameCount)
 		}
 		items = append(items, LayerItem{Entry: entry, Image: img})
-		m.pathRefs[entry.Path]++
+	}
+	if stage.Layout != nil {
+		for _, obj := range stage.Layout.Objects {
+			load(obj.File, objectPlaceholder)
+		}
+		usedAnimated := make(map[string]bool)
+		for _, obj := range stage.Layout.Objects {
+			if obj.Category != "anim_prop" && obj.Category != "anim_block" && obj.AnimFile == "" {
+				continue
+			}
+			if obj.File != "" {
+				usedAnimated[obj.File] = true
+			}
+			if obj.AnimFile != "" {
+				usedAnimated[obj.AnimFile] = true
+			}
+		}
+		anims := make(map[string]*StageAnimation)
+		for i := range stage.Layout.Assets {
+			asset := &stage.Layout.Assets[i]
+			if !usedAnimated[asset.File] && (asset.AnimFile == "" || !usedAnimated[asset.AnimFile]) {
+				continue
+			}
+			anim := composeStageAnimation(asset, load)
+			if anim == nil {
+				continue
+			}
+			if asset.File != "" {
+				anims[asset.File] = anim
+			}
+			if asset.AnimFile != "" {
+				anims[asset.AnimFile] = anim
+			}
+		}
+		if len(anims) > 0 {
+			m.stageAnims[stage.ID] = anims
+		}
 	}
 	m.stageLayers[stage.ID] = items
+	m.stageImages[stage.ID] = images
 	return nil
 }
 
@@ -150,6 +208,34 @@ func (m *AssetManager) StageLayers(stageID string) []LayerItem {
 	return m.stageLayers[stageID]
 }
 
+// StageObjectImage returns the texture for one placed stage object. Paths are
+// relative to the game asset root (the same root ImageCache uses).
+func (m *AssetManager) StageObjectImage(stageID, path string) *ebiten.Image {
+	if images, ok := m.stageImages[stageID]; ok {
+		return images[path]
+	}
+	return nil
+}
+
+// StageObjectAnimation returns the pre-composed animation for a placed stage
+// object, or nil when the object is static or its animation failed to load.
+func (m *AssetManager) StageObjectAnimation(stageID string, obj *stage.Object) *StageAnimation {
+	if obj == nil || (obj.Category != "anim_prop" && obj.Category != "anim_block" && obj.AnimFile == "") {
+		return nil
+	}
+	byKey := m.stageAnims[stageID]
+	if byKey == nil {
+		return nil
+	}
+	if anim := byKey[obj.File]; anim != nil {
+		return anim
+	}
+	if obj.AnimFile != "" {
+		return byKey[obj.AnimFile]
+	}
+	return nil
+}
+
 func (m *AssetManager) Tint() *TintController {
 	return m.tint
 }
@@ -159,9 +245,25 @@ func (m *AssetManager) UnloadStage(stageID string) {
 		if item.Entry.FrameCount > 1 {
 			delete(m.frames, item.Entry.Key)
 		}
-		m.releasePath(item.Entry.Path)
+	}
+	released := make(map[*StageAnimation]bool, len(m.stageAnims[stageID]))
+	for _, anim := range m.stageAnims[stageID] {
+		if anim == nil || released[anim] {
+			continue
+		}
+		released[anim] = true
+		for _, img := range anim.Frames {
+			if img != nil {
+				img.Deallocate()
+			}
+		}
+	}
+	for path := range m.stageImages[stageID] {
+		m.releasePath(path)
 	}
 	delete(m.stageLayers, stageID)
+	delete(m.stageImages, stageID)
+	delete(m.stageAnims, stageID)
 }
 
 func placeholderImage(entry AssetEntry) *ebiten.Image {

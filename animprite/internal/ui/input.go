@@ -88,7 +88,7 @@ func (t *TextInput) HandleMouse(cx, cy int, justPressed bool) {
 		now := time.Now()
 		dcx := cx - t.lastClickCX
 		dcy := cy - t.lastClickCY
-		isMulti := !t.lastClickTime.IsZero() && now.Sub(t.lastClickTime) < 400 &&
+		isMulti := !t.lastClickTime.IsZero() && now.Sub(t.lastClickTime) < 500*time.Millisecond &&
 			dcx >= -4 && dcx <= 4 && dcy >= -4 && dcy <= 4
 		t.lastClickTime = now
 		t.lastClickCX = cx
@@ -239,6 +239,10 @@ func (t *TextInput) HandleKeys() {
 
 	case ctrl && inpututil.IsKeyJustPressed(ebiten.KeyV):
 		if text, ok := ClipboardGet(); ok {
+			text = t.pasteText(text)
+			if text == "" {
+				break
+			}
 			if t.selStart >= 0 {
 				t.deleteSelection()
 			}
@@ -254,6 +258,27 @@ func (t *TextInput) HandleKeys() {
 	if changed && t.OnChange != nil {
 		t.OnChange(t.Text)
 	}
+}
+
+func (t *TextInput) pasteText(text string) string {
+	if !t.Numeric {
+		return text
+	}
+	text = strings.TrimSpace(text)
+	var b strings.Builder
+	seenDot := false
+	for i, r := range text {
+		switch {
+		case unicode.IsDigit(r):
+			b.WriteRune(r)
+		case r == '-' && i == 0:
+			b.WriteRune(r)
+		case r == '.' && !seenDot:
+			b.WriteRune(r)
+			seenDot = true
+		}
+	}
+	return b.String()
 }
 
 func (t *TextInput) HandleEnter() {

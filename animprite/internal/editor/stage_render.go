@@ -17,10 +17,17 @@ func (a *EditorApp) buildStageRenders() {
 	renders := make([]canvas.SpriteRender, 0, len(stage.Objects))
 
 	// Layers render bottom to top. Inside one layer backgrounds render first,
-	// props above them and blocks on top, matching hit-testing inside that
-	// layer.
+	// static props and then animated props above them, static blocks and then
+	// animated blocks on top. Hit-testing inside that layer walks this order
+	// backwards.
 	for _, layer := range stage.Layers {
-		for _, wantCategory := range []string{project.StageCategoryBG, project.StageCategoryProp, project.StageCategoryBlock} {
+		for _, wantCategory := range []string{
+			project.StageCategoryBG,
+			project.StageCategoryProp,
+			project.StageCategoryAnimProp,
+			project.StageCategoryBlock,
+			project.StageCategoryAnimBlock,
+		} {
 			for i := range stage.Objects {
 				obj := &stage.Objects[i]
 				if stage.LayerNameFor(*obj) != layer.Name {
@@ -40,6 +47,8 @@ func (a *EditorApp) buildStageRenders() {
 		ghost := project.StageObject{
 			Category: asset.Category,
 			File:     asset.File,
+			AnimFile: asset.AnimFile,
+			AnimName: asset.AnimName,
 			X:        a.st.ghostWX,
 			Y:        a.st.ghostWY,
 			Width:    w,
@@ -114,6 +123,12 @@ func (a *EditorApp) stageObjectRender(obj *project.StageObject, opacity float64)
 	}
 
 	img := a.stageImage(obj.File)
+	if project.StageCategoryIsAnimated(obj.Category) {
+		img = nil
+		if anim := a.stageAnimationForObject(obj); anim != nil {
+			img = a.stageAnimationFrame(anim)
+		}
+	}
 	if img != nil {
 		iw := float64(img.Bounds().Dx())
 		ih := float64(img.Bounds().Dy())

@@ -44,8 +44,10 @@ type stageLayerRect struct {
 }
 
 type stageState struct {
-	images   map[string]*ebiten.Image
-	expanded map[string]bool
+	images     map[string]*ebiten.Image
+	animations map[string]*stageAnimation
+	animClock  float64
+	expanded   map[string]bool
 
 	assetRects    []stageAssetRect
 	categoryRects []stageCategoryRect
@@ -136,11 +138,16 @@ func (a *EditorApp) ensureStageMode() {
 	if a.st.images == nil {
 		a.st.images = make(map[string]*ebiten.Image)
 	}
+	if a.st.animations == nil {
+		a.st.animations = make(map[string]*stageAnimation)
+	}
 	if a.st.expanded == nil {
 		a.st.expanded = map[string]bool{
-			project.StageCategoryBG:    true,
-			project.StageCategoryProp:  true,
-			project.StageCategoryBlock: true,
+			project.StageCategoryBG:        true,
+			project.StageCategoryProp:      true,
+			project.StageCategoryAnimProp:  true,
+			project.StageCategoryBlock:     true,
+			project.StageCategoryAnimBlock: true,
 		}
 	}
 	if a.st.toolTab == "" {
@@ -229,6 +236,7 @@ func (a *EditorApp) loadStageImage(file string) (*ebiten.Image, error) {
 }
 
 func (a *EditorApp) clearStageImages() {
+	a.clearStageAnimations()
 	for key, img := range a.st.images {
 		if img != nil {
 			img.Deallocate()
@@ -286,6 +294,15 @@ func scanStageAssets(dir string) ([]project.StageAsset, error) {
 			Height:     cfg.Height,
 			FrameCount: 1,
 		})
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if asset, ok := scanAnimatedStageAsset(filepath.Join(dir, entry.Name())); ok {
+			assets = append(assets, asset)
+		}
 	}
 
 	sort.SliceStable(assets, func(i, j int) bool {
@@ -409,9 +426,11 @@ func loadStageFile(path string) (project.StageData, error) {
 	dir := filepath.Dir(path)
 	for i := range stage.Assets {
 		stage.Assets[i].File = resolveStagePath(dir, stage.Assets[i].File)
+		stage.Assets[i].AnimFile = resolveStagePath(dir, stage.Assets[i].AnimFile)
 	}
 	for i := range stage.Objects {
 		stage.Objects[i].File = resolveStagePath(dir, stage.Objects[i].File)
+		stage.Objects[i].AnimFile = resolveStagePath(dir, stage.Objects[i].AnimFile)
 	}
 	return stage, nil
 }
@@ -442,19 +461,34 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 		stage.Height = project.DefaultStageHeight
 	}
 	for i := range stage.Assets {
-		if stage.Assets[i].Category == "" {
-			stage.Assets[i].Category = project.StageCategoryForFile(stage.Assets[i].File)
+		asset := &stage.Assets[i]
+		if asset.Category == "" {
+			if asset.AnimFile != "" {
+				asset.Category = animatedCategoryHint(asset.Name, asset.File, asset.AnimFile)
+			} else {
+				asset.Category = project.StageCategoryForFile(asset.File)
+			}
 		}
-		if stage.Assets[i].Name == "" {
-			stage.Assets[i].Name = strings.TrimSuffix(filepath.Base(stage.Assets[i].File), filepath.Ext(stage.Assets[i].File))
+		if asset.Name == "" {
+			asset.Name = strings.TrimSuffix(filepath.Base(asset.File), filepath.Ext(asset.File))
 		}
 	}
 	for i := range stage.Objects {
 		obj := &stage.Objects[i]
 		if obj.Category == "" {
-			obj.Category = project.StageCategoryForFile(obj.File)
+			if obj.AnimFile != "" {
+				obj.Category = animatedCategoryHint("", obj.File, obj.AnimFile)
+			} else {
+				obj.Category = project.StageCategoryForFile(obj.File)
+			}
 		}
-		if obj.Category == project.StageCategoryProp &&
+		if project.StageCategoryIsAnimated(obj.Category) && obj.AnimFile == "" {
+			if asset := stageAssetByFile(stage.Assets, obj.File); asset != nil {
+				obj.AnimFile = asset.AnimFile
+				obj.AnimName = asset.AnimName
+			}
+		}
+		if project.StageCategoryIsProp(obj.Category) &&
 			len(obj.CollisionBoxes) == 0 && len(obj.Hitboxes) == 0 {
 			obj.CollisionDisabled = true
 		}
@@ -482,12 +516,15 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 	a.clearStageInputFocus()
 
 	for _, asset := range stage.Assets {
+		if asset.File == "" {
+			continue
+		}
 		if _, loadErr := a.loadStageImage(asset.File); loadErr != nil {
 			a.setStatus("Image load error: " + loadErr.Error())
 		}
 	}
 	for _, obj := range stage.Objects {
-		if a.stageImage(obj.File) != nil {
+		if obj.File == "" || a.stageImage(obj.File) != nil {
 			continue
 		}
 		if _, loadErr := a.loadStageImage(obj.File); loadErr != nil {
@@ -521,9 +558,11 @@ func (a *EditorApp) saveStageFile(path string) error {
 	dir := filepath.Dir(path)
 	for i := range stage.Assets {
 		stage.Assets[i].File = relativeSpritePath(dir, stage.Assets[i].File)
+		stage.Assets[i].AnimFile = relativeSpritePath(dir, stage.Assets[i].AnimFile)
 	}
 	for i := range stage.Objects {
 		stage.Objects[i].File = relativeSpritePath(dir, stage.Objects[i].File)
+		stage.Objects[i].AnimFile = relativeSpritePath(dir, stage.Objects[i].AnimFile)
 	}
 
 	data, err := json.MarshalIndent(stage, "", "  ")
@@ -567,6 +606,14 @@ func (a *EditorApp) stageDefaultSize(asset project.StageAsset) (float64, float64
 	}
 	w := float64(asset.Width)
 	h := float64(asset.Height)
+	if (w <= 0 || h <= 0) && project.StageCategoryIsAnimated(asset.Category) {
+		if anim := a.stageAnimationForAsset(asset); anim != nil && len(anim.Frames) > 0 {
+			b := anim.Frames[0].Bounds()
+			if b.Dx() > 0 && b.Dy() > 0 {
+				w, h = float64(b.Dx()), float64(b.Dy())
+			}
+		}
+	}
 	if w <= 0 {
 		w = project.DefaultBlockSize
 	}
@@ -591,13 +638,15 @@ func (a *EditorApp) addStageObjectFromAsset(assetIdx int, wx, wy float64) {
 		Layer:             layer,
 		Category:          asset.Category,
 		File:              asset.File,
+		AnimFile:          asset.AnimFile,
+		AnimName:          asset.AnimName,
 		X:                 wx,
 		Y:                 wy,
 		Width:             w,
 		Height:            h,
 		Rotation:          0,
 		Opacity:           1,
-		CollisionDisabled: asset.Category == project.StageCategoryProp,
+		CollisionDisabled: project.StageCategoryIsProp(asset.Category),
 	})
 	a.selectStageObject(len(a.proj.Stage.Objects) - 1)
 	if general {
@@ -1160,12 +1209,19 @@ func (a *EditorApp) stageObjectAtWorld(wx, wy float64) int {
 		a.proj.Stage.NormalizeLayers()
 	}
 	objects := a.proj.Stage.Objects
-	// Walk layers from front to back. Inside one layer, blocks stay ahead of
-	// props and props ahead of backgrounds so a full-stage backdrop does not
-	// swallow clicks on smaller objects.
+	// Walk layers from front to back. Inside one layer, animated blocks stay
+	// ahead of static blocks, animated props ahead of static props, and both
+	// ahead of backgrounds so a full-stage backdrop does not swallow clicks on
+	// smaller objects.
 	for li := len(a.proj.Stage.Layers) - 1; li >= 0; li-- {
 		layer := a.proj.Stage.Layers[li].Name
-		for _, wantCategory := range []string{project.StageCategoryBlock, project.StageCategoryProp, project.StageCategoryBG} {
+		for _, wantCategory := range []string{
+			project.StageCategoryAnimBlock,
+			project.StageCategoryBlock,
+			project.StageCategoryAnimProp,
+			project.StageCategoryProp,
+			project.StageCategoryBG,
+		} {
 			for i := len(objects) - 1; i >= 0; i-- {
 				obj := &objects[i]
 				if a.proj.Stage.LayerNameFor(*obj) != layer {

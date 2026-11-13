@@ -6,17 +6,21 @@ import (
 )
 
 const (
-	StageVersion       = 1
-	StageCategoryBG    = "bg"
-	StageCategoryProp  = "prop"
-	StageCategoryBlock = "block"
-	DefaultStageLayer  = "Layer 1"
-	DefaultBlockSize   = 50.0
-	DefaultStageWidth  = 2560.0
-	DefaultStageHeight = 720.0
+	StageVersion           = 1
+	StageCategoryBG        = "bg"
+	StageCategoryProp      = "prop"
+	StageCategoryBlock     = "block"
+	StageCategoryAnimProp  = "anim_prop"
+	StageCategoryAnimBlock = "anim_block"
+	DefaultStageLayer      = "Layer 1"
+	DefaultBlockSize       = 50.0
+	DefaultStageWidth      = 2560.0
+	DefaultStageHeight     = 720.0
 )
 
 // StageAsset describes one image available in the stage asset library.
+// Animated assets keep the primary spritesheet in File and reference the
+// movement definition that describes how to slice and compose it.
 type StageAsset struct {
 	Category   string `json:"category"`
 	Name       string `json:"name"`
@@ -24,6 +28,8 @@ type StageAsset struct {
 	Width      int    `json:"width"`
 	Height     int    `json:"height"`
 	FrameCount int    `json:"frameCount,omitempty"`
+	AnimFile   string `json:"animFile,omitempty"`
+	AnimName   string `json:"animName,omitempty"`
 }
 
 // StageLayer is one named stack of stage objects. Layers render bottom to top
@@ -53,6 +59,8 @@ type StageObject struct {
 	Layer             string     `json:"layer,omitempty"`
 	Category          string     `json:"category"`
 	File              string     `json:"file"`
+	AnimFile          string     `json:"animFile,omitempty"`
+	AnimName          string     `json:"animName,omitempty"`
 	X                 float64    `json:"x"`
 	Y                 float64    `json:"y"`
 	Width             float64    `json:"width"`
@@ -87,9 +95,9 @@ func (o StageObject) DefaultCollisionBox() StageBox {
 }
 
 // EffectiveCollisionBoxes returns the boxes rendered and exported for this
-// object. Backgrounds and disabled objects have none. Blocks with no authored
-// boxes fall back to the default box; props only collide when a box was
-// authored explicitly.
+// object. Backgrounds and disabled objects have none. Blocks (including
+// animated blocks) with no authored boxes fall back to the default box; props
+// only collide when a box was authored explicitly.
 func (o StageObject) EffectiveCollisionBoxes() []StageBox {
 	if o.Category == StageCategoryBG || o.CollisionDisabled {
 		return nil
@@ -97,7 +105,7 @@ func (o StageObject) EffectiveCollisionBoxes() []StageBox {
 	if len(o.CollisionBoxes) > 0 {
 		return o.CollisionBoxes
 	}
-	if o.Category == StageCategoryBlock {
+	if StageCategoryIsBlock(o.Category) {
 		return []StageBox{o.DefaultCollisionBox()}
 	}
 	return nil
@@ -214,9 +222,7 @@ func (l StageData) LayerNameFor(obj StageObject) string {
 // folder. Backgrounds are detected by "bg", "background" or "sky"; props by
 // "prop", "decor" or "scenery"; everything else is a block asset.
 func StageCategoryForFile(name string) string {
-	base := filepath.Base(name)
-	base = strings.TrimSuffix(base, filepath.Ext(base))
-	base = strings.ToLower(base)
+	base := stageBaseName(name)
 	for _, marker := range []string{"bg", "background", "sky"} {
 		if strings.Contains(base, marker) {
 			return StageCategoryBG
@@ -228,4 +234,47 @@ func StageCategoryForFile(name string) string {
 		}
 	}
 	return StageCategoryBlock
+}
+
+// StageCategoryForAnimatedFile classifies an animated asset from the names
+// that surround it (folder, movement file, spritesheet, animation). Block-like
+// markers win over prop markers; everything else becomes an animated prop.
+func StageCategoryForAnimatedFile(name string) string {
+	haystack := strings.ToLower(name)
+	for _, marker := range []string{"block", "tile", "platform", "floor"} {
+		if strings.Contains(haystack, marker) {
+			return StageCategoryAnimBlock
+		}
+	}
+	return StageCategoryAnimProp
+}
+
+func stageBaseName(name string) string {
+	base := filepath.Base(name)
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	return strings.ToLower(base)
+}
+
+// StageCategoryIsAnimated reports whether category refers to an animated
+// stage object.
+func StageCategoryIsAnimated(category string) bool {
+	return category == StageCategoryAnimProp || category == StageCategoryAnimBlock
+}
+
+// StageCategoryIsBlock reports whether category uses the block collision
+// model (implicit collision box from the object size).
+func StageCategoryIsBlock(category string) bool {
+	return category == StageCategoryBlock || category == StageCategoryAnimBlock
+}
+
+// StageCategoryIsProp reports whether category uses the prop collision model
+// (collision only when authored explicitly).
+func StageCategoryIsProp(category string) bool {
+	return category == StageCategoryProp || category == StageCategoryAnimProp
+}
+
+// StageCategoryHasCollision reports whether category can own collision and
+// hit boxes.
+func StageCategoryHasCollision(category string) bool {
+	return StageCategoryIsBlock(category) || StageCategoryIsProp(category)
 }

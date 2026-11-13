@@ -111,7 +111,7 @@ func (a *EditorApp) stageCollisionList() *[]project.StageBox {
 	if obj == nil {
 		return nil
 	}
-	if obj.Category != project.StageCategoryBlock && obj.Category != project.StageCategoryProp {
+	if !project.StageCategoryHasCollision(obj.Category) {
 		return nil
 	}
 	if a.st.collisionTab == "hitbox" {
@@ -218,7 +218,7 @@ func (a *EditorApp) syncStageCollisionInputs() {
 
 func (a *EditorApp) ensureStageCollisionDefault() {
 	obj := a.selectedStageObject()
-	if obj == nil || obj.Category != project.StageCategoryBlock {
+	if obj == nil || !project.StageCategoryIsBlock(obj.Category) {
 		return
 	}
 	if len(obj.CollisionBoxes) > 0 {
@@ -231,7 +231,7 @@ func (a *EditorApp) ensureStageCollisionDefault() {
 
 func (a *EditorApp) openStageCollisionEditor() {
 	obj := a.selectedStageObject()
-	if obj == nil || (obj.Category != project.StageCategoryBlock && obj.Category != project.StageCategoryProp) {
+	if obj == nil || !project.StageCategoryHasCollision(obj.Category) {
 		a.setStatus("Select a block or prop to edit its collision")
 		return
 	}
@@ -308,11 +308,11 @@ func (a *EditorApp) removeStageCollisionBox() {
 	*listPtr = append((*listPtr)[:idx], (*listPtr)[idx+1:]...)
 	obj := a.selectedStageObject()
 	if a.st.collisionTab == "collision" && len(*listPtr) == 0 && obj != nil {
-		if obj.Category == project.StageCategoryBlock {
+		if project.StageCategoryIsBlock(obj.Category) {
 			*listPtr = []project.StageBox{obj.DefaultCollisionBox()}
 		}
 	}
-	if obj != nil && obj.Category == project.StageCategoryProp &&
+	if obj != nil && project.StageCategoryIsProp(obj.Category) &&
 		len(obj.CollisionBoxes) == 0 && len(obj.Hitboxes) == 0 {
 		obj.CollisionDisabled = true
 	}
@@ -334,7 +334,7 @@ func (a *EditorApp) toggleStageCollisionForSelection() {
 	anySupported := false
 	for _, idx := range indices {
 		obj := &a.proj.Stage.Objects[idx]
-		if obj.Category != project.StageCategoryBlock && obj.Category != project.StageCategoryProp {
+		if !project.StageCategoryHasCollision(obj.Category) {
 			continue
 		}
 		anySupported = true
@@ -349,10 +349,10 @@ func (a *EditorApp) toggleStageCollisionForSelection() {
 	a.saveSnapshot()
 	for _, idx := range indices {
 		obj := &a.proj.Stage.Objects[idx]
-		if obj.Category != project.StageCategoryBlock && obj.Category != project.StageCategoryProp {
+		if !project.StageCategoryHasCollision(obj.Category) {
 			continue
 		}
-		if !anyEnabled && obj.Category == project.StageCategoryProp &&
+		if !anyEnabled && project.StageCategoryIsProp(obj.Category) &&
 			len(obj.CollisionBoxes) == 0 && len(obj.Hitboxes) == 0 {
 			obj.CollisionBoxes = []project.StageBox{obj.DefaultCollisionBox()}
 		}

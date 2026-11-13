@@ -120,6 +120,7 @@ func (a *EditorApp) Update() error {
 		a.tickStageInfoAuto()
 	}
 	a.advancePreview()
+	a.advanceStageAnimations()
 
 	a.prevMouseX = mx
 	a.prevMouseY = my

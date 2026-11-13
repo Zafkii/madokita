@@ -3,11 +3,14 @@ package editor
 import (
 	"bytes"
 	"encoding/json"
+	"go/parser"
+	"go/token"
 	"image"
 	"image/png"
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"animprite/internal/project"
@@ -1334,5 +1337,344 @@ func TestStageClickPrefersBlockThenPropThenBackground(t *testing.T) {
 	app.proj.Stage.Objects = app.proj.Stage.Objects[:1]
 	if got := app.stageObjectAtWorld(50, 50); got != 0 {
 		t.Fatalf("hit = %d, want background 0", got)
+	}
+}
+
+func TestStageCategoryForAnimatedFile(t *testing.T) {
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"tree_moves", project.StageCategoryAnimProp},
+		{"sprite_prop_tree", project.StageCategoryAnimProp},
+		{"decor_fire", project.StageCategoryAnimProp},
+		{"animated_blocks", project.StageCategoryAnimBlock},
+		{"moving_platform", project.StageCategoryAnimBlock},
+		{"floor_tile_anim", project.StageCategoryAnimBlock},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := project.StageCategoryForAnimatedFile(tt.name); got != tt.want {
+				t.Fatalf("StageCategoryForAnimatedFile(%q) = %q, want %q", tt.name, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAnimatedCategoryCollisionModel(t *testing.T) {
+	block := project.StageObject{Category: project.StageCategoryAnimBlock, Width: 80, Height: 40}
+	if !project.StageCategoryIsBlock(block.Category) {
+		t.Fatal("anim_block should use the block collision model")
+	}
+	boxes := block.EffectiveCollisionBoxes()
+	if len(boxes) != 1 || boxes[0].Width != 80 || boxes[0].Height != 40 {
+		t.Fatalf("anim_block collision = %+v, want implicit 80x40 box", boxes)
+	}
+
+	prop := project.StageObject{Category: project.StageCategoryAnimProp, Width: 80, Height: 40}
+	if !project.StageCategoryIsProp(prop.Category) {
+		t.Fatal("anim_prop should use the prop collision model")
+	}
+	if got := prop.EffectiveCollisionBoxes(); len(got) != 0 {
+		t.Fatalf("anim_prop collision = %+v, want none until authored", got)
+	}
+}
+
+func TestScanStageAssetsFindsAnimatedProp(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "tree_moves")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create movement dir: %v", err)
+	}
+	writeTestPNG(t, filepath.Join(dir, "sprite_prop_tree.png"), 1600, 400)
+	movement := `package movements
+
+import . "madokita-gems/internal/animation"
+
+var MyMovement = Movement{
+	AssetKey:       "my_movement",
+	DefaultOriginX: 0.5,
+	DefaultOriginY: 0.5,
+	Sprites: []SpriteSheetDef{
+		{File: "sprite_prop_tree.png", FrameW: 400, FrameH: 400, FrameCount: 4},
+	},
+	Animations: map[string]MovementAnimDef{
+		"idle": Anim(1, true,
+			F(S(0, 0, 0, 0, 0, 1, 1, 0.5, 0.5)),
+			F(S(0, 1, 0, 0, 0, 1, 1, 0.5, 0.5)),
+			F(S(0, 2, 0, 0, 0, 1, 1, 0.5, 0.5)),
+		),
+	},
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "moves.go"), []byte(movement), 0o644); err != nil {
+		t.Fatalf("write movement: %v", err)
+	}
+
+	assets, err := scanStageAssets(root)
+	if err != nil {
+		t.Fatalf("scanStageAssets() error: %v", err)
+	}
+	if len(assets) != 1 {
+		t.Fatalf("assets = %d, want 1 animated asset", len(assets))
+	}
+	asset := assets[0]
+	if asset.Name != "tree" {
+		t.Fatalf("name = %q, want tree", asset.Name)
+	}
+	if asset.Category != project.StageCategoryAnimProp {
+		t.Fatalf("category = %q, want anim_prop", asset.Category)
+	}
+	if asset.Width != 400 || asset.Height != 400 {
+		t.Fatalf("size = %dx%d, want 400x400", asset.Width, asset.Height)
+	}
+	if asset.FrameCount != 3 {
+		t.Fatalf("frame count = %d, want 3", asset.FrameCount)
+	}
+	if asset.AnimName != "idle" {
+		t.Fatalf("anim name = %q, want idle", asset.AnimName)
+	}
+	if !filepath.IsAbs(asset.File) || !filepath.IsAbs(asset.AnimFile) {
+		t.Fatalf("asset paths must be absolute: file=%q anim=%q", asset.File, asset.AnimFile)
+	}
+}
+
+func TestOpenStageFolderLoadsAnimatedAsset(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "tree_moves")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create movement dir: %v", err)
+	}
+	writeTestPNG(t, filepath.Join(dir, "sprite_prop_tree.png"), 1600, 400)
+	movement := `package movements
+
+import . "madokita-gems/internal/animation"
+
+var MyMovement = Movement{
+	AssetKey: "my_movement",
+	Sprites: []SpriteSheetDef{
+		{File: "sprite_prop_tree.png", FrameW: 400, FrameH: 400, FrameCount: 4},
+	},
+	Animations: map[string]MovementAnimDef{
+		"idle": Anim(1, true,
+			F(S(0, 0, 0, 0, 0, 1, 1, 0.5, 0.5)),
+			F(S(0, 1, 0, 0, 0, 1, 1, 0.5, 0.5)),
+		),
+	},
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "moves.go"), []byte(movement), 0o644); err != nil {
+		t.Fatalf("write movement: %v", err)
+	}
+
+	app := NewEditorApp()
+	if err := app.openStageFolder(root); err != nil {
+		t.Fatalf("openStageFolder() error: %v", err)
+	}
+	if len(app.proj.Stage.Assets) != 1 {
+		t.Fatalf("assets = %d, want 1", len(app.proj.Stage.Assets))
+	}
+	asset := app.proj.Stage.Assets[0]
+	if asset.Category != project.StageCategoryAnimProp {
+		t.Fatalf("category = %q, want anim_prop", asset.Category)
+	}
+	if app.stageImage(asset.File) == nil {
+		t.Fatal("animated asset spritesheet was not loaded")
+	}
+	anim := app.stageAnimationForAsset(asset)
+	if anim == nil || len(anim.Frames) != 2 {
+		t.Fatalf("animation = %+v, want 2 frames", anim)
+	}
+}
+
+func TestStageAnimationSizeAccountsForOffset(t *testing.T) {
+	defs := []project.SpriteRow{{Width: 100, Height: 100}}
+	anim := project.AnimationRow{Frames: []project.AnimationFrame{{Sprites: []project.FrameSpriteEntry{{
+		SpriteIdx: 0,
+		OffsetX:   50,
+		ScaleX:    1,
+		ScaleY:    1,
+		OriginX:   0.5,
+		OriginY:   0.5,
+	}}}}}
+	w, h := stageAnimationSize(defs, anim)
+	if w != 200 || h != 100 {
+		t.Fatalf("stageAnimationSize() = %dx%d, want 200x100", w, h)
+	}
+}
+
+func TestExportImportStageKeepsAnimationReference(t *testing.T) {
+	dir := t.TempDir()
+	stage := project.NewStageData("Anim Stage")
+	stage.Assets = []project.StageAsset{{
+		Category: project.StageCategoryAnimProp,
+		Name:     "tree",
+		File:     filepath.Join(dir, "tree_moves", "sprite_prop_tree.png"),
+		Width:    400,
+		Height:   400,
+		AnimFile: filepath.Join(dir, "tree_moves", "moves.go"),
+		AnimName: "idle",
+	}}
+	stage.Objects = []project.StageObject{{
+		Category: project.StageCategoryAnimProp,
+		File:     filepath.Join(dir, "tree_moves", "sprite_prop_tree.png"),
+		AnimFile: filepath.Join(dir, "tree_moves", "moves.go"),
+		AnimName: "idle",
+		X:        100,
+		Y:        100,
+		Width:    400,
+		Height:   400,
+		Opacity:  1,
+	}}
+
+	outPath := filepath.Join(dir, "stage.go")
+	if err := ExportStage(outPath, stage); err != nil {
+		t.Fatalf("ExportStage() error: %v", err)
+	}
+	saved, err := ImportStage(outPath)
+	if err != nil {
+		t.Fatalf("ImportStage() error: %v", err)
+	}
+	if len(saved.Assets) != 1 || saved.Assets[0].AnimName != "idle" {
+		t.Fatalf("asset anim = %+v, want idle", saved.Assets)
+	}
+	if saved.Assets[0].AnimFile != stage.Assets[0].AnimFile {
+		t.Fatalf("asset anim file = %q, want %q", saved.Assets[0].AnimFile, stage.Assets[0].AnimFile)
+	}
+	if len(saved.Objects) != 1 || saved.Objects[0].AnimName != "idle" {
+		t.Fatalf("object anim = %+v, want idle", saved.Objects)
+	}
+	if saved.Objects[0].AnimFile != stage.Objects[0].AnimFile {
+		t.Fatalf("object anim file = %q, want %q", saved.Objects[0].AnimFile, stage.Objects[0].AnimFile)
+	}
+}
+
+func TestExportStageWritesAnimationData(t *testing.T) {
+	dir := t.TempDir()
+	animDir := filepath.Join(dir, "tree_moves")
+	if err := os.MkdirAll(animDir, 0o755); err != nil {
+		t.Fatalf("create movement dir: %v", err)
+	}
+	writeTestPNG(t, filepath.Join(animDir, "sprite_prop_tree.png"), 800, 400)
+	movement := `package movements
+
+import . "madokita-gems/internal/animation"
+
+var MyMovement = Movement{
+	AssetKey: "my_movement",
+	Sprites: []SpriteSheetDef{
+		{File: "sprite_prop_tree.png", FrameW: 400, FrameH: 400, FrameCount: 2},
+	},
+	Animations: map[string]MovementAnimDef{
+		"idle": Anim(1, true,
+			F(S(0, 0, 0, 0, 0, 1, 1, 0.5, 0.5)),
+			F(S(0, 1, 0, 0, 0, 1, 1, 0.5, 0.5)),
+		),
+	},
+}
+`
+	movesPath := filepath.Join(animDir, "moves.go")
+	if err := os.WriteFile(movesPath, []byte(movement), 0o644); err != nil {
+		t.Fatalf("write movement: %v", err)
+	}
+
+	stage := project.NewStageData("Anim Stage")
+	stage.Assets = []project.StageAsset{{
+		Category: project.StageCategoryAnimProp,
+		Name:     "tree",
+		File:     filepath.Join(animDir, "sprite_prop_tree.png"),
+		Width:    400,
+		Height:   400,
+		AnimFile: movesPath,
+		AnimName: "idle",
+	}}
+	outPath := filepath.Join(dir, "stage.go")
+	if err := ExportStage(outPath, stage); err != nil {
+		t.Fatalf("ExportStage() error: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read exported stage: %v", err)
+	}
+	if _, err := parser.ParseFile(token.NewFileSet(), outPath, data, parser.AllErrors); err != nil {
+		t.Fatalf("exported stage is not valid Go: %v\n%s", err, data)
+	}
+	text := string(data)
+	for _, want := range []string{
+		"Sprites: []SpriteSheet{",
+		"Animation: &Animation{",
+		"FrameW: 400",
+		"FrameH: 400",
+		"SpriteFrameIdx: 1",
+		"ScaleX: 1",
+		"OriginX: 0.5",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("exported stage missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestJSONStageKeepsRelativeAnimationReference(t *testing.T) {
+	dir := t.TempDir()
+	animDir := filepath.Join(dir, "tree_moves")
+	if err := os.MkdirAll(animDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	animFile := filepath.Join(animDir, "moves.go")
+	sheetFile := filepath.Join(animDir, "sprite_prop_tree.png")
+	stage := project.NewStageData("Anim JSON Stage")
+	stage.Assets = []project.StageAsset{{
+		Category: project.StageCategoryAnimProp,
+		Name:     "tree",
+		File:     sheetFile,
+		Width:    400,
+		Height:   400,
+		AnimFile: animFile,
+		AnimName: "idle",
+	}}
+	stage.Objects = []project.StageObject{{
+		Category: project.StageCategoryAnimProp,
+		File:     sheetFile,
+		AnimFile: animFile,
+		AnimName: "idle",
+		X:        100,
+		Y:        100,
+		Width:    400,
+		Height:   400,
+		Opacity:  1,
+	}}
+
+	app := NewEditorApp()
+	app.proj.Stage = stage
+	jsonPath := filepath.Join(dir, "stage.json")
+	if err := app.saveStageFile(jsonPath); err != nil {
+		t.Fatalf("saveStageFile() error: %v", err)
+	}
+
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatalf("read stage.json: %v", err)
+	}
+	var raw project.StageData
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("unmarshal stage.json: %v", err)
+	}
+	if got := raw.Assets[0].AnimFile; got != "tree_moves/moves.go" {
+		t.Fatalf("asset anim file in json = %q, want tree_moves/moves.go", got)
+	}
+	if got := raw.Objects[0].AnimFile; got != "tree_moves/moves.go" {
+		t.Fatalf("object anim file in json = %q, want tree_moves/moves.go", got)
+	}
+
+	loaded, err := loadStageFile(jsonPath)
+	if err != nil {
+		t.Fatalf("loadStageFile() error: %v", err)
+	}
+	if got := loaded.Assets[0].AnimFile; got != animFile {
+		t.Fatalf("loaded asset anim file = %q, want %q", got, animFile)
+	}
+	if got := loaded.Objects[0].AnimFile; got != animFile {
+		t.Fatalf("loaded object anim file = %q, want %q", got, animFile)
 	}
 }

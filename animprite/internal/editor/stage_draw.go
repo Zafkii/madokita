@@ -15,10 +15,28 @@ import (
 
 func stageAssetCategory(asset project.StageAsset) string {
 	switch asset.Category {
-	case project.StageCategoryBG, project.StageCategoryProp:
+	case project.StageCategoryBG, project.StageCategoryProp,
+		project.StageCategoryAnimProp, project.StageCategoryAnimBlock:
 		return asset.Category
 	default:
 		return project.StageCategoryBlock
+	}
+}
+
+func stageCategoryLabel(category string) string {
+	switch category {
+	case project.StageCategoryBG:
+		return "Backgrounds"
+	case project.StageCategoryProp:
+		return "Props"
+	case project.StageCategoryAnimProp:
+		return "Anim Props"
+	case project.StageCategoryBlock:
+		return "Blocks"
+	case project.StageCategoryAnimBlock:
+		return "Anim Blocks"
+	default:
+		return category
 	}
 }
 
@@ -267,7 +285,7 @@ func (a *EditorApp) drawStageEditActions(screen *ebiten.Image, p theme.Palette, 
 	}
 
 	buttons := []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn}
-	if obj.Category == project.StageCategoryBlock || obj.Category == project.StageCategoryProp {
+	if project.StageCategoryHasCollision(obj.Category) {
 		if a.st.collisionToggleBtn != nil {
 			a.st.collisionToggleBtn.Text = "Collision: On"
 			if obj.CollisionDisabled {
@@ -527,7 +545,13 @@ func (a *EditorApp) drawStageRightPanel(screen *ebiten.Image, p theme.Palette, p
 
 	iy = a.drawSectionHeader(screen, p, px, iy, "Assets")
 
-	categories := []string{project.StageCategoryBG, project.StageCategoryProp, project.StageCategoryBlock}
+	categories := []string{
+		project.StageCategoryBG,
+		project.StageCategoryProp,
+		project.StageCategoryAnimProp,
+		project.StageCategoryBlock,
+		project.StageCategoryAnimBlock,
+	}
 	for _, cat := range categories {
 		count := 0
 		for _, asset := range stage.Assets {
@@ -536,6 +560,7 @@ func (a *EditorApp) drawStageRightPanel(screen *ebiten.Image, p theme.Palette, p
 			}
 		}
 
+		label := stageCategoryLabel(cat)
 		headerH := 20
 		a.st.categoryRects = append(a.st.categoryRects, stageCategoryRect{
 			Category: cat,
@@ -552,8 +577,8 @@ func (a *EditorApp) drawStageRightPanel(screen *ebiten.Image, p theme.Palette, p
 			arrow = "▾"
 		}
 		ui.DrawText(screen, arrow, px+2, iy+2, 1, p.TextPrimary)
-		ui.DrawText(screen, cat, px+16, iy+2, 1, p.TextPrimary)
-		ui.DrawText(screen, fmt.Sprintf("(%d)", count), px+16+ui.TextWidth(cat)+6, iy+2, 1, p.TextMuted)
+		ui.DrawText(screen, label, px+16, iy+2, 1, p.TextPrimary)
+		ui.DrawText(screen, fmt.Sprintf("(%d)", count), px+16+ui.TextWidth(label)+6, iy+2, 1, p.TextMuted)
 		iy += headerH
 
 		if !a.st.expanded[cat] {
@@ -577,7 +602,7 @@ func (a *EditorApp) drawStageRightPanel(screen *ebiten.Image, p theme.Palette, p
 			}
 			ui.FillBorder(screen, cardX, cardY, cardW, cardH, border)
 
-			img := a.stageImage(asset.File)
+			img := a.stageAssetThumb(asset)
 			imgH := cardH - 26
 			drawImageFit(screen, img, cardX+4, cardY+4, cardW-8, imgH)
 			if img == nil {

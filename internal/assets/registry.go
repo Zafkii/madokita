@@ -1,5 +1,7 @@
 package assets
 
+import "madokita-gems/internal/stage"
+
 type AssetEntry struct {
 	Key        string
 	Path       string
@@ -18,6 +20,7 @@ type StageDef struct {
 	ID         string
 	Name       string
 	Images     []AssetEntry
+	Layout     *stage.Stage
 	Characters []string
 	Enemies    []string
 	BGM        string

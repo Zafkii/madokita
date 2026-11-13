@@ -173,8 +173,15 @@ func NewEditorApp() *EditorApp {
 		spriteEditIdx:            0,
 		loadedSprites:            make(map[int]*ebiten.Image),
 		st: stageState{
-			images:       make(map[string]*ebiten.Image),
-			expanded:     map[string]bool{project.StageCategoryBG: true, project.StageCategoryProp: true, project.StageCategoryBlock: true},
+			images:     make(map[string]*ebiten.Image),
+			animations: make(map[string]*stageAnimation),
+			expanded: map[string]bool{
+				project.StageCategoryBG:        true,
+				project.StageCategoryProp:      true,
+				project.StageCategoryAnimProp:  true,
+				project.StageCategoryBlock:     true,
+				project.StageCategoryAnimBlock: true,
+			},
 			toolTab:      "build",
 			toolToggles:  make(map[string]bool),
 			snap:         true,
