@@ -302,6 +302,12 @@ Each `StageDef` defines `GroundY` (logical ground line Y) and optional `SpawnX`/
 
 There is **no automatic visual foot offset**. The game must resolve ground contact through collision boxes (or place the visual floor independently); never derive `p.Y` from `FrameSize`/`DefaultOriginY`.
 
+## Stage Collision
+
+`GameScene.solidRects()` converts layout geometry into world-space collision rectangles. Blocks (`block`, `anim_block`) without authored boxes use their rendered `Width`/`Height`; props collide only when they have explicit `CollisionBoxes`; backgrounds, start markers, and `CollisionDisabled` objects are ignored. Object and box rotation are approximated by their axis-aligned extents.
+
+The player owns a solid body derived from the standing hurtbox union (not from the moving damage hurtboxes). Horizontal movement pushes out of solids and gravity resolves landings/ceilings; walking off a ledge clears `IsGrounded`. `StageGroundY` remains the fallback line for stages with no block geometry. Hurtboxes remain damage-only and never act as stage collision.
+
 ## Ebitengine v2 GeoM Caveat
 
 `GeoM.Translate()` does NOT perform a proper matrix multiplication — it **only adds** to `tx`/`ty`. In contrast, `Scale()` and `Rotate()` multiply ALL matrix components **including** `tx`/`ty` (proper left-multiplication).

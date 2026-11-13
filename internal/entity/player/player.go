@@ -13,7 +13,19 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-const FrameSize = 256
+const (
+	FrameSize = 256
+
+	// The solid collision body approximates the standing hurtbox union. The
+	// hurtboxes themselves stay damage-only; this body is what blocks stage
+	// geometry so the player cannot walk or fall through it.
+	solidBodyWidth   = 95.0
+	solidBodyHeight  = 190.0
+	solidBodyOffsetX = 1.5
+	solidBodyOffsetY = 32.0
+
+	collisionEpsilon = 0.5
+)
 
 type State struct {
 	IsControlled      bool
@@ -69,6 +81,8 @@ type Player struct {
 	assetMgr   *assets.AssetManager
 	attackAnim *animation.AttackAnimator
 
+	solidRects []math2.Rect
+
 	defaultAttackID string
 }
 
@@ -113,19 +127,19 @@ func (p *Player) Update(dt time.Duration) {
 	}
 
 	moving := false
-	if !p.State.IsMovementLocked {
+	if !p.State.IsMovementLocked && p.Input != nil {
+		dx := 0.0
 		if p.Input.IsPressed(input.ActionMoveLeft) {
-			p.X -= p.Movement.speed * dtSec
+			dx = -p.Movement.speed * dtSec
 			p.FlipX = true
 			moving = true
 		} else if p.Input.IsPressed(input.ActionMoveRight) {
-			p.X += p.Movement.speed * dtSec
+			dx = p.Movement.speed * dtSec
 			p.FlipX = false
 			moving = true
 		}
-
-		if p.X < 0 {
-			p.X = 0
+		if dx != 0 {
+			p.moveHorizontal(dx)
 		}
 
 		wantsJump := p.Input.IsPressed(input.ActionJump) && p.Movement.IsGrounded
@@ -135,19 +149,14 @@ func (p *Player) Update(dt time.Duration) {
 		}
 	}
 
+	// Walking off a ledge must release the grounded state before gravity.
+	if p.Movement.IsGrounded && !p.hasSupport() {
+		p.Movement.IsGrounded = false
+	}
+
 	// Gravity runs unconditionally: attacking mid-air must not freeze the fall.
 	if !p.Movement.IsGrounded {
-		p.Movement.yVelocity += p.Movement.gravity * dtSec
-		p.Y += p.Movement.yVelocity * dtSec
-
-		// The player's Y is the logical ground contact. Collision boxes own
-		// the real ground resolution; this clamp keeps the origin on the
-		// stage's ground line until that system exists.
-		if p.Y >= p.StageGroundY {
-			p.Y = p.StageGroundY
-			p.Movement.yVelocity = 0
-			p.Movement.IsGrounded = true
-		}
+		p.applyGravity(dtSec)
 	}
 
 	p.clampWorldBounds()
@@ -173,6 +182,150 @@ func (p *Player) Update(dt time.Duration) {
 	if p.Actor != nil {
 		p.Actor.Update(dt)
 	}
+}
+
+// SetSolidRects installs the stage collision rectangles the player must not
+// pass through. The slice is copied so callers can rebuild their layout.
+func (p *Player) SetSolidRects(rects []math2.Rect) {
+	p.solidRects = append(p.solidRects[:0], rects...)
+}
+
+func (p *Player) collisionScale() float64 {
+	if p.Scale > 0 {
+		return p.Scale
+	}
+	return 1
+}
+
+func (p *Player) bodyRectAt(x, y float64) math2.Rect {
+	scale := p.collisionScale()
+	w := solidBodyWidth * scale
+	h := solidBodyHeight * scale
+	cx := x + solidBodyOffsetX*scale
+	cy := y + solidBodyOffsetY*scale
+	return math2.NewRect(cx-w/2, cy-h/2, w, h)
+}
+
+func (p *Player) bodyRect() math2.Rect {
+	return p.bodyRectAt(p.X, p.Y)
+}
+
+func (p *Player) bodyBottomOffset() float64 {
+	return (solidBodyOffsetY + solidBodyHeight/2) * p.collisionScale()
+}
+
+func (p *Player) bodyTopOffset() float64 {
+	return (solidBodyOffsetY - solidBodyHeight/2) * p.collisionScale()
+}
+
+func (p *Player) moveHorizontal(dx float64) {
+	p.X += dx
+	if len(p.solidRects) == 0 {
+		return
+	}
+
+	// A couple of passes handles corners shared by adjacent blocks.
+	for pass := 0; pass < 2; pass++ {
+		body := p.bodyRect()
+		hit := false
+		for _, solid := range p.solidRects {
+			if !body.Overlaps(solid) {
+				continue
+			}
+			leftOffset := body.X - p.X
+			rightOffset := body.X + body.W - p.X
+			if dx > 0 {
+				p.X = solid.X - rightOffset
+			} else {
+				p.X = solid.X + solid.W - leftOffset
+			}
+			body = p.bodyRect()
+			hit = true
+		}
+		if !hit {
+			return
+		}
+	}
+}
+
+func (p *Player) applyGravity(dtSec float64) {
+	prevBody := p.bodyRect()
+	p.Movement.yVelocity += p.Movement.gravity * dtSec
+	p.Y += p.Movement.yVelocity * dtSec
+	body := p.bodyRect()
+
+	if p.Movement.yVelocity > 0 {
+		landingTop := math.Inf(1)
+		for _, solid := range p.solidRects {
+			if !horizontalOverlap(body, solid) {
+				continue
+			}
+			// Only land when the body crossed the top during this step.
+			if prevBody.Y+prevBody.H > solid.Y+collisionEpsilon {
+				continue
+			}
+			if body.Y+body.H < solid.Y {
+				continue
+			}
+			if solid.Y < landingTop {
+				landingTop = solid.Y
+			}
+		}
+		if !math.IsInf(landingTop, 1) {
+			p.Y = landingTop - p.bodyBottomOffset()
+			p.Movement.yVelocity = 0
+			p.Movement.IsGrounded = true
+			return
+		}
+
+		// Compatibility fallback for stages with no authored block geometry.
+		if p.Y >= p.StageGroundY {
+			p.Y = p.StageGroundY
+			p.Movement.yVelocity = 0
+			p.Movement.IsGrounded = true
+		}
+		return
+	}
+
+	if p.Movement.yVelocity < 0 {
+		ceilingBottom := math.Inf(-1)
+		for _, solid := range p.solidRects {
+			if !horizontalOverlap(body, solid) {
+				continue
+			}
+			if prevBody.Y < solid.Y+solid.H-collisionEpsilon {
+				continue
+			}
+			if body.Y > solid.Y+solid.H {
+				continue
+			}
+			if solid.Y+solid.H > ceilingBottom {
+				ceilingBottom = solid.Y + solid.H
+			}
+		}
+		if !math.IsInf(ceilingBottom, -1) {
+			p.Y = ceilingBottom - p.bodyTopOffset()
+			p.Movement.yVelocity = 0
+		}
+	}
+}
+
+func (p *Player) hasSupport() bool {
+	body := p.bodyRect()
+	bottom := body.Y + body.H
+	for _, solid := range p.solidRects {
+		if !horizontalOverlap(body, solid) {
+			continue
+		}
+		if math.Abs(bottom-solid.Y) <= collisionEpsilon {
+			return true
+		}
+	}
+	return p.StageGroundY > 0 && math.Abs(p.Y-p.StageGroundY) <= collisionEpsilon
+}
+
+func horizontalOverlap(a, b math2.Rect) bool {
+	return a.X < b.X+b.W && a.X+a.W > b.X
 }
 
 func (p *Player) SetWorldBounds(width, height float64) {

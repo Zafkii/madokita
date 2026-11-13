@@ -6,6 +6,7 @@ import (
 
 	"madokita-gems/internal/animation"
 	"madokita-gems/internal/combat"
+	math2 "madokita-gems/internal/math"
 )
 
 // commitmentTestDef is a synthetic attack with one frame per phase at 10fps
@@ -285,5 +286,56 @@ func TestWorldBoundsClampBottom(t *testing.T) {
 	}
 	if p.Movement.yVelocity != 0 {
 		t.Errorf("yVelocity = %v, want 0", p.Movement.yVelocity)
+	}
+}
+
+func TestPlayerLandsOnSolidStageBox(t *testing.T) {
+	p := &Player{
+		State:        State{IsControlled: true, IsMovementLocked: true},
+		Movement:     Movement{gravity: 1000},
+		Scale:        0.5,
+		X:            50,
+		Y:            0,
+		StageGroundY: 1000,
+	}
+	p.SetSolidRects([]math2.Rect{math2.NewRect(0, 100, 200, 50)})
+
+	for i := 0; i < 300; i++ {
+		p.Update(10 * time.Millisecond)
+	}
+
+	wantY := 100 - p.bodyBottomOffset()
+	if diff := p.Y - wantY; diff < -0.01 || diff > 0.01 {
+		t.Fatalf("Y = %v, want landing on box top at %v", p.Y, wantY)
+	}
+	if !p.Movement.IsGrounded {
+		t.Fatal("player must be grounded after landing on a solid box")
+	}
+	if p.Movement.yVelocity != 0 {
+		t.Fatalf("yVelocity = %v, want 0", p.Movement.yVelocity)
+	}
+}
+
+func TestPlayerStopsAtSolidWall(t *testing.T) {
+	p := &Player{Scale: 0.5, X: 20, Y: 36.5}
+	p.SetSolidRects([]math2.Rect{math2.NewRect(100, 0, 50, 200)})
+	p.moveHorizontal(100)
+
+	wantX := 100 - (p.bodyRect().X + p.bodyRect().W - p.X)
+	if diff := p.X - wantX; diff < -0.01 || diff > 0.01 {
+		t.Fatalf("X = %v, want blocked at wall left edge %v", p.X, wantX)
+	}
+}
+
+func TestPlayerSupportRequiresCurrentSurface(t *testing.T) {
+	p := &Player{Scale: 0.5, X: 50, Y: 36.5, StageGroundY: 1000}
+	p.SetSolidRects([]math2.Rect{math2.NewRect(0, 100, 100, 50)})
+	if !p.hasSupport() {
+		t.Fatal("player standing on the box must have support")
+	}
+
+	p.X = 200
+	if p.hasSupport() {
+		t.Fatal("player past the box edge must lose support")
 	}
 }

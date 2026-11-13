@@ -56,6 +56,31 @@ func (s *GameScene) SetPlayer(p *player.Player) {
 		p.SpawnAt(s.stage.SpawnX, spawnY, s.stage.GroundY)
 	}
 	p.SetWorldBounds(s.stageWidth(), s.stageHeight())
+	p.SetSolidRects(s.solidRects())
+}
+
+// solidRects turns the stage block layout into world-space collision boxes.
+// Collision boxes are authored around the object center; object and box
+// rotation are approximated by their axis-aligned extents.
+func (s *GameScene) solidRects() []math2.Rect {
+	if s.stage == nil || s.stage.Layout == nil {
+		return nil
+	}
+
+	var rects []math2.Rect
+	for i := range s.stage.Layout.Objects {
+		obj := &s.stage.Layout.Objects[i]
+		for _, box := range obj.EffectiveCollisionBoxes() {
+			rot := (obj.Rotation + box.Rotation) * math.Pi / 180
+			cos, sin := math.Cos(rot), math.Sin(rot)
+			cx := obj.X + box.X*cos - box.Y*sin
+			cy := obj.Y + box.X*sin + box.Y*cos
+			hw := (math.Abs(cos)*box.Width + math.Abs(sin)*box.Height) / 2
+			hh := (math.Abs(sin)*box.Width + math.Abs(cos)*box.Height) / 2
+			rects = append(rects, math2.NewRect(cx-hw, cy-hh, hw*2, hh*2))
+		}
+	}
+	return rects
 }
 
 func (s *GameScene) Update(dt float64) error {

@@ -1,8 +1,17 @@
 package stage
 
-// CategoryStart marks the single player start-position marker in a stage
-// layout. The marker has no image; its X/Y define where the player spawns.
-const CategoryStart = "start"
+const (
+	CategoryBG        = "bg"
+	CategoryProp      = "prop"
+	CategoryBlock     = "block"
+	CategoryAnimProp  = "anim_prop"
+	CategoryAnimBlock = "anim_block"
+	// CategoryStart marks the single player start-position marker in a stage
+	// layout. The marker has no image; its X/Y define where the player spawns.
+	CategoryStart = "start"
+
+	DefaultBlockSize = 50.0
+)
 
 // Stage is a serializable stage layout: the asset catalog plus placed objects.
 type Stage struct {
@@ -99,4 +108,40 @@ type Object struct {
 	CollisionDisabled bool
 	CollisionBoxes    []Box
 	Hitboxes          []Box
+}
+
+// CategoryIsBlock reports whether category uses the block collision model.
+func CategoryIsBlock(category string) bool {
+	return category == CategoryBlock || category == CategoryAnimBlock
+}
+
+// DefaultCollisionBox returns the implicit box of a block. It matches the
+// rendered object and is centered on it.
+func (o Object) DefaultCollisionBox() Box {
+	w := o.Width
+	h := o.Height
+	if w <= 0 {
+		w = DefaultBlockSize
+	}
+	if h <= 0 {
+		h = DefaultBlockSize
+	}
+	return Box{Width: w, Height: h}
+}
+
+// EffectiveCollisionBoxes returns the solid boxes the runtime must resolve.
+// Backgrounds, start markers, and disabled objects have none. Blocks without
+// authored boxes use their rendered size; props only collide when a box was
+// authored explicitly. Hitboxes are damage-only and never included here.
+func (o Object) EffectiveCollisionBoxes() []Box {
+	if o.Category == CategoryBG || o.Category == CategoryStart || o.CollisionDisabled {
+		return nil
+	}
+	if len(o.CollisionBoxes) > 0 {
+		return o.CollisionBoxes
+	}
+	if CategoryIsBlock(o.Category) {
+		return []Box{o.DefaultCollisionBox()}
+	}
+	return nil
 }
