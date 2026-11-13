@@ -51,6 +51,7 @@ func (s *GameScene) SetPlayer(p *player.Player) {
 	if s.stage != nil {
 		p.Spawn(s.stage.SpawnX, s.stage.GroundY)
 	}
+	p.SetWorldBounds(s.stageWidth(), s.stageHeight())
 }
 
 func (s *GameScene) Update(dt float64) error {
@@ -123,7 +124,11 @@ func (s *GameScene) DrawOverlay(screen *ebiten.Image) {
 }
 
 func (s *GameScene) FloorRect() math2.Rect {
-	return math2.NewRect(0, GroundY, s.stageWidth(), CanvasH-GroundY)
+	height := s.stageHeight() - GroundY
+	if height < 0 {
+		height = 0
+	}
+	return math2.NewRect(0, GroundY, s.stageWidth(), height)
 }
 
 func (s *GameScene) stageWidth() float64 {
@@ -131,6 +136,13 @@ func (s *GameScene) stageWidth() float64 {
 		return s.stage.Layout.Width
 	}
 	return StageWidth
+}
+
+func (s *GameScene) stageHeight() float64 {
+	if s.stage != nil && s.stage.Layout != nil && s.stage.Layout.Height > 0 {
+		return s.stage.Layout.Height
+	}
+	return StageHeight
 }
 
 func (s *GameScene) drawStageLayout(screen *ebiten.Image) {

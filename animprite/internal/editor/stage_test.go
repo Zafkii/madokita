@@ -254,6 +254,9 @@ func TestExportImportStageGo(t *testing.T) {
 	if saved.Name != "Test Stage" {
 		t.Fatalf("saved name = %q, want Test Stage", saved.Name)
 	}
+	if saved.Width != stage.Width || saved.Height != stage.Height {
+		t.Fatalf("saved size = %vx%v, want %vx%v", saved.Width, saved.Height, stage.Width, stage.Height)
+	}
 	if len(saved.Assets) != 1 || saved.Assets[0].File != assetPath {
 		t.Fatalf("saved assets = %+v, want file %q", saved.Assets, assetPath)
 	}
@@ -1676,5 +1679,117 @@ func TestJSONStageKeepsRelativeAnimationReference(t *testing.T) {
 	}
 	if got := loaded.Objects[0].AnimFile; got != animFile {
 		t.Fatalf("loaded object anim file = %q, want %q", got, animFile)
+	}
+}
+
+func TestImportStageDerivesSizeFromFirstBackgroundWhenMissing(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "stage.go")
+	src := `package stages
+
+var DefaultSizeStage = Stage{
+	Name: "Default Size",
+	Assets: []StageAsset{
+		{Category: "prop", Name: "tree", File: "tree.png", Width: 640, Height: 480},
+		{Category: "bg", Name: "no-size", File: "empty.png"},
+		{Category: "bg", Name: "sky", File: "sky.png", Width: 3200, Height: 900},
+	},
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("write stage.go: %v", err)
+	}
+
+	stage, err := ImportStage(path)
+	if err != nil {
+		t.Fatalf("ImportStage() error: %v", err)
+	}
+	if stage.Width != 3200 || stage.Height != 900 {
+		t.Fatalf("stage size = %vx%v, want 3200x900", stage.Width, stage.Height)
+	}
+}
+
+func TestCommitStageSizeInputsUpdatesStageAndCanvas(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.st.stageWidthInput.SetNumeric(3200)
+	app.st.stageHeightInput.SetNumeric(900)
+
+	app.commitStageSizeInputs()
+
+	if app.proj.Stage.Width != 3200 || app.proj.Stage.Height != 900 {
+		t.Fatalf("stage size = %vx%v, want 3200x900", app.proj.Stage.Width, app.proj.Stage.Height)
+	}
+	if app.canvas.BoundWidth != 3200 || app.canvas.BoundHeight != 900 {
+		t.Fatalf("canvas bounds = %vx%v, want 3200x900", app.canvas.BoundWidth, app.canvas.BoundHeight)
+	}
+}
+
+func TestCommitStageSizeInputsRestoresInvalidValues(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.st.stageWidthInput.SetNumeric(0)
+	app.st.stageHeightInput.SetNumeric(-10)
+
+	app.commitStageSizeInputs()
+
+	if app.proj.Stage.Width != project.DefaultStageWidth || app.proj.Stage.Height != project.DefaultStageHeight {
+		t.Fatalf("stage size = %vx%v, want defaults", app.proj.Stage.Width, app.proj.Stage.Height)
+	}
+	if app.st.stageWidthInput.NumericValue() != project.DefaultStageWidth ||
+		app.st.stageHeightInput.NumericValue() != project.DefaultStageHeight {
+		t.Fatal("invalid input values were not restored to the current stage size")
+	}
+}
+
+func TestOpenStageFolderUsesFirstBackgroundSize(t *testing.T) {
+	dir := t.TempDir()
+	writeTestPNG(t, filepath.Join(dir, "wide_bg.png"), 3200, 900)
+
+	app := NewEditorApp()
+	if err := app.openStageFolder(dir); err != nil {
+		t.Fatalf("openStageFolder() error: %v", err)
+	}
+	if app.proj.Stage.Width != 3200 || app.proj.Stage.Height != 900 {
+		t.Fatalf("stage size = %vx%v, want 3200x900", app.proj.Stage.Width, app.proj.Stage.Height)
+	}
+}
+
+func TestImportStageKeepsExplicitDimensionWhenOtherMissing(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "stage.go")
+	src := `package stages
+
+var PartialSizeStage = Stage{
+	Name:  "Partial Size",
+	Width: 1234,
+	Assets: []StageAsset{
+		{Category: "bg", Name: "sky", File: "sky.png", Width: 3200, Height: 900},
+	},
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("write stage.go: %v", err)
+	}
+
+	stage, err := ImportStage(path)
+	if err != nil {
+		t.Fatalf("ImportStage() error: %v", err)
+	}
+	if stage.Width != 1234 || stage.Height != 900 {
+		t.Fatalf("stage size = %vx%v, want 1234x900", stage.Width, stage.Height)
+	}
+}
+
+func TestClearStageInputFocusCommitsStageSize(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.st.stageWidthInput.Focused = true
+	app.st.stageWidthInput.SetNumeric(3000)
+
+	app.clearStageInputFocus()
+
+	if app.proj.Stage.Width != 3000 {
+		t.Fatalf("stage width = %v, want 3000", app.proj.Stage.Width)
+	}
+	if app.st.stageWidthInput.Focused {
+		t.Fatal("stage width input still focused")
 	}
 }

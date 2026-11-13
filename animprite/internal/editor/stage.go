@@ -94,13 +94,15 @@ type stageState struct {
 	panning              bool
 	stagePointerOnObject bool
 
-	opacityInput   *ui.TextInput
-	deleteBtn      *ui.Button
-	duplicateBtn   *ui.Button
-	layerAddBtn    *ui.Button
-	layerDeleteBtn *ui.Button
-	layerUpBtn     *ui.Button
-	layerDownBtn   *ui.Button
+	stageWidthInput  *ui.TextInput
+	stageHeightInput *ui.TextInput
+	opacityInput     *ui.TextInput
+	deleteBtn        *ui.Button
+	duplicateBtn     *ui.Button
+	layerAddBtn      *ui.Button
+	layerDeleteBtn   *ui.Button
+	layerUpBtn       *ui.Button
+	layerDownBtn     *ui.Button
 
 	collisionViewBtn   *ui.Button
 	collisionEditBtn   *ui.Button
@@ -405,6 +407,7 @@ func (a *EditorApp) openStageFolder(dir string) error {
 	}
 	stage := project.NewStageData(name)
 	stage.Assets = assets
+	stage.ApplySizeFromFirstBackground()
 	a.applyLoadedStage(stage, "")
 	return nil
 }
@@ -454,12 +457,6 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 	if stage.Name == "" {
 		stage.Name = "Stage1"
 	}
-	if stage.Width <= 0 {
-		stage.Width = project.DefaultStageWidth
-	}
-	if stage.Height <= 0 {
-		stage.Height = project.DefaultStageHeight
-	}
 	for i := range stage.Assets {
 		asset := &stage.Assets[i]
 		if asset.Category == "" {
@@ -472,6 +469,23 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 		if asset.Name == "" {
 			asset.Name = strings.TrimSuffix(filepath.Base(asset.File), filepath.Ext(asset.File))
 		}
+	}
+	if stage.Width <= 0 || stage.Height <= 0 {
+		width, height := stage.Width, stage.Height
+		if stage.ApplySizeFromFirstBackground() {
+			if width > 0 {
+				stage.Width = width
+			}
+			if height > 0 {
+				stage.Height = height
+			}
+		}
+	}
+	if stage.Width <= 0 {
+		stage.Width = project.DefaultStageWidth
+	}
+	if stage.Height <= 0 {
+		stage.Height = project.DefaultStageHeight
 	}
 	for i := range stage.Objects {
 		obj := &stage.Objects[i]
@@ -495,6 +509,10 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 	}
 	stage.NormalizeLayers()
 
+	if a.stageSizeInputFocused() {
+		a.commitStageSizeInputs()
+	}
+	a.clearStageInputFocus()
 	a.clearStageImages()
 	a.proj.Stage = stage
 	a.st.activeLayer = ""
@@ -513,7 +531,6 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 	a.st.panning = false
 	a.st.dragUndoSaved = false
 	a.rp.scroll = 0
-	a.clearStageInputFocus()
 
 	for _, asset := range stage.Assets {
 		if asset.File == "" {
@@ -537,6 +554,9 @@ func (a *EditorApp) applyLoadedStage(stage project.StageData, path string) {
 }
 
 func (a *EditorApp) saveStageFile(path string) error {
+	if a.stageSizeInputFocused() {
+		a.commitStageSizeInputs()
+	}
 	stage := a.proj.Stage.DeepCopy()
 	if stage.Version == 0 {
 		stage.Version = project.StageVersion
@@ -731,6 +751,7 @@ func (a *EditorApp) followStageObjectLayer(idx int) {
 }
 
 func (a *EditorApp) syncStageSelectionUI() {
+	a.syncStageSizeInputs()
 	a.panelMode = panelModeStage
 	if a.st.selectedObj >= 0 || a.st.toolTab == "info" {
 		a.st.toolTab = "edit"
@@ -1387,6 +1408,7 @@ func (a *EditorApp) flushStageInputs() {
 }
 
 func (a *EditorApp) syncStageInputs() {
+	a.syncStageSizeInputs()
 	obj := a.selectedStageObject()
 	if obj == nil {
 		return

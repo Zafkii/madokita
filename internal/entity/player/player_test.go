@@ -220,3 +220,46 @@ func TestGroundClampUsesPlayerY(t *testing.T) {
 		t.Error("player must be grounded after reaching the ground line")
 	}
 }
+
+func TestSetWorldBoundsClampsPosition(t *testing.T) {
+	p := &Player{
+		StageGroundY: 700,
+		X:            150,
+		Y:            -10,
+		Movement:     Movement{yVelocity: -100},
+	}
+	p.SetWorldBounds(100, 720)
+	p.clampWorldBounds()
+
+	if p.X != 100 {
+		t.Errorf("X = %v, want clamped to 100", p.X)
+	}
+	if p.Y != 0 {
+		t.Errorf("Y = %v, want clamped to 0", p.Y)
+	}
+	if p.Movement.yVelocity != 0 {
+		t.Errorf("yVelocity = %v, want 0", p.Movement.yVelocity)
+	}
+}
+
+func TestWorldBoundsClampBottom(t *testing.T) {
+	p := &Player{
+		StageGroundY: 700,
+		WorldWidth:   100,
+		WorldHeight:  720,
+		X:            -5,
+		Y:            800,
+		Movement:     Movement{yVelocity: 100},
+	}
+	p.clampWorldBounds()
+
+	if p.X != 0 {
+		t.Errorf("X = %v, want clamped to 0", p.X)
+	}
+	if p.Y != 720 {
+		t.Errorf("Y = %v, want clamped to 720", p.Y)
+	}
+	if p.Movement.yVelocity != 0 {
+		t.Errorf("yVelocity = %v, want 0", p.Movement.yVelocity)
+	}
+}

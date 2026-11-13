@@ -184,9 +184,8 @@ func ImportStage(path string) (project.StageData, error) {
 			stage := project.StageData{
 				Version: project.StageVersion,
 				Name:    vs.Names[0].Name,
-				Width:   project.DefaultStageWidth,
-				Height:  project.DefaultStageHeight,
 			}
+			hasWidth, hasHeight := false, false
 			for _, elt := range cl.Elts {
 				kv, ok := elt.(*ast.KeyValueExpr)
 				if !ok {
@@ -197,8 +196,10 @@ func ImportStage(path string) (project.StageData, error) {
 					stage.Name = stringLit(kv.Value)
 				case "Width":
 					stage.Width = floatLit(kv.Value)
+					hasWidth = stage.Width > 0
 				case "Height":
 					stage.Height = floatLit(kv.Value)
+					hasHeight = stage.Height > 0
 				case "Layers":
 					stage.Layers = parseStageLayers(kv.Value)
 				case "Assets":
@@ -209,6 +210,17 @@ func ImportStage(path string) (project.StageData, error) {
 			}
 			if stage.Name == "" {
 				stage.Name = vs.Names[0].Name
+			}
+			if !hasWidth || !hasHeight {
+				width, height := stage.Width, stage.Height
+				if stage.ApplySizeFromFirstBackground() {
+					if hasWidth {
+						stage.Width = width
+					}
+					if hasHeight {
+						stage.Height = height
+					}
+				}
 			}
 			if stage.Width <= 0 {
 				stage.Width = project.DefaultStageWidth

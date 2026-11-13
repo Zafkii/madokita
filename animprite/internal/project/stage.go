@@ -119,6 +119,25 @@ func (o StageObject) EffectiveHitboxes() []StageBox {
 	return o.Hitboxes
 }
 
+// ApplySizeFromFirstBackground sets Width/Height from the first background
+// asset that has a usable image size. It returns false and leaves the stage
+// size unchanged when no such background exists.
+func (l *StageData) ApplySizeFromFirstBackground() bool {
+	for _, asset := range l.Assets {
+		category := asset.Category
+		if category == "" {
+			category = StageCategoryForFile(asset.File)
+		}
+		if !strings.EqualFold(category, StageCategoryBG) || asset.Width <= 0 || asset.Height <= 0 {
+			continue
+		}
+		l.Width = float64(asset.Width)
+		l.Height = float64(asset.Height)
+		return true
+	}
+	return false
+}
+
 // StageData is the serialized stage document.
 type StageData struct {
 	Version int           `json:"version"`

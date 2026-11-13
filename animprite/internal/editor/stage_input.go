@@ -10,6 +10,12 @@ import (
 )
 
 func (a *EditorApp) clearStageInputFocus() {
+	if a.stageSizeInputFocused() {
+		a.commitStageSizeInputs()
+	}
+	for _, inp := range a.stageSizeInputs() {
+		inp.Focused = false
+	}
 	for i := range a.props {
 		if a.props[i] != nil {
 			a.props[i].Focused = false
@@ -24,6 +30,66 @@ func (a *EditorApp) clearStageInputFocus() {
 			inp.Visible = false
 		}
 	}
+}
+
+func (a *EditorApp) stageSizeInputs() []*ui.TextInput {
+	if a.st.stageWidthInput == nil || a.st.stageHeightInput == nil {
+		return nil
+	}
+	return []*ui.TextInput{a.st.stageWidthInput, a.st.stageHeightInput}
+}
+
+func (a *EditorApp) stageSizeInputFocused() bool {
+	for _, inp := range a.stageSizeInputs() {
+		if inp.Focused {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *EditorApp) isStageSizeInput(inp *ui.TextInput) bool {
+	return inp != nil && (inp == a.st.stageWidthInput || inp == a.st.stageHeightInput)
+}
+
+func (a *EditorApp) syncStageSizeInputs() {
+	for _, inp := range a.stageSizeInputs() {
+		if inp.Focused {
+			continue
+		}
+		if inp == a.st.stageWidthInput {
+			inp.SetNumeric(a.proj.Stage.Width)
+		} else {
+			inp.SetNumeric(a.proj.Stage.Height)
+		}
+	}
+}
+
+func (a *EditorApp) commitStageSizeInputs() {
+	widthInput, heightInput := a.st.stageWidthInput, a.st.stageHeightInput
+	if widthInput == nil || heightInput == nil {
+		return
+	}
+
+	width := math.Round(widthInput.NumericValue())
+	height := math.Round(heightInput.NumericValue())
+	if width <= 0 {
+		width = a.proj.Stage.Width
+	}
+	if height <= 0 {
+		height = a.proj.Stage.Height
+	}
+	widthInput.SetNumeric(width)
+	heightInput.SetNumeric(height)
+
+	if width == a.proj.Stage.Width && height == a.proj.Stage.Height {
+		return
+	}
+
+	a.saveSnapshot()
+	a.proj.Stage.Width = width
+	a.proj.Stage.Height = height
+	a.setStageCanvasBounds()
 }
 
 func (a *EditorApp) pointInCanvas(mx, my int) bool {
@@ -121,6 +187,21 @@ func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 func (a *EditorApp) handleStagePanelMouse(mx, my int, justL bool) {
 	if mx < a.win.outsideWidth-rightPanelW ||
 		my < a.rightPanelY() || my >= a.rightPanelY()+a.rightPanelH() {
+		return
+	}
+
+	focusedBefore := a.stageSizeInputFocused()
+	sizeInputHit := false
+	for _, inp := range a.stageSizeInputs() {
+		if stageInfoInputHit(inp, mx, my) {
+			sizeInputHit = true
+		}
+		inp.HandleMouse(mx, my, justL)
+	}
+	if justL && focusedBefore && !a.stageSizeInputFocused() {
+		a.commitStageSizeInputs()
+	}
+	if justL && sizeInputHit {
 		return
 	}
 

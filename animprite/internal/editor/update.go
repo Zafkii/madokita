@@ -216,6 +216,11 @@ func (a *EditorApp) isNavigationInput(inp *ui.TextInput) bool {
 
 func (a *EditorApp) focusedInput() *ui.TextInput {
 	if a.isStageMode() {
+		for _, inp := range a.stageSizeInputs() {
+			if inp.Focused {
+				return inp
+			}
+		}
 		if a.selectedStageObject() == nil {
 			return nil
 		}
@@ -313,10 +318,11 @@ func (a *EditorApp) focusedInput() *ui.TextInput {
 
 func (a *EditorApp) allInputs() []*ui.TextInput {
 	if a.isStageMode() {
+		all := make([]*ui.TextInput, 0, len(a.props)+3)
+		all = append(all, a.stageSizeInputs()...)
 		if a.selectedStageObject() == nil {
-			return nil
+			return all
 		}
-		all := make([]*ui.TextInput, 0, len(a.props)+1)
 		all = append(all, a.props[:]...)
 		if a.st.opacityInput != nil {
 			all = append(all, a.st.opacityInput)

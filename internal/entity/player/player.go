@@ -63,6 +63,8 @@ type Player struct {
 	AttackDef    *animation.Attack
 	Scale        float64
 	StageGroundY float64
+	WorldWidth   float64
+	WorldHeight  float64
 
 	assetMgr   *assets.AssetManager
 	attackAnim *animation.AttackAnimator
@@ -148,6 +150,8 @@ func (p *Player) Update(dt time.Duration) {
 		}
 	}
 
+	p.clampWorldBounds()
+
 	if !p.State.IsAttacking {
 		desiredAnim := "idle"
 		if !p.Movement.IsGrounded {
@@ -168,6 +172,37 @@ func (p *Player) Update(dt time.Duration) {
 
 	if p.Actor != nil {
 		p.Actor.Update(dt)
+	}
+}
+
+func (p *Player) SetWorldBounds(width, height float64) {
+	p.WorldWidth = width
+	p.WorldHeight = height
+}
+
+func (p *Player) clampWorldBounds() {
+	if p.WorldWidth > 0 {
+		if p.X < 0 {
+			p.X = 0
+		}
+		if p.X > p.WorldWidth {
+			p.X = p.WorldWidth
+		}
+	}
+	if p.WorldHeight <= 0 {
+		return
+	}
+	if p.Y < 0 {
+		p.Y = 0
+		if p.Movement.yVelocity < 0 {
+			p.Movement.yVelocity = 0
+		}
+	}
+	if p.Y > p.WorldHeight && p.WorldHeight >= p.StageGroundY {
+		p.Y = p.WorldHeight
+		if p.Movement.yVelocity > 0 {
+			p.Movement.yVelocity = 0
+		}
 	}
 }
 

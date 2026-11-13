@@ -444,6 +444,28 @@ func (a *EditorApp) initStageWidgets() {
 	iw := rightPanelInner
 	th := a.th
 
+	stageWidth := ui.NewTextInput(px, 0, iw, rightPanelInputH, th)
+	stageWidth.SetLabel("W")
+	stageWidth.Numeric = true
+	stageWidth.Min = 1
+	stageWidth.Step = 1
+	stageWidth.SetNumeric(project.DefaultStageWidth)
+	stageWidth.OnEnter = func() {
+		a.commitStageSizeInputs()
+	}
+	a.st.stageWidthInput = stageWidth
+
+	stageHeight := ui.NewTextInput(px, 0, iw, rightPanelInputH, th)
+	stageHeight.SetLabel("H")
+	stageHeight.Numeric = true
+	stageHeight.Min = 1
+	stageHeight.Step = 1
+	stageHeight.SetNumeric(project.DefaultStageHeight)
+	stageHeight.OnEnter = func() {
+		a.commitStageSizeInputs()
+	}
+	a.st.stageHeightInput = stageHeight
+
 	opacity := ui.NewTextInput(px, 0, iw, rightPanelInputH, th)
 	opacity.SetLabel("Opacity")
 	opacity.Numeric = true

@@ -192,6 +192,7 @@ func (a *EditorApp) handleRightPanelKeys() {
 	if current == -1 {
 		return
 	}
+	wasStageSize := a.isStageSizeInput(inputs[current])
 	shift := ebiten.IsKeyPressed(ebiten.KeyShift)
 	next := current + 1
 	if shift {
@@ -204,6 +205,9 @@ func (a *EditorApp) handleRightPanelKeys() {
 		next = 0
 	}
 	inputs[next].Focused = true
+	if wasStageSize {
+		a.commitStageSizeInputs()
+	}
 }
 
 func (a *EditorApp) handleScrollWheel(mx, my int, yoff float64) bool {

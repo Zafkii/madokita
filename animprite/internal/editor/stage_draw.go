@@ -526,6 +526,23 @@ func (a *EditorApp) drawStageRightPanel(screen *ebiten.Image, p theme.Palette, p
 	ui.DrawText(screen, fmt.Sprintf("Objects: %d", len(stage.Objects)), px, iy, 1, p.TextPrimary)
 	iy += 18
 
+	if a.st.stageWidthInput != nil && a.st.stageHeightInput != nil {
+		gap := 6
+		width := (rightPanelInner - gap) / 2
+		a.st.stageWidthInput.X = px
+		a.st.stageWidthInput.Y = iy
+		a.st.stageWidthInput.W = width
+		a.st.stageWidthInput.H = rightPanelInputH
+		a.st.stageWidthInput.Draw(screen)
+
+		a.st.stageHeightInput.X = px + width + gap
+		a.st.stageHeightInput.Y = iy
+		a.st.stageHeightInput.W = rightPanelInner - width - gap
+		a.st.stageHeightInput.H = rightPanelInputH
+		a.st.stageHeightInput.Draw(screen)
+		iy += rightPanelInputH + 4
+	}
+
 	chkSize := 14
 	chkY := iy + 3
 	a.st.snapRect.X = px
