@@ -173,6 +173,21 @@ func DrawText(screen *ebiten.Image, str string, x, y int, scale float64, clr col
 	drawTextFace(screen, str, x, y, face, size, clr)
 }
 
+// DrawTextOutlined draws text with a one-pixel outline behind the fill. Use it
+// for text that may overlap unknown backgrounds.
+func DrawTextOutlined(screen *ebiten.Image, str string, x, y int, scale float64, fill, outline color.Color) {
+	size := math.Round(13.0 * scale)
+	face := getFace(size)
+	offsets := [][2]int{
+		{-1, 0}, {1, 0}, {0, -1}, {0, 1},
+		{-1, -1}, {1, -1}, {-1, 1}, {1, 1},
+	}
+	for _, o := range offsets {
+		drawTextFace(screen, str, x+o[0], y+o[1], face, size, outline)
+	}
+	drawTextFace(screen, str, x, y, face, size, fill)
+}
+
 func DrawTextCentered(screen *ebiten.Image, str string, cx, cy int, scale float64, clr color.Color) {
 	size := math.Round(13.0 * scale)
 	face := getFace(size)

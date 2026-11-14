@@ -164,8 +164,7 @@ func DrawInfo(screen *ebiten.Image, p *player.Player) {
 		fmt.Sprintf("State: %s | %s", grounded, moving),
 		fmt.Sprintf("FlipX: %v | Scale: %.1f", p.FlipX, p.Scale),
 	}
-	clr := color.RGBA{0, 255, 200, 255}
 	for i, l := range lines {
-		ui.DrawText(screen, l, 8, 8+i*18, 1, clr)
+		ui.DrawTextOutlined(screen, l, 8, 8+i*18, 1, color.White, color.Black)
 	}
 }
