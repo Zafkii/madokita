@@ -218,6 +218,12 @@ func (p *Player) bodyTopOffset() float64 {
 	return (solidBodyOffsetY - solidBodyHeight/2) * p.collisionScale()
 }
 
+// maxAutoStepHeight is the tallest ledge the player walks up without jumping.
+// Stage geometry approximates rotated or curved surfaces with axis-aligned
+// boxes, so a rounded floor is a staircase of small ledges; anything taller
+// stays a wall.
+const maxAutoStepHeight = 16.0
+
 func (p *Player) moveHorizontal(dx float64) {
 	p.X += dx
 	if len(p.solidRects) == 0 {
@@ -230,6 +236,11 @@ func (p *Player) moveHorizontal(dx float64) {
 		hit := false
 		for _, solid := range p.solidRects {
 			if !body.Overlaps(solid) {
+				continue
+			}
+			if p.tryStepUp(solid) {
+				body = p.bodyRect()
+				hit = true
 				continue
 			}
 			leftOffset := body.X - p.X
@@ -246,6 +257,29 @@ func (p *Player) moveHorizontal(dx float64) {
 			return
 		}
 	}
+}
+
+// tryStepUp lifts the player onto a solid whose top is a small step above the
+// body's feet, as long as the raised body stays clear of every other solid.
+func (p *Player) tryStepUp(solid math2.Rect) bool {
+	body := p.bodyRect()
+	stepUp := body.Y + body.H - solid.Y
+	if stepUp <= 0 || stepUp > maxAutoStepHeight {
+		return false
+	}
+
+	p.Y -= stepUp
+	raised := p.bodyRect()
+	for _, other := range p.solidRects {
+		if other == solid {
+			continue
+		}
+		if raised.Overlaps(other) {
+			p.Y += stepUp
+			return false
+		}
+	}
+	return true
 }
 
 func (p *Player) applyGravity(dtSec float64) {

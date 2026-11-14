@@ -327,6 +327,42 @@ func TestPlayerStopsAtSolidWall(t *testing.T) {
 	}
 }
 
+func TestPlayerStepsUpSmallLedge(t *testing.T) {
+	p := &Player{Scale: 0.5, X: 50, Y: 36.5, Movement: Movement{IsGrounded: true}}
+	floor := math2.NewRect(0, 100, 200, 50)
+	step := math2.NewRect(100, 90, 50, 200)
+	p.SetSolidRects([]math2.Rect{floor, step})
+
+	p.moveHorizontal(60)
+
+	if diff := p.Y - 26.5; diff < -0.01 || diff > 0.01 {
+		t.Fatalf("Y = %v, want the player raised onto the 10px step at %v", p.Y, 26.5)
+	}
+	if p.X != 110 {
+		t.Fatalf("X = %v, want the player to keep walking across the step", p.X)
+	}
+	if !p.hasSupport() {
+		t.Fatal("player raised onto a small step must stay grounded")
+	}
+}
+
+func TestPlayerDoesNotStepUpTallWall(t *testing.T) {
+	p := &Player{Scale: 0.5, X: 50, Y: 36.5, Movement: Movement{IsGrounded: true}}
+	floor := math2.NewRect(0, 100, 200, 50)
+	wall := math2.NewRect(100, 80, 50, 200)
+	p.SetSolidRects([]math2.Rect{floor, wall})
+
+	p.moveHorizontal(60)
+
+	wantX := 100 - (p.bodyRect().X + p.bodyRect().W - p.X)
+	if diff := p.X - wantX; diff < -0.01 || diff > 0.01 {
+		t.Fatalf("X = %v, want blocked at wall left edge %v", p.X, wantX)
+	}
+	if diff := p.Y - 36.5; diff < -0.01 || diff > 0.01 {
+		t.Fatalf("Y = %v, want the player to stay on the floor", p.Y)
+	}
+}
+
 func TestPlayerSupportRequiresCurrentSurface(t *testing.T) {
 	p := &Player{Scale: 0.5, X: 50, Y: 36.5, StageGroundY: 1000}
 	p.SetSolidRects([]math2.Rect{math2.NewRect(0, 100, 100, 50)})
