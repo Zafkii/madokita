@@ -35,6 +35,22 @@ func TestEffectiveCollisionBoxes(t *testing.T) {
 	}
 }
 
+func TestFlipXMirrorsCollisionBoxes(t *testing.T) {
+	obj := Object{
+		Category:       CategoryProp,
+		FlipX:          true,
+		CollisionBoxes: []Box{{X: 6, Y: 2, Width: 10, Height: 8, Rotation: 15}},
+	}
+
+	boxes := obj.EffectiveCollisionBoxes()
+	if len(boxes) != 1 || boxes[0].X != -6 || boxes[0].Rotation != -15 {
+		t.Fatalf("boxes = %+v, want mirrored X -6, Rotation -15", boxes)
+	}
+	if obj.CollisionBoxes[0].X != 6 || obj.CollisionBoxes[0].Rotation != 15 {
+		t.Fatalf("authored boxes changed: %+v", obj.CollisionBoxes)
+	}
+}
+
 func TestDefaultCollisionBoxFallsBackToBlockSize(t *testing.T) {
 	boxes := (Object{Category: CategoryBlock}).EffectiveCollisionBoxes()
 	if len(boxes) != 1 || boxes[0].Width != DefaultBlockSize || boxes[0].Height != DefaultBlockSize {

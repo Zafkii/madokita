@@ -226,6 +226,7 @@ func TestExportImportStageGo(t *testing.T) {
 		Width:    50,
 		Height:   50,
 		Opacity:  1,
+		FlipX:    true,
 	}}
 
 	outPath := filepath.Join(dir, "stage.go")
@@ -265,6 +266,9 @@ func TestExportImportStageGo(t *testing.T) {
 	}
 	if saved.Objects[0].Width != 50 || saved.Objects[0].Height != 50 {
 		t.Fatalf("saved object size = %gx%g, want 50x50", saved.Objects[0].Width, saved.Objects[0].Height)
+	}
+	if !saved.Objects[0].FlipX {
+		t.Fatal("saved object FlipX = false, want true")
 	}
 	if len(saved.Layers) != 1 || saved.Layers[0].Name != project.DefaultStageLayer {
 		t.Fatalf("saved layers = %+v, want default layer", saved.Layers)
@@ -1553,6 +1557,136 @@ func TestStageClickPrefersBlockThenPropThenBackground(t *testing.T) {
 	app.proj.Stage.Objects = app.proj.Stage.Objects[:1]
 	if got := app.stageObjectAtWorld(50, 50); got != 0 {
 		t.Fatalf("hit = %d, want background 0", got)
+	}
+}
+
+func TestStagePressKeepsSelectionOverHigherPriorityOverlap(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.proj.Stage.Objects = []project.StageObject{
+		{Category: project.StageCategoryBlock, File: "block.png", X: 50, Y: 50, Width: 50, Height: 50, Opacity: 1},
+		{Category: project.StageCategoryProp, File: "prop.png", X: 50, Y: 50, Width: 50, Height: 50, Opacity: 1},
+	}
+	app.selectStageObject(1)
+
+	if got := app.stageObjectAtWorld(50, 50); got != 0 {
+		t.Fatalf("hit test = %d, want block 0", got)
+	}
+	if got := app.stagePressTarget(50, 50); got != 1 {
+		t.Fatalf("press target = %d, want selected prop 1", got)
+	}
+}
+
+func TestStagePressUsesHitTestOutsideSelection(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.proj.Stage.Objects = []project.StageObject{
+		{Category: project.StageCategoryBlock, File: "block.png", X: 50, Y: 50, Width: 50, Height: 50, Opacity: 1},
+		{Category: project.StageCategoryProp, File: "prop.png", X: 200, Y: 200, Width: 50, Height: 50, Opacity: 1},
+	}
+	app.selectStageObject(1)
+
+	if got := app.stagePressTarget(50, 50); got != 0 {
+		t.Fatalf("press target = %d, want block 0", got)
+	}
+}
+
+func TestStagePressDoesNotPreferSelectedBackground(t *testing.T) {
+	app := newStageObjectApp(0)
+	app.proj.Stage.Objects = []project.StageObject{
+		{Category: project.StageCategoryBG, File: "bg.png", X: 50, Y: 50, Width: 200, Height: 200, Opacity: 1},
+		{Category: project.StageCategoryBlock, File: "block.png", X: 50, Y: 50, Width: 50, Height: 50, Opacity: 1},
+	}
+	app.selectStageObject(0)
+
+	if got := app.stagePressTarget(50, 50); got != 1 {
+		t.Fatalf("press target = %d, want block 1", got)
+	}
+}
+
+func TestStageRotateSelectedObjects(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+
+	steps := []struct {
+		delta float64
+		want  float64
+	}{
+		{90, 90},
+		{-90, 0},
+		{45, 45},
+		{-45, 0},
+	}
+	for _, step := range steps {
+		if !app.rotateSelectedStageObjects(step.delta) {
+			t.Fatalf("delta %v: expected rotation to apply", step.delta)
+		}
+		if got := app.proj.Stage.Objects[0].Rotation; got != step.want {
+			t.Fatalf("delta %v: rotation = %v, want %v", step.delta, got, step.want)
+		}
+	}
+}
+
+func TestStageRotateAppliesToEverySelectedObject(t *testing.T) {
+	app := newStageObjectApp(2)
+	app.selectStageObject(0)
+	app.addStageObjectSelection(1)
+	app.proj.Stage.Objects[1].Rotation = 10
+
+	app.rotateSelectedStageObjects(45)
+
+	if got := app.proj.Stage.Objects[0].Rotation; got != 45 {
+		t.Fatalf("object 0 rotation = %v, want 45", got)
+	}
+	if got := app.proj.Stage.Objects[1].Rotation; got != 55 {
+		t.Fatalf("object 1 rotation = %v, want 55", got)
+	}
+}
+
+func TestStageRotateWithoutSelectionDoesNothing(t *testing.T) {
+	app := newStageObjectApp(1)
+	before := len(app.undoStack)
+
+	if app.rotateSelectedStageObjects(90) {
+		t.Fatal("expected rotation to be ignored without a selection")
+	}
+	if len(app.undoStack) != before {
+		t.Fatalf("undo stack grew to %d, want %d", len(app.undoStack), before)
+	}
+}
+
+func TestStageMirrorTogglesSelectedObjects(t *testing.T) {
+	app := newStageObjectApp(2)
+	app.selectStageObject(0)
+	app.addStageObjectSelection(1)
+
+	if !app.toggleSelectedStageObjectsMirror() {
+		t.Fatal("expected mirror to apply")
+	}
+	for i := range app.proj.Stage.Objects {
+		if !app.proj.Stage.Objects[i].FlipX {
+			t.Fatalf("object %d FlipX = false, want true", i)
+		}
+	}
+
+	app.toggleSelectedStageObjectsMirror()
+	for i := range app.proj.Stage.Objects {
+		if app.proj.Stage.Objects[i].FlipX {
+			t.Fatalf("object %d FlipX = true, want false", i)
+		}
+	}
+	if got := len(app.undoStack); got != 2 {
+		t.Fatalf("undo stack = %d, want 2 snapshots", got)
+	}
+}
+
+func TestStageMirrorWithoutSelectionDoesNothing(t *testing.T) {
+	app := newStageObjectApp(1)
+	before := len(app.undoStack)
+
+	if app.toggleSelectedStageObjectsMirror() {
+		t.Fatal("expected mirror to be ignored without a selection")
+	}
+	if len(app.undoStack) != before {
+		t.Fatalf("undo stack grew to %d, want %d", len(app.undoStack), before)
 	}
 }
 

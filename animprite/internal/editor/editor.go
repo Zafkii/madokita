@@ -488,6 +488,12 @@ func (a *EditorApp) initStageWidgets() {
 		a.duplicateSelectedStageObject()
 	}
 
+	a.st.mirrorBtn = ui.NewButton(0, 0, 1, 22, "Mirror", th)
+	a.st.mirrorBtn.BtnType = ui.BtnDefault
+	a.st.mirrorBtn.OnClick = func() {
+		a.toggleSelectedStageObjectsMirror()
+	}
+
 	a.st.cutBtn = ui.NewButton(0, 0, 1, 22, "Cut", th)
 	a.st.cutBtn.BtnType = ui.BtnDefault
 	a.st.cutBtn.OnClick = func() {

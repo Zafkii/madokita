@@ -224,7 +224,11 @@ func (s *GameScene) drawStageObject(screen, img *ebiten.Image, obj *stage.Object
 
 	op := &colorm.DrawImageOptions{}
 	op.GeoM.Translate(-iw/2, -ih/2)
-	op.GeoM.Scale(w/iw, h/ih)
+	sx := w / iw
+	if obj.FlipX {
+		sx = -sx
+	}
+	op.GeoM.Scale(sx, h/ih)
 	op.GeoM.Rotate(obj.Rotation * math.Pi / 180)
 	op.GeoM.Translate(obj.X-s.CameraX, obj.Y)
 	op.ColorScale.ScaleAlpha(float32(opacity))

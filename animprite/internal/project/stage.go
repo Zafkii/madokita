@@ -69,6 +69,7 @@ type StageObject struct {
 	Height            float64    `json:"height"`
 	Rotation          float64    `json:"rotation"`
 	Opacity           float64    `json:"opacity"`
+	FlipX             bool       `json:"flipX,omitempty"`
 	CollisionDisabled bool       `json:"collisionDisabled,omitempty"`
 	CollisionBoxes    []StageBox `json:"collisionBoxes,omitempty"`
 	Hitboxes          []StageBox `json:"hitboxes,omitempty"`
@@ -105,6 +106,9 @@ func (o StageObject) EffectiveCollisionBoxes() []StageBox {
 		return nil
 	}
 	if len(o.CollisionBoxes) > 0 {
+		if o.FlipX {
+			return mirrorStageBoxes(o.CollisionBoxes)
+		}
 		return o.CollisionBoxes
 	}
 	if StageCategoryIsBlock(o.Category) {
@@ -118,7 +122,25 @@ func (o StageObject) EffectiveHitboxes() []StageBox {
 	if o.Category == StageCategoryBG || StageCategoryIsStart(o.Category) || o.CollisionDisabled {
 		return nil
 	}
+	if o.FlipX {
+		return mirrorStageBoxes(o.Hitboxes)
+	}
 	return o.Hitboxes
+}
+
+// mirrorStageBoxes mirrors box offsets and rotations across the object's local
+// vertical axis, matching the horizontal flip of the rendered image.
+func mirrorStageBoxes(boxes []StageBox) []StageBox {
+	if len(boxes) == 0 {
+		return nil
+	}
+	out := make([]StageBox, len(boxes))
+	for i, box := range boxes {
+		box.X = -box.X
+		box.Rotation = -box.Rotation
+		out[i] = box
+	}
+	return out
 }
 
 // ApplySizeFromFirstBackground sets Width/Height from the first background

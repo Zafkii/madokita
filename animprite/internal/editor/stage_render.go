@@ -135,6 +135,9 @@ func (a *EditorApp) stageObjectRender(obj *project.StageObject, opacity float64)
 		r.Image = img
 		if iw > 0 {
 			r.ScaleX = w / iw
+			if obj.FlipX {
+				r.ScaleX = -r.ScaleX
+			}
 		}
 		if ih > 0 {
 			r.ScaleY = h / ih

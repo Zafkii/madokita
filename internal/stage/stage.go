@@ -105,6 +105,7 @@ type Object struct {
 	Height            float64
 	Rotation          float64
 	Opacity           float64
+	FlipX             bool
 	CollisionDisabled bool
 	CollisionBoxes    []Box
 	Hitboxes          []Box
@@ -138,10 +139,28 @@ func (o Object) EffectiveCollisionBoxes() []Box {
 		return nil
 	}
 	if len(o.CollisionBoxes) > 0 {
+		if o.FlipX {
+			return mirrorBoxes(o.CollisionBoxes)
+		}
 		return o.CollisionBoxes
 	}
 	if CategoryIsBlock(o.Category) {
 		return []Box{o.DefaultCollisionBox()}
 	}
 	return nil
+}
+
+// mirrorBoxes mirrors box offsets and rotations across the object's local
+// vertical axis, matching the horizontal flip of its rendered image.
+func mirrorBoxes(boxes []Box) []Box {
+	if len(boxes) == 0 {
+		return nil
+	}
+	out := make([]Box, len(boxes))
+	for i, box := range boxes {
+		box.X = -box.X
+		box.Rotation = -box.Rotation
+		out[i] = box
+	}
+	return out
 }

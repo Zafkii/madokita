@@ -103,7 +103,7 @@ func (a *EditorApp) drawStageInfo(screen *ebiten.Image, p theme.Palette) {
 		a.hideStageObjectInputs()
 		ui.DrawText(screen, fmt.Sprintf("Stage: %s    Objects: %d    Assets: %d", name, len(a.proj.Stage.Objects), len(a.proj.Stage.Assets)), x, top+2, 1, p.LabelColor)
 		ui.DrawText(screen, "No object selected. Click an object to edit its properties here.", x, top+22, 1, p.TextMuted)
-		ui.DrawText(screen, "CapsLock + drag moves. Tab + click or box selects. Wheel zooms.", x, top+42, 1, p.TextMuted)
+		ui.DrawText(screen, "CapsLock + drag moves. Tab + click or box selects. Shift + arrows rotates. Wheel zooms.", x, top+42, 1, p.TextMuted)
 		return
 	}
 
@@ -139,7 +139,7 @@ func (a *EditorApp) drawStageInfo(screen *ebiten.Image, p theme.Palette) {
 
 	rows := (len(inputs) + cols - 1) / cols
 	hintY := top + 22 + rows*rowH + 4
-	ui.DrawText(screen, "CapsLock + drag moves. Tab + click or box selects. Wheel zooms.", x, hintY, 1, p.TextMuted)
+	ui.DrawText(screen, "CapsLock + drag moves. Tab + click or box selects. Shift + arrows rotates. Wheel zooms.", x, hintY, 1, p.TextMuted)
 }
 
 var stageToolTabs = []struct{ Key, Label, Icon string }{
@@ -269,7 +269,7 @@ func (a *EditorApp) drawStageToolContent(screen *ebiten.Image, x, y, w, h int, l
 }
 
 func (a *EditorApp) drawStageEditActions(screen *ebiten.Image, p theme.Palette, x, y int) {
-	if a.st.deleteBtn == nil || a.st.duplicateBtn == nil || a.st.cutBtn == nil || a.st.pasteBtn == nil {
+	if a.st.deleteBtn == nil || a.st.duplicateBtn == nil || a.st.mirrorBtn == nil || a.st.cutBtn == nil || a.st.pasteBtn == nil {
 		return
 	}
 	hideCollision := func() {
@@ -280,7 +280,7 @@ func (a *EditorApp) drawStageEditActions(screen *ebiten.Image, p theme.Palette, 
 		}
 	}
 	hideActions := func() {
-		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.cutBtn, a.st.pasteBtn} {
+		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.mirrorBtn, a.st.cutBtn, a.st.pasteBtn} {
 			if btn != nil {
 				btn.Visible = false
 			}
@@ -292,7 +292,13 @@ func (a *EditorApp) drawStageEditActions(screen *ebiten.Image, p theme.Palette, 
 	obj := a.selectedStageObject()
 	buttons := make([]*ui.Button, 0, 6)
 	if obj != nil {
-		buttons = append(buttons, a.st.deleteBtn, a.st.duplicateBtn, a.st.cutBtn)
+		if a.st.mirrorBtn != nil {
+			a.st.mirrorBtn.BtnType = ui.BtnDefault
+			if obj.FlipX {
+				a.st.mirrorBtn.BtnType = ui.BtnBlue
+			}
+		}
+		buttons = append(buttons, a.st.deleteBtn, a.st.duplicateBtn, a.st.mirrorBtn, a.st.cutBtn)
 		if project.StageCategoryHasCollision(obj.Category) {
 			if a.st.collisionToggleBtn != nil {
 				a.st.collisionToggleBtn.Text = "Collision: On"

@@ -100,6 +100,7 @@ type stageState struct {
 	opacityInput     *ui.TextInput
 	deleteBtn        *ui.Button
 	duplicateBtn     *ui.Button
+	mirrorBtn        *ui.Button
 	cutBtn           *ui.Button
 	pasteBtn         *ui.Button
 	layerAddBtn      *ui.Button
@@ -904,6 +905,39 @@ func (a *EditorApp) stageSelectionCount() int {
 	return len(a.stageSelectedIndices())
 }
 
+// rotateSelectedStageObjects turns every selected object by delta degrees
+// around its own center. Positive values rotate clockwise.
+func (a *EditorApp) rotateSelectedStageObjects(delta float64) bool {
+	indices := a.stageSelectedIndices()
+	if len(indices) == 0 {
+		return false
+	}
+	a.saveSnapshot()
+	for _, idx := range indices {
+		obj := &a.proj.Stage.Objects[idx]
+		obj.Rotation += delta
+	}
+	if obj := a.selectedStageObject(); obj != nil {
+		a.props[4].SetNumeric(obj.Rotation)
+	}
+	a.markStageObjectLiveEdit()
+	return true
+}
+
+// toggleSelectedStageObjectsMirror flips every selected object horizontally.
+func (a *EditorApp) toggleSelectedStageObjectsMirror() bool {
+	indices := a.stageSelectedIndices()
+	if len(indices) == 0 {
+		return false
+	}
+	a.saveSnapshot()
+	for _, idx := range indices {
+		obj := &a.proj.Stage.Objects[idx]
+		obj.FlipX = !obj.FlipX
+	}
+	return true
+}
+
 func (a *EditorApp) selectAllStageObjects() {
 	indices := make([]int, 0, len(a.proj.Stage.Objects))
 	for idx := range a.proj.Stage.Objects {
@@ -1411,20 +1445,39 @@ func (a *EditorApp) stageObjectAtWorld(wx, wy float64) int {
 				if obj.Category != wantCategory {
 					continue
 				}
-				dx := wx - obj.X
-				dy := wy - obj.Y
-				rot := -obj.Rotation * math.Pi / 180
-				cos := math.Cos(rot)
-				sin := math.Sin(rot)
-				lx := dx*cos - dy*sin
-				ly := dx*sin + dy*cos
-				if math.Abs(lx) <= obj.Width/2 && math.Abs(ly) <= obj.Height/2 {
+				if stageObjectContainsWorld(*obj, wx, wy) {
 					return i
 				}
 			}
 		}
 	}
 	return -1
+}
+
+// stageObjectContainsWorld reports whether a world point falls inside the
+// object's rotated hit rectangle.
+func stageObjectContainsWorld(obj project.StageObject, wx, wy float64) bool {
+	dx := wx - obj.X
+	dy := wy - obj.Y
+	rot := -obj.Rotation * math.Pi / 180
+	cos := math.Cos(rot)
+	sin := math.Sin(rot)
+	lx := dx*cos - dy*sin
+	ly := dx*sin + dy*cos
+	return math.Abs(lx) <= obj.Width/2 && math.Abs(ly) <= obj.Height/2
+}
+
+// stagePressTarget resolves the object a plain press should target. A press
+// inside the current selection keeps it, so a freshly placed object that sits
+// under a higher-priority category still drags instead of stealing a different
+// object. Backgrounds stay hit-tested because they cover the whole stage.
+func (a *EditorApp) stagePressTarget(wx, wy float64) int {
+	if obj := a.selectedStageObject(); obj != nil &&
+		obj.Category != project.StageCategoryBG &&
+		stageObjectContainsWorld(*obj, wx, wy) {
+		return a.st.selectedObj
+	}
+	return a.stageObjectAtWorld(wx, wy)
 }
 
 func (a *EditorApp) updateStageAssetDrag(mx, my int, leftDown bool) {

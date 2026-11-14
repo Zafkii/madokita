@@ -58,6 +58,9 @@ func ExportStage(path string, stage project.StageData) error {
 		if obj.AnimName != "" {
 			fmt.Fprintf(&b, ", AnimName: %q", obj.AnimName)
 		}
+		if obj.FlipX {
+			b.WriteString(", FlipX: true")
+		}
 		if obj.CollisionDisabled {
 			b.WriteString(", CollisionDisabled: true")
 		}
@@ -367,6 +370,8 @@ func parseStageObjects(expr ast.Expr, dir string) []project.StageObject {
 				obj.AnimFile = resolveStagePath(dir, stringLit(kve.Value))
 			case "AnimName":
 				obj.AnimName = stringLit(kve.Value)
+			case "FlipX":
+				obj.FlipX = exprString(kve.Value) == "true"
 			case "CollisionDisabled":
 				obj.CollisionDisabled = exprString(kve.Value) == "true"
 			case "CollisionBoxes":

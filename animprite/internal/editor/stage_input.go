@@ -120,7 +120,7 @@ func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 		}
 	}
 	if a.st.toolTab == "edit" {
-		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.cutBtn, a.st.pasteBtn, a.st.collisionEditBtn, a.st.collisionToggleBtn} {
+		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.mirrorBtn, a.st.cutBtn, a.st.pasteBtn, a.st.collisionEditBtn, a.st.collisionToggleBtn} {
 			if btn == nil || !btn.Visible {
 				continue
 			}
@@ -366,7 +366,13 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 		}
 
 		wx, wy := a.canvasWorld(mx, my)
-		if idx := a.stageObjectAtWorld(wx, wy); idx >= 0 {
+		idx := -1
+		if tab || ctrl || shift {
+			idx = a.stageObjectAtWorld(wx, wy)
+		} else {
+			idx = a.stagePressTarget(wx, wy)
+		}
+		if idx >= 0 {
 			a.st.stagePointerOnObject = true
 			switch {
 			case tab || ctrl:
@@ -463,6 +469,18 @@ func (a *EditorApp) handleStageKeys() {
 	}
 	if ctrl && inpututil.IsKeyJustPressed(ebiten.KeyV) {
 		a.pasteStageObjects()
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyShift) {
+		switch {
+		case inpututil.IsKeyJustPressed(ebiten.KeyUp):
+			a.rotateSelectedStageObjects(90)
+		case inpututil.IsKeyJustPressed(ebiten.KeyDown):
+			a.rotateSelectedStageObjects(-90)
+		case inpututil.IsKeyJustPressed(ebiten.KeyRight):
+			a.rotateSelectedStageObjects(45)
+		case inpututil.IsKeyJustPressed(ebiten.KeyLeft):
+			a.rotateSelectedStageObjects(-45)
+		}
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyDelete) {
 		a.deleteSelectedStageObject()
