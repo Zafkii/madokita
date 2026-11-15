@@ -237,14 +237,54 @@ const maxAutoStepHeight = 16.0
 // keeps the walk animation instead of falling a few pixels per frame.
 const maxStepDown = 12.0
 
-// groundProbeX is the point where the body meets the floor: the body centre
-// pushed a quarter of its width toward the walking direction. Resolving the
-// ground there puts three quarters of the base on the collision and lets the
-// leading quarter hang over a slope or an edge, which reads naturally both
-// climbing and descending.
+// probeEdge is how far inside the body the edge floors are sampled, so a probe
+// never lands exactly on a strip boundary.
+const probeEdge = 0.5
+
+// groundProbeX is the point where the body meets the floor. Descending, it is
+// the body centre pushed a quarter of its width toward the walking direction, so
+// three quarters of the base stand on the collision and the leading quarter may
+// hang over the drop. Ascending the ground ahead is higher, so the probe moves to
+// the trailing edge: the base rides the lower ground behind it and the rising
+// ground buries the front of the base instead of leaving the whole base airborne.
 func (p *Player) groundProbeX() float64 {
 	body := p.bodyRect()
-	return body.X + body.W/2 + float64(p.walkDir)*body.W/4
+	if p.walkDir == 0 {
+		return body.X + body.W/2
+	}
+
+	lead, trail := body.X+body.W-probeEdge, body.X+probeEdge
+	if p.walkDir < 0 {
+		lead, trail = body.X+probeEdge, body.X+body.W-probeEdge
+	}
+	if leadTop, leadOK := p.floorAtX(lead, body); leadOK {
+		if trailTop, trailOK := p.floorAtX(trail, body); trailOK && leadTop < trailTop-collisionEpsilon {
+			return trail
+		}
+	}
+	return lead - float64(p.walkDir)*body.W/4
+}
+
+// floorAtX returns the highest (smallest Y) solid top at x close to the body,
+// i.e. within a few walkable steps of its feet. The band keeps overhead geometry
+// — tree canopies, tall props — from being read as the floor.
+func (p *Player) floorAtX(x float64, body math2.Rect) (float64, bool) {
+	feet := body.Y + body.H
+	top := math.Inf(1)
+	found := false
+	for _, solid := range p.solidRects {
+		if x < solid.X || x >= solid.X+solid.W {
+			continue
+		}
+		if solid.Y < feet-4*maxAutoStepHeight || solid.Y > feet+4*maxStepDown {
+			continue
+		}
+		if solid.Y < top {
+			top = solid.Y
+			found = true
+		}
+	}
+	return top, found
 }
 
 // probeFloorTop returns the highest (smallest Y) solid top under the ground
@@ -269,10 +309,37 @@ func (p *Player) probeFloorTop(minTop, maxTop float64) (float64, bool) {
 	return top, found
 }
 
-// behindProbe reports whether a solid sits entirely on the trailing side of the
-// ground probe, where the base may sink into a slope without blocking anything.
-func (p *Player) behindProbe(solid math2.Rect) bool {
+// wallAhead returns a solid the body overlaps whose top rises more than a
+// walkable step above the ground at its own leading face. Measuring against the
+// adjacent ground instead of the feet keeps a climb from reading as a wall: the
+// base rides the low side, so the strips ahead of the feet are legitimately above
+// them, while a real ledge still towers over the ground it stands on.
+func (p *Player) wallAhead() (math2.Rect, bool) {
+	body := p.bodyRect()
+	feet := body.Y + body.H
 	probe := p.groundProbeX()
+	for _, solid := range p.solidRects {
+		if !body.Overlaps(solid) || p.behindProbeAt(probe, solid) {
+			continue
+		}
+		if feet-solid.Y <= maxAutoStepHeight {
+			continue
+		}
+		beside := solid.X - 1
+		if p.walkDir < 0 {
+			beside = solid.X + solid.W + 1
+		}
+		if top, ok := p.floorAtX(beside, body); ok && solid.Y >= top-maxAutoStepHeight {
+			continue
+		}
+		return solid, true
+	}
+	return math2.Rect{}, false
+}
+
+// behindProbeAt reports whether a solid sits entirely on the trailing side of a
+// probe, where the base may sink into a slope without blocking anything.
+func (p *Player) behindProbeAt(probe float64, solid math2.Rect) bool {
 	switch {
 	case p.walkDir > 0:
 		return solid.X+solid.W <= probe+collisionEpsilon
@@ -280,22 +347,6 @@ func (p *Player) behindProbe(solid math2.Rect) bool {
 		return solid.X >= probe-collisionEpsilon
 	}
 	return false
-}
-
-// wallAhead returns a solid the body overlaps whose top rises more than a
-// walkable step above the feet, ignoring the floor already behind the probe.
-func (p *Player) wallAhead() (math2.Rect, bool) {
-	body := p.bodyRect()
-	feet := body.Y + body.H
-	for _, solid := range p.solidRects {
-		if !body.Overlaps(solid) || p.behindProbe(solid) {
-			continue
-		}
-		if feet-solid.Y > maxAutoStepHeight {
-			return solid, true
-		}
-	}
-	return math2.Rect{}, false
 }
 
 func (p *Player) moveHorizontal(dx float64) {

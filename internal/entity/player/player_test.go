@@ -331,17 +331,29 @@ func TestPlayerStopsAtSolidWall(t *testing.T) {
 
 func TestPlayerStepsUpSmallLedge(t *testing.T) {
 	p := &Player{Scale: 0.5, X: 50, Y: 36.5, Movement: Movement{IsGrounded: true}}
-	floor := math2.NewRect(0, 100, 200, 50)
-	step := math2.NewRect(100, 90, 50, 200)
+	floor := math2.NewRect(0, 100, 400, 50)
+	step := math2.NewRect(100, 90, 300, 200)
 	p.SetSolidRects([]math2.Rect{floor, step})
 
+	// The base rides the low ground, so the body is buried in the 10px step while
+	// the step sits only ahead of the trailing edge, and it keeps walking.
 	p.moveHorizontal(60)
+
+	if diff := p.Y - 36.5; diff < -0.01 || diff > 0.01 {
+		t.Fatalf("Y = %v, want the base still on the lower floor at %v", p.Y, 36.5)
+	}
+	if p.X != 110 {
+		t.Fatalf("X = %v, want the player to keep walking into the step", p.X)
+	}
+	if !p.hasSupport() {
+		t.Fatal("player walking into a small step must stay grounded")
+	}
+
+	// Once the trailing edge reaches the step the base climbs onto it.
+	p.moveHorizontal(60) // X = 170: the trailing edge is on the step.
 
 	if diff := p.Y - 26.5; diff < -0.01 || diff > 0.01 {
 		t.Fatalf("Y = %v, want the player raised onto the 10px step at %v", p.Y, 26.5)
-	}
-	if p.X != 110 {
-		t.Fatalf("X = %v, want the player to keep walking across the step", p.X)
 	}
 	if !p.hasSupport() {
 		t.Fatal("player raised onto a small step must stay grounded")
@@ -537,6 +549,45 @@ func TestPlayerFallsOffTallLedge(t *testing.T) {
 // TestPlayerWalksRotatedStageHill walks the real test_stage hill, which is built
 // from rotated grass blocks. Rotated collision boxes are decomposed into strips,
 // so the walk must stay grounded and never bump more than a few pixels at once.
+// TestPlayerKeepsClimbingBaseOnLowGround pins the ascending side of the ground
+// probe: the ground ahead is higher, so the base rides the trailing edge and the
+// rise buries the front of the base instead of leaving the body airborne. The
+// body climbs once its trailing edge reaches the higher ground.
+func TestPlayerKeepsClimbingBaseOnLowGround(t *testing.T) {
+	p := &Player{State: State{IsControlled: true}, Scale: 0.5, X: 160}
+	p.Y = 100 - p.bodyBottomOffset()
+	p.Movement = Movement{IsGrounded: true, gravity: 1000}
+	p.SetSolidRects([]math2.Rect{
+		math2.NewRect(0, 100, 200, 50),
+		math2.NewRect(200, 92, 200, 50),
+	})
+
+	for p.X < 185 {
+		p.moveHorizontal(5)
+		p.Update(10 * time.Millisecond)
+	}
+
+	body := p.bodyRect()
+	feet := body.Y + body.H
+	if math.Abs(feet-100) > 0.01 {
+		t.Fatalf("feet = %v, want the base held on the lower ground at 100", feet)
+	}
+	if lead, ok := p.floorAtX(body.X+body.W-probeEdge, body); !ok || lead >= feet {
+		t.Fatalf("leading floor = %v (found %v), want it above the base so nothing floats", lead, ok)
+	}
+	if !p.Movement.IsGrounded {
+		t.Fatal("player must stay grounded while climbing")
+	}
+
+	for p.X < 225 {
+		p.moveHorizontal(5)
+		p.Update(10 * time.Millisecond)
+	}
+	if feet := p.bodyRect().Y + p.bodyRect().H; math.Abs(feet-92) > 0.01 {
+		t.Fatalf("feet = %v, want the base raised once the trailing edge reaches the rise", feet)
+	}
+}
+
 // TestPlayerGroundsThreeQuartersOfTheBase pins the ground probe: the body rests
 // where the centre pushed a quarter of its width toward the walk direction meets
 // the floor, so the leading quarter may hang past an edge while three quarters
@@ -580,14 +631,22 @@ func TestPlayerGroundsThreeQuartersOfTheBase(t *testing.T) {
 		t.Fatal("an 8px drop at the probe must be followed while walking")
 	}
 
-	// Mirror: walking back left lifts the body as soon as the probe reaches the
-	// higher floor, so the probe leads in the walk direction on both sides.
+	// Mirror: climbing back left the base stays on the lower ground, so the rise
+	// buries the front of the base instead of floating the body. It climbs once
+	// its trailing edge reaches the higher floor at 200.
 	p.X = 210
 	p.Y = 108 - p.bodyBottomOffset()
 	p.Movement.IsGrounded = true
-	p.moveHorizontal(-stepW)
+	p.moveHorizontal(-stepW) // X = 205: the trailing edge is still on the drop.
+	if feet := p.bodyRect().Y + p.bodyRect().H; math.Abs(feet-108) > 0.01 {
+		t.Fatalf("feet = %v, want the base held on the lower ground at 108", feet)
+	}
+
+	for p.X > 175 {
+		p.moveHorizontal(-stepW)
+	}
 	if feet := p.bodyRect().Y + p.bodyRect().H; math.Abs(feet-100) > 0.01 {
-		t.Fatalf("feet = %v, want the body raised onto the upper floor walking left", feet)
+		t.Fatalf("feet = %v, want the body raised onto the upper floor", feet)
 	}
 }
 
