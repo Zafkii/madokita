@@ -77,6 +77,9 @@ func (a *EditorApp) hideStageObjectInputs() {
 	if a.st.opacityInput != nil {
 		a.st.opacityInput.Visible = false
 	}
+	if a.st.zInput != nil {
+		a.st.zInput.Visible = false
+	}
 }
 
 func (a *EditorApp) drawStageInfoInput(screen *ebiten.Image, inp *ui.TextInput, x, y, w int) {
@@ -127,7 +130,7 @@ func (a *EditorApp) drawStageInfo(screen *ebiten.Image, p theme.Palette) {
 	if cellW < 80 {
 		cellW = 80
 	}
-	inputs := []*ui.TextInput{a.props[0], a.props[1], a.props[2], a.props[3], a.props[4], a.st.opacityInput}
+	inputs := []*ui.TextInput{a.props[0], a.props[1], a.props[2], a.props[3], a.props[4], a.st.zInput, a.st.opacityInput}
 	for i, inp := range inputs {
 		if inp == nil {
 			continue

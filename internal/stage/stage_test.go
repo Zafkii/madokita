@@ -171,3 +171,65 @@ func TestEffectiveHitboxes(t *testing.T) {
 		}
 	}
 }
+
+func TestDrawOrderLayersZAndCategory(t *testing.T) {
+	s := Stage{
+		Layers: []Layer{{Name: "Back"}, {Name: "Front"}},
+		Objects: []Object{
+			{Layer: "Front", Category: CategoryBlock, Z: 5},
+			{Layer: "Front", Category: CategoryBG},
+			{Layer: "Back", Category: CategoryBlock, Z: -10},
+			{Layer: "Front", Category: CategoryProp, Z: 5},
+		},
+	}
+
+	order := DrawOrder(s)
+
+	want := []int{2, 1, 3, 0}
+	if len(order) != len(want) {
+		t.Fatalf("order = %v, want %v", order, want)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("order = %v, want %v", order, want)
+		}
+	}
+}
+
+func TestDrawOrderAtEqualZKeepsCategoryOrder(t *testing.T) {
+	s := Stage{
+		Layers: []Layer{{Name: "Layer 1"}},
+		Objects: []Object{
+			{Layer: "Layer 1", Category: CategoryAnimBlock},
+			{Layer: "Layer 1", Category: CategoryBlock},
+			{Layer: "Layer 1", Category: CategoryAnimProp},
+			{Layer: "Layer 1", Category: CategoryProp},
+			{Layer: "Layer 1", Category: CategoryBG},
+		},
+	}
+
+	order := DrawOrder(s)
+
+	want := []int{4, 3, 2, 1, 0}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("order = %v, want %v", order, want)
+		}
+	}
+}
+
+func TestDrawOrderSkipsObjectsOutsideListedLayers(t *testing.T) {
+	s := Stage{
+		Layers: []Layer{{Name: "Layer 1"}},
+		Objects: []Object{
+			{Layer: "Layer 1", Category: CategoryBG},
+			{Layer: "Missing", Category: CategoryBG},
+		},
+	}
+
+	order := DrawOrder(s)
+
+	if len(order) != 1 || order[0] != 0 {
+		t.Fatalf("order = %v, want only the object whose layer is listed", order)
+	}
+}

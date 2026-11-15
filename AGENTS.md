@@ -217,6 +217,7 @@ The player is locked by phases, derived from `AttackAnimator.Phase()` in `Player
 | **Table exclusive selection**                       | ✅ Done           |
 | **New frame inherits sprite + frame**               | ✅ Done           |
 | **Strict per-layer stage editing**                  | ✅ Done           |
+| **Per-object Z depth inside a layer**               | ✅ Done           |
 | **Cut/Paste stage objects**                         | ✅ Done           |
 | **Open/Save project files**                         | ❌ Pending        |
 | **Undo/Redo**                                       | ❌ Pending        |
@@ -224,6 +225,12 @@ The player is locked by phases, derived from `AttackAnimator.Phase()` in `Player
 ## Stage Layer Editing
 
 An active layer restricts hit-testing, selection, marquee, select-all, drag, delete, duplicate, and collision edits to that layer. The General view edits every layer. Cut/Paste moves selected objects into the active layer, or into the top layer while in General view; the clipboard is cleared when a stage is loaded.
+
+## Stage Depth (Z)
+
+Each stage object carries a `Z` depth edited in the Info tab next to Rotation and Opacity. Layers still draw in slice order, so Z only orders objects **inside their own layer**: a larger Z draws closer to the camera, and at equal Z the category order is kept (backgrounds, static and animated props, static and animated blocks). Default Z is 0, so existing stages render exactly as before.
+
+One ordering rule feeds both renderers so the editor previews what the game paints: `StageData.RenderOrder()` (`animprite/internal/project/stage.go`) and `stage.DrawOrder()` (`internal/stage/stage.go`) return object indices sorted by layer, then Z, then category rank, then slice position. Rendering walks the list forwards and picking walks it backwards, so the topmost object receives the click. Start markers sort last inside their layer (they never paint) which keeps them pickable ahead of the artwork. Z is display only: collision and hurtboxes ignore it, and the export writes `Z` only when it is not zero.
 
 ## Per-Frame Sprite Composition
 

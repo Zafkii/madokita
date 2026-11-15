@@ -52,6 +52,9 @@ func ExportStage(path string, stage project.StageData) error {
 		fmt.Fprintf(&b, "\t\t{Layer: %q, Category: %q, File: %q, X: %g, Y: %g, Width: %g, Height: %g, Rotation: %g, Opacity: %g",
 			obj.Layer, obj.Category, relativeSpritePath(dir, obj.File),
 			obj.X, obj.Y, obj.Width, obj.Height, obj.Rotation, obj.Opacity)
+		if obj.Z != 0 {
+			fmt.Fprintf(&b, ", Z: %g", obj.Z)
+		}
 		if obj.AnimFile != "" {
 			fmt.Fprintf(&b, ", AnimFile: %q", relativeSpritePath(dir, obj.AnimFile))
 		}
@@ -366,6 +369,8 @@ func parseStageObjects(expr ast.Expr, dir string) []project.StageObject {
 			case "Opacity":
 				obj.Opacity = floatLit(kve.Value)
 				haveOpacity = true
+			case "Z":
+				obj.Z = floatLit(kve.Value)
 			case "AnimFile":
 				obj.AnimFile = resolveStagePath(dir, stringLit(kve.Value))
 			case "AnimName":

@@ -2,6 +2,7 @@ package project
 
 import (
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -51,7 +52,9 @@ type StageBox struct {
 }
 
 // StageObject is one image placed in the stage. X/Y are the object center.
-// Layer is the name of the StageLayer that owns the object.
+// Layer is the name of the StageLayer that owns the object. Z orders objects
+// inside their own layer: a larger Z draws closer to the camera, while layers
+// still draw in slice order so Z never crosses a layer boundary.
 //
 // Blocks have collision on by default: when CollisionBoxes is empty, a single
 // box matching Width/Height is used. Props keep their image size and have no
@@ -68,11 +71,88 @@ type StageObject struct {
 	Width             float64    `json:"width"`
 	Height            float64    `json:"height"`
 	Rotation          float64    `json:"rotation"`
+	Z                 float64    `json:"z,omitempty"`
 	Opacity           float64    `json:"opacity"`
 	FlipX             bool       `json:"flipX,omitempty"`
 	CollisionDisabled bool       `json:"collisionDisabled,omitempty"`
 	CollisionBoxes    []StageBox `json:"collisionBoxes,omitempty"`
 	Hitboxes          []StageBox `json:"hitboxes,omitempty"`
+}
+
+// StageCategoryRenderRank is the draw order inside one layer at equal Z:
+// backgrounds first, then static and animated props, then static and animated
+// blocks. It matches the runtime order so the editor previews what the game
+// paints. Categories that never paint (start markers, unknown names) sort last
+// inside their layer, which puts them first when the order is walked backwards
+// for picking.
+func StageCategoryRenderRank(category string) int {
+	switch category {
+	case StageCategoryBG:
+		return 0
+	case StageCategoryProp:
+		return 1
+	case StageCategoryAnimProp:
+		return 2
+	case StageCategoryBlock:
+		return 3
+	case StageCategoryAnimBlock:
+		return 4
+	}
+	return 5
+}
+
+// StageCategoryDraws reports whether the category paints a sprite on the canvas.
+func StageCategoryDraws(category string) bool {
+	return StageCategoryRenderRank(category) < 5
+}
+
+// RenderOrder returns object indices in draw order: layers in slice order, and
+// inside one layer ascending Z, then category rank, then slice position. Higher
+// Z paints on top, so the last index is closest to the camera. Picking walks
+// this order backwards, which keeps the topmost artwork clickable first.
+func (l StageData) RenderOrder() []int {
+	layerRank := make(map[string]int, len(l.Layers))
+	for i := range l.Layers {
+		layerRank[l.Layers[i].Name] = i
+	}
+	if len(layerRank) == 0 {
+		layerRank[DefaultStageLayer] = 0
+	}
+	type entry struct {
+		idx   int
+		layer int
+		rank  int
+		z     float64
+	}
+	entries := make([]entry, 0, len(l.Objects))
+	for i := range l.Objects {
+		obj := &l.Objects[i]
+		layer, ok := layerRank[l.LayerNameFor(*obj)]
+		if !ok {
+			continue
+		}
+		entries = append(entries, entry{
+			idx:   i,
+			layer: layer,
+			rank:  StageCategoryRenderRank(obj.Category),
+			z:     obj.Z,
+		})
+	}
+	sort.SliceStable(entries, func(a, b int) bool {
+		ea, eb := entries[a], entries[b]
+		if ea.layer != eb.layer {
+			return ea.layer < eb.layer
+		}
+		if ea.z != eb.z {
+			return ea.z < eb.z
+		}
+		return ea.rank < eb.rank
+	})
+	out := make([]int, len(entries))
+	for i := range entries {
+		out[i] = entries[i].idx
+	}
+	return out
 }
 
 // DeepCopy copies the object and its box slices so undo snapshots stay

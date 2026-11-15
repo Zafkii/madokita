@@ -2,6 +2,7 @@ package stage
 
 import (
 	"math"
+	"sort"
 
 	math2 "madokita-gems/internal/math"
 )
@@ -98,7 +99,9 @@ type Box struct {
 	Rotation float64
 }
 
-// Object is one image placed in the stage. X/Y are the object center.
+// Object is one image placed in the stage. X/Y are the object center. Z orders
+// objects inside their own layer: a larger Z draws closer to the camera, and
+// layers still draw in slice order, so Z never crosses a layer.
 type Object struct {
 	Layer             string
 	Category          string
@@ -110,6 +113,7 @@ type Object struct {
 	Width             float64
 	Height            float64
 	Rotation          float64
+	Z                 float64
 	Opacity           float64
 	FlipX             bool
 	CollisionDisabled bool
@@ -269,6 +273,67 @@ func (o Object) solidStrips(box Box) []math2.Rect {
 // EffectiveHitboxes returns the authored damage boxes for this object.
 // Backgrounds, start markers, and disabled objects have none. Hitboxes are
 // damage-only and never take part in solid collision.
+// CategoryRenderRank is the draw order inside one layer at equal Z:
+// backgrounds first, then props, then blocks. Unknown categories render as
+// blocks, matching what the game resolves a missing category to.
+func CategoryRenderRank(category string) int {
+	switch category {
+	case CategoryBG:
+		return 0
+	case CategoryProp:
+		return 1
+	case CategoryAnimProp:
+		return 2
+	case CategoryAnimBlock:
+		return 4
+	default:
+		return 3
+	}
+}
+
+// DrawOrder returns the object indices in draw order: layers in slice order,
+// and inside one layer ascending Z, then category rank, then slice position.
+// Higher Z draws on top, so the last index paints closest to the camera.
+// Hit-testing and object picking walk this order backwards. Objects whose
+// layer is not listed are left out; the game normalizes layers on load so
+// every object has one.
+func DrawOrder(s Stage) []int {
+	layerRank := make(map[string]int, len(s.Layers))
+	for i := range s.Layers {
+		layerRank[s.Layers[i].Name] = i
+	}
+	type entry struct {
+		idx   int
+		layer int
+		rank  int
+		z     float64
+	}
+	entries := make([]entry, 0, len(s.Objects))
+	for i := range s.Objects {
+		obj := &s.Objects[i]
+		layer, ok := layerRank[obj.Layer]
+		if !ok {
+			continue
+		}
+		entries = append(entries, entry{idx: i, layer: layer, rank: CategoryRenderRank(obj.Category), z: obj.Z})
+	}
+	sort.SliceStable(entries, func(a, b int) bool {
+		ea, eb := entries[a], entries[b]
+		if ea.layer != eb.layer {
+			return ea.layer < eb.layer
+		}
+		if ea.z != eb.z {
+			return ea.z < eb.z
+		}
+		return ea.rank < eb.rank
+	})
+	out := make([]int, len(entries))
+	for i := range entries {
+		out[i] = entries[i].idx
+	}
+	return out
+}
+
 func (o Object) EffectiveHitboxes() []Box {
 	if o.Category == CategoryBG || o.Category == CategoryStart || o.CollisionDisabled {
 		return nil

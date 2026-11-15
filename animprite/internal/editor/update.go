@@ -239,6 +239,9 @@ func (a *EditorApp) focusedInput() *ui.TextInput {
 		if a.st.opacityInput != nil && a.st.opacityInput.Focused {
 			return a.st.opacityInput
 		}
+		if a.st.zInput != nil && a.st.zInput.Focused {
+			return a.st.zInput
+		}
 		return nil
 	}
 
@@ -326,6 +329,9 @@ func (a *EditorApp) allInputs() []*ui.TextInput {
 		all = append(all, a.props[:]...)
 		if a.st.opacityInput != nil {
 			all = append(all, a.st.opacityInput)
+		}
+		if a.st.zInput != nil {
+			all = append(all, a.st.zInput)
 		}
 		if a.st.collisionEdit {
 			all = append(all, a.stageCollisionInputList()...)

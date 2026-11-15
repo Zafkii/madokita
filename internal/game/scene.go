@@ -171,25 +171,20 @@ func (s *GameScene) stageHeight() float64 {
 
 func (s *GameScene) drawStageLayout(screen *ebiten.Image) {
 	layout := s.stage.Layout
-	for _, layer := range layout.Layers {
-		for _, category := range []string{"bg", "prop", "anim_prop", "block", "anim_block"} {
-			for i := range layout.Objects {
-				obj := &layout.Objects[i]
-				if obj.Layer != layer.Name || normalizedStageCategory(obj.Category) != category {
-					continue
-				}
-				img := s.assetM.StageObjectImage(s.stage.ID, obj.File)
-				if anim := s.assetM.StageObjectAnimation(s.stage.ID, obj); anim != nil {
-					if frame := anim.Frame(s.stageAnimClock); frame != nil {
-						img = frame
-					}
-				}
-				if img == nil {
-					continue
-				}
-				s.drawStageObject(screen, img, obj)
+	// Layers draw in slice order and, inside one layer, by ascending Z and then
+	// category; the editor picks and hit-tests in this same order.
+	for _, idx := range stage.DrawOrder(*layout) {
+		obj := &layout.Objects[idx]
+		img := s.assetM.StageObjectImage(s.stage.ID, obj.File)
+		if anim := s.assetM.StageObjectAnimation(s.stage.ID, obj); anim != nil {
+			if frame := anim.Frame(s.stageAnimClock); frame != nil {
+				img = frame
 			}
 		}
+		if img == nil {
+			continue
+		}
+		s.drawStageObject(screen, img, obj)
 	}
 }
 

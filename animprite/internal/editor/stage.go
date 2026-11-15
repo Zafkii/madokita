@@ -98,6 +98,7 @@ type stageState struct {
 	stageWidthInput  *ui.TextInput
 	stageHeightInput *ui.TextInput
 	opacityInput     *ui.TextInput
+	zInput           *ui.TextInput
 	deleteBtn        *ui.Button
 	duplicateBtn     *ui.Button
 	mirrorBtn        *ui.Button
@@ -858,6 +859,9 @@ func (a *EditorApp) syncStageSelectionUI() {
 	if a.st.opacityInput != nil {
 		a.st.opacityInput.SetNumeric(obj.Opacity)
 	}
+	if a.st.zInput != nil {
+		a.st.zInput.SetNumeric(obj.Z)
+	}
 
 	a.canvas.SetSelectionRect(canvas.SelectionRect{
 		X:        obj.X - obj.Width/2,
@@ -1420,35 +1424,18 @@ func (a *EditorApp) stageObjectAtWorld(wx, wy float64) int {
 		a.proj.Stage.NormalizeLayers()
 	}
 	objects := a.proj.Stage.Objects
-	// Walk layers from front to back. Inside one layer, animated blocks stay
-	// ahead of static blocks, animated props ahead of static props, and both
-	// ahead of backgrounds so a full-stage backdrop does not swallow clicks on
-	// smaller objects.
-	for li := len(a.proj.Stage.Layers) - 1; li >= 0; li-- {
-		layer := a.proj.Stage.Layers[li].Name
-		if a.st.activeLayer != "" && a.st.activeLayer != layer {
+	// Walk the draw order from front to back, so the object painted on top wins
+	// the click. The last entry of a layer is its start marker, which never
+	// paints and therefore stays pickable ahead of the artwork.
+	order := a.proj.Stage.RenderOrder()
+	for k := len(order) - 1; k >= 0; k-- {
+		i := order[k]
+		obj := &objects[i]
+		if a.st.activeLayer != "" && a.proj.Stage.LayerNameFor(*obj) != a.st.activeLayer {
 			continue
 		}
-		for _, wantCategory := range []string{
-			project.StageCategoryStart,
-			project.StageCategoryAnimBlock,
-			project.StageCategoryBlock,
-			project.StageCategoryAnimProp,
-			project.StageCategoryProp,
-			project.StageCategoryBG,
-		} {
-			for i := len(objects) - 1; i >= 0; i-- {
-				obj := &objects[i]
-				if a.proj.Stage.LayerNameFor(*obj) != layer {
-					continue
-				}
-				if obj.Category != wantCategory {
-					continue
-				}
-				if stageObjectContainsWorld(*obj, wx, wy) {
-					return i
-				}
-			}
+		if stageObjectContainsWorld(*obj, wx, wy) {
+			return i
 		}
 	}
 	return -1
@@ -1555,6 +1542,10 @@ func (a *EditorApp) flushStageInputs() {
 	if a.st.opacityInput != nil {
 		opacity = clamp(a.st.opacityInput.NumericValue(), 0, 1)
 	}
+	z := primary.Z
+	if a.st.zInput != nil {
+		z = a.st.zInput.NumericValue()
+	}
 
 	origX := primary.X
 	origY := primary.Y
@@ -1562,6 +1553,7 @@ func (a *EditorApp) flushStageInputs() {
 	origH := primary.Height
 	origRot := primary.Rotation
 	origOpacity := primary.Opacity
+	origZ := primary.Z
 
 	applyX := !multi || x != origX
 	applyY := !multi || y != origY
@@ -1569,7 +1561,8 @@ func (a *EditorApp) flushStageInputs() {
 	applyH := !multi || h != origH
 	applyRot := !multi || rot != origRot
 	applyOpacity := !multi || opacity != origOpacity
-	if !applyX && !applyY && !applyW && !applyH && !applyRot && !applyOpacity {
+	applyZ := !multi || z != origZ
+	if !applyX && !applyY && !applyW && !applyH && !applyRot && !applyOpacity && !applyZ {
 		return
 	}
 
@@ -1614,6 +1607,10 @@ func (a *EditorApp) flushStageInputs() {
 			changed = true
 			obj.Opacity = opacity
 		}
+		if applyZ && obj.Z != z {
+			changed = true
+			obj.Z = z
+		}
 	}
 	if changed && focused != nil {
 		a.markStageObjectLiveEdit()
@@ -1633,5 +1630,8 @@ func (a *EditorApp) syncStageInputs() {
 	a.props[4].SetNumeric(obj.Rotation)
 	if a.st.opacityInput != nil {
 		a.st.opacityInput.SetNumeric(obj.Opacity)
+	}
+	if a.st.zInput != nil {
+		a.st.zInput.SetNumeric(obj.Z)
 	}
 }

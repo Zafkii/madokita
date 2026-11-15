@@ -226,6 +226,7 @@ func TestExportImportStageGo(t *testing.T) {
 		Width:    50,
 		Height:   50,
 		Opacity:  1,
+		Z:        3.5,
 		FlipX:    true,
 	}}
 
@@ -269,6 +270,12 @@ func TestExportImportStageGo(t *testing.T) {
 	}
 	if !saved.Objects[0].FlipX {
 		t.Fatal("saved object FlipX = false, want true")
+	}
+	if !bytes.Contains(data, []byte("Z: 3.5")) {
+		t.Fatalf("stage.go missing the authored Z:\n%s", data)
+	}
+	if saved.Objects[0].Z != 3.5 {
+		t.Fatalf("saved object Z = %g, want 3.5", saved.Objects[0].Z)
 	}
 	if len(saved.Layers) != 1 || saved.Layers[0].Name != project.DefaultStageLayer {
 		t.Fatalf("saved layers = %+v, want default layer", saved.Layers)
@@ -959,6 +966,50 @@ func TestStageMultiPropertyWidthAppliesToAll(t *testing.T) {
 
 	if app.proj.Stage.Objects[0].Width != 70 || app.proj.Stage.Objects[1].Width != 70 {
 		t.Fatalf("widths = %g, %g, want 70,70", app.proj.Stage.Objects[0].Width, app.proj.Stage.Objects[1].Width)
+	}
+}
+
+func TestStageZInputSetsDepthOnSelection(t *testing.T) {
+	app := newStageObjectApp(2)
+	if app.st.zInput == nil {
+		t.Fatal("stage panel has no Z input")
+	}
+	app.selectStageObject(0)
+	app.addStageObjectSelection(1)
+	app.st.zInput.Focused = true
+	app.st.zInput.SetNumeric(4)
+
+	app.flushStageInputs()
+
+	if app.proj.Stage.Objects[0].Z != 4 || app.proj.Stage.Objects[1].Z != 4 {
+		t.Fatalf("Z = %g, %g, want 4,4", app.proj.Stage.Objects[0].Z, app.proj.Stage.Objects[1].Z)
+	}
+
+	// Selecting another object loads its own Z instead of leaking the old value.
+	app.selectStageObject(1)
+	app.st.zInput.SetNumeric(4)
+	app.flushStageInputs()
+	if app.proj.Stage.Objects[0].Z != 4 || app.proj.Stage.Objects[1].Z != 4 {
+		t.Fatalf("Z changed without an edit: %g, %g", app.proj.Stage.Objects[0].Z, app.proj.Stage.Objects[1].Z)
+	}
+}
+
+func TestStageZOrdersPickingWithinLayer(t *testing.T) {
+	app := newStageObjectApp(2)
+	// Both objects overlap at (60,40); Z picks which one a click resolves to.
+	for i := range app.proj.Stage.Objects {
+		app.proj.Stage.Objects[i].X = 60
+		app.proj.Stage.Objects[i].Y = 40
+	}
+	app.proj.Stage.Objects[0].Z = 10
+
+	if got := app.stageObjectAtWorld(60, 40); got != 0 {
+		t.Fatalf("picked object = %d, want the higher Z object 0", got)
+	}
+
+	app.proj.Stage.Objects[1].Z = 20
+	if got := app.stageObjectAtWorld(60, 40); got != 1 {
+		t.Fatalf("picked object = %d, want the higher Z object 1", got)
 	}
 }
 

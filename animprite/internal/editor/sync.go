@@ -593,6 +593,9 @@ func (a *EditorApp) syncLayout() {
 	if a.st.opacityInput != nil {
 		a.st.opacityInput.X = px
 	}
+	if a.st.zInput != nil {
+		a.st.zInput.X = px
+	}
 	a.layoutConfirmDialog()
 }
 

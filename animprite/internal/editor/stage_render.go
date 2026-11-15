@@ -16,29 +16,14 @@ func (a *EditorApp) buildStageRenders() {
 	}
 	renders := make([]canvas.SpriteRender, 0, len(stage.Objects))
 
-	// Layers render bottom to top. Inside one layer backgrounds render first,
-	// static props and then animated props above them, static blocks and then
-	// animated blocks on top. Hit-testing inside that layer walks this order
-	// backwards.
-	for _, layer := range stage.Layers {
-		for _, wantCategory := range []string{
-			project.StageCategoryBG,
-			project.StageCategoryProp,
-			project.StageCategoryAnimProp,
-			project.StageCategoryBlock,
-			project.StageCategoryAnimBlock,
-		} {
-			for i := range stage.Objects {
-				obj := &stage.Objects[i]
-				if stage.LayerNameFor(*obj) != layer.Name {
-					continue
-				}
-				if obj.Category != wantCategory {
-					continue
-				}
-				renders = append(renders, a.stageObjectRender(obj, a.stageObjectOpacity(obj)))
-			}
+	// Layers render bottom to top; inside one layer ascending Z wins, then the
+	// category order. Picking walks this same order backwards.
+	for _, idx := range stage.RenderOrder() {
+		obj := &stage.Objects[idx]
+		if !project.StageCategoryDraws(obj.Category) {
+			continue
 		}
+		renders = append(renders, a.stageObjectRender(obj, a.stageObjectOpacity(obj)))
 	}
 
 	if a.st.dragAsset >= 0 && a.st.draggingFromPanel && a.st.dragAsset < len(stage.Assets) {
