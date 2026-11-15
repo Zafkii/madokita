@@ -540,9 +540,6 @@ func boxColors(kind RenderKind, selected bool) (fill, border color.RGBA) {
 	case RenderCollision:
 		fill = color.RGBA{80, 190, 255, 207}
 		border = color.RGBA{126, 214, 255, 255}
-		if selected {
-			border = color.RGBA{176, 236, 255, 255}
-		}
 	default:
 		fill = color.RGBA{255, 255, 0, 207}
 		border = color.RGBA{250, 232, 111, 255}
@@ -559,7 +556,7 @@ func (c *Canvas) drawHurtboxes(screen *ebiten.Image, cam *camera.Camera) {
 			continue
 		}
 		fillClr, borderClr := boxColors(h.Kind, h.Selected)
-		if h.Selected {
+		if h.Selected && h.Kind != RenderCollision {
 			hwFull := h.WorldWidth / 2
 			hhFull := h.WorldHeight / 2
 			cos := math.Cos(h.Rotation)

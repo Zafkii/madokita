@@ -83,6 +83,11 @@ type Player struct {
 
 	solidRects []math2.Rect
 
+	// walkDir is the last horizontal walking direction (-1 left, 1 right, 0
+	// none). Ground contact is resolved at a probe pushed a quarter of the
+	// body width that way, so the base rides the surface it walks into.
+	walkDir int
+
 	defaultAttackID string
 }
 
@@ -149,9 +154,12 @@ func (p *Player) Update(dt time.Duration) {
 		}
 	}
 
-	// Walking off a ledge must release the grounded state before gravity.
+	// Walking off a ledge must release the grounded state before gravity, but a
+	// small drop (the staircase of a slope) is followed instead of becoming air.
 	if p.Movement.IsGrounded && !p.hasSupport() {
-		p.Movement.IsGrounded = false
+		if !p.snapDown() {
+			p.Movement.IsGrounded = false
+		}
 	}
 
 	// Gravity runs unconditionally: attacking mid-air must not freeze the fall.
@@ -220,66 +228,116 @@ func (p *Player) bodyTopOffset() float64 {
 
 // maxAutoStepHeight is the tallest ledge the player walks up without jumping.
 // Stage geometry approximates rotated or curved surfaces with axis-aligned
-// boxes, so a rounded floor is a staircase of small ledges; anything taller
+// strips, so a rounded floor is a staircase of small ledges; anything taller
 // stays a wall.
 const maxAutoStepHeight = 16.0
 
+// maxStepDown is the deepest drop the player follows while walking. It keeps
+// the down side of a stair-stepped slope smooth: the player stays grounded and
+// keeps the walk animation instead of falling a few pixels per frame.
+const maxStepDown = 12.0
+
+// groundProbeX is the point where the body meets the floor: the body centre
+// pushed a quarter of its width toward the walking direction. Resolving the
+// ground there puts three quarters of the base on the collision and lets the
+// leading quarter hang over a slope or an edge, which reads naturally both
+// climbing and descending.
+func (p *Player) groundProbeX() float64 {
+	body := p.bodyRect()
+	return body.X + body.W/2 + float64(p.walkDir)*body.W/4
+}
+
+// probeFloorTop returns the highest (smallest Y) solid top under the ground
+// probe whose top lies within [minTop, maxTop]. Bounding the band keeps overhead
+// geometry — tree canopies, tall props — from hijacking the ground contact.
+func (p *Player) probeFloorTop(minTop, maxTop float64) (float64, bool) {
+	x := p.groundProbeX()
+	top := math.Inf(1)
+	found := false
+	for _, solid := range p.solidRects {
+		if x < solid.X || x >= solid.X+solid.W {
+			continue
+		}
+		if solid.Y < minTop || solid.Y > maxTop {
+			continue
+		}
+		if solid.Y < top {
+			top = solid.Y
+			found = true
+		}
+	}
+	return top, found
+}
+
+// behindProbe reports whether a solid sits entirely on the trailing side of the
+// ground probe, where the base may sink into a slope without blocking anything.
+func (p *Player) behindProbe(solid math2.Rect) bool {
+	probe := p.groundProbeX()
+	switch {
+	case p.walkDir > 0:
+		return solid.X+solid.W <= probe+collisionEpsilon
+	case p.walkDir < 0:
+		return solid.X >= probe-collisionEpsilon
+	}
+	return false
+}
+
+// wallAhead returns a solid the body overlaps whose top rises more than a
+// walkable step above the feet, ignoring the floor already behind the probe.
+func (p *Player) wallAhead() (math2.Rect, bool) {
+	body := p.bodyRect()
+	feet := body.Y + body.H
+	for _, solid := range p.solidRects {
+		if !body.Overlaps(solid) || p.behindProbe(solid) {
+			continue
+		}
+		if feet-solid.Y > maxAutoStepHeight {
+			return solid, true
+		}
+	}
+	return math2.Rect{}, false
+}
+
 func (p *Player) moveHorizontal(dx float64) {
+	if dx == 0 {
+		return
+	}
+	if dx > 0 {
+		p.walkDir = 1
+	} else {
+		p.walkDir = -1
+	}
 	p.X += dx
 	if len(p.solidRects) == 0 {
 		return
 	}
 
-	// A couple of passes handles corners shared by adjacent blocks.
-	for pass := 0; pass < 2; pass++ {
+	// Several passes handle the strips of a slope: moving sideways can enter
+	// more than one step, and each pass either climbs to the probe's surface or
+	// stops at a wall.
+	for pass := 0; pass < 8; pass++ {
 		body := p.bodyRect()
-		hit := false
-		for _, solid := range p.solidRects {
-			if !body.Overlaps(solid) {
-				continue
-			}
-			if p.tryStepUp(solid) {
-				body = p.bodyRect()
-				hit = true
-				continue
-			}
+		feet := body.Y + body.H
+
+		// A solid towering over the feet is a wall; the floor strips behind the
+		// probe only bury the base and never block.
+		if blocker, blocked := p.wallAhead(); blocked {
 			leftOffset := body.X - p.X
 			rightOffset := body.X + body.W - p.X
 			if dx > 0 {
-				p.X = solid.X - rightOffset
+				p.X = blocker.X - rightOffset
 			} else {
-				p.X = solid.X + solid.W - leftOffset
+				p.X = blocker.X + blocker.W - leftOffset
 			}
-			body = p.bodyRect()
-			hit = true
-		}
-		if !hit {
-			return
-		}
-	}
-}
-
-// tryStepUp lifts the player onto a solid whose top is a small step above the
-// body's feet, as long as the raised body stays clear of every other solid.
-func (p *Player) tryStepUp(solid math2.Rect) bool {
-	body := p.bodyRect()
-	stepUp := body.Y + body.H - solid.Y
-	if stepUp <= 0 || stepUp > maxAutoStepHeight {
-		return false
-	}
-
-	p.Y -= stepUp
-	raised := p.bodyRect()
-	for _, other := range p.solidRects {
-		if other == solid {
 			continue
 		}
-		if raised.Overlaps(other) {
-			p.Y += stepUp
-			return false
+
+		top, ok := p.probeFloorTop(feet-maxAutoStepHeight, math.Inf(1))
+		if !ok || top >= feet-collisionEpsilon {
+			return
 		}
+		p.Y -= feet - top
 	}
-	return true
 }
 
 func (p *Player) applyGravity(dtSec float64) {
@@ -289,23 +347,8 @@ func (p *Player) applyGravity(dtSec float64) {
 	body := p.bodyRect()
 
 	if p.Movement.yVelocity > 0 {
-		landingTop := math.Inf(1)
-		for _, solid := range p.solidRects {
-			if !horizontalOverlap(body, solid) {
-				continue
-			}
-			// Only land when the body crossed the top during this step.
-			if prevBody.Y+prevBody.H > solid.Y+collisionEpsilon {
-				continue
-			}
-			if body.Y+body.H < solid.Y {
-				continue
-			}
-			if solid.Y < landingTop {
-				landingTop = solid.Y
-			}
-		}
-		if !math.IsInf(landingTop, 1) {
+		// Land on the highest surface under the probe that this step crossed.
+		if landingTop, ok := p.probeFloorTop(prevBody.Y+prevBody.H, body.Y+body.H); ok {
 			p.Y = landingTop - p.bodyBottomOffset()
 			p.Movement.yVelocity = 0
 			p.Movement.IsGrounded = true
@@ -313,7 +356,7 @@ func (p *Player) applyGravity(dtSec float64) {
 		}
 
 		// Compatibility fallback for stages with no authored block geometry.
-		if p.Y >= p.StageGroundY {
+		if len(p.solidRects) == 0 && p.Y >= p.StageGroundY {
 			p.Y = p.StageGroundY
 			p.Movement.yVelocity = 0
 			p.Movement.IsGrounded = true
@@ -344,18 +387,38 @@ func (p *Player) applyGravity(dtSec float64) {
 	}
 }
 
-func (p *Player) hasSupport() bool {
-	body := p.bodyRect()
-	bottom := body.Y + body.H
-	for _, solid := range p.solidRects {
-		if !horizontalOverlap(body, solid) {
-			continue
-		}
-		if math.Abs(bottom-solid.Y) <= collisionEpsilon {
-			return true
-		}
+// snapDown lowers the player onto the closest surface under its body when the
+// drop is small enough to walk down. It returns false when there is nothing to
+// stand on within maxStepDown, so real ledges still make the player airborne.
+func (p *Player) snapDown() bool {
+	if len(p.solidRects) == 0 {
+		return false
 	}
-	return p.StageGroundY > 0 && math.Abs(p.Y-p.StageGroundY) <= collisionEpsilon
+	feet := p.bodyRect().Y + p.bodyRect().H
+	top, ok := p.probeFloorTop(feet-maxAutoStepHeight, math.Inf(1))
+	if !ok {
+		return false
+	}
+	drop := top - feet
+	if drop <= collisionEpsilon || drop > maxStepDown {
+		return false
+	}
+
+	p.Y += drop
+	if _, walled := p.wallAhead(); walled {
+		p.Y -= drop
+		return false
+	}
+	return true
+}
+
+func (p *Player) hasSupport() bool {
+	feet := p.bodyRect().Y + p.bodyRect().H
+	if top, ok := p.probeFloorTop(feet-maxAutoStepHeight, math.Inf(1)); ok && math.Abs(feet-top) <= collisionEpsilon {
+		return true
+	}
+	// The logical ground line only backs stages with no authored geometry.
+	return len(p.solidRects) == 0 && p.StageGroundY > 0 && math.Abs(p.Y-p.StageGroundY) <= collisionEpsilon
 }
 
 func horizontalOverlap(a, b math2.Rect) bool {

@@ -60,8 +60,8 @@ func (s *GameScene) SetPlayer(p *player.Player) {
 }
 
 // solidRects turns the stage block layout into world-space collision boxes.
-// Collision boxes are authored around the object center; object and box
-// rotation are approximated by their axis-aligned extents.
+// Rotated boxes are decomposed into thin axis-aligned strips so slopes are
+// walkable instead of blocking with their full bounding box.
 func (s *GameScene) solidRects() []math2.Rect {
 	if s.stage == nil || s.stage.Layout == nil {
 		return nil
@@ -69,16 +69,7 @@ func (s *GameScene) solidRects() []math2.Rect {
 
 	var rects []math2.Rect
 	for i := range s.stage.Layout.Objects {
-		obj := &s.stage.Layout.Objects[i]
-		for _, box := range obj.EffectiveCollisionBoxes() {
-			rot := (obj.Rotation + box.Rotation) * math.Pi / 180
-			cos, sin := math.Cos(rot), math.Sin(rot)
-			cx := obj.X + box.X*cos - box.Y*sin
-			cy := obj.Y + box.X*sin + box.Y*cos
-			hw := (math.Abs(cos)*box.Width + math.Abs(sin)*box.Height) / 2
-			hh := (math.Abs(sin)*box.Width + math.Abs(cos)*box.Height) / 2
-			rects = append(rects, math2.NewRect(cx-hw, cy-hh, hw*2, hh*2))
-		}
+		rects = append(rects, s.stage.Layout.Objects[i].SolidRects()...)
 	}
 	return rects
 }
@@ -138,6 +129,9 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 		s.Player.Draw(screen, s.CameraX)
 
 		if s.ShowDebug {
+			if s.stage != nil {
+				debug.DrawStageBoxes(screen, s.stage.Layout, s.CameraX)
+			}
 			debug.DrawGround(screen, s.CameraX)
 			debug.DrawOrigin(screen, s.Player, s.CameraX)
 			debug.DrawSpriteBBox(screen, s.Player, s.CameraX)

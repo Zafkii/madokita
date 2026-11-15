@@ -1,11 +1,13 @@
 package player
 
 import (
+	"math"
 	"testing"
 	"time"
 
 	"madokita-gems/internal/animation"
 	"madokita-gems/internal/combat"
+	"madokita-gems/internal/game/stages"
 	math2 "madokita-gems/internal/math"
 )
 
@@ -419,5 +421,234 @@ func TestActiveHitboxesFollowAttackPhase(t *testing.T) {
 	p.updateAttacking(0.1) // recover frame
 	if got := p.ActiveHitboxes(); len(got) != 0 {
 		t.Fatalf("recover hitboxes = %v, want none", got)
+	}
+}
+
+// slopeStrips builds a staircase of axis-aligned strips like the ones the stage
+// runtime produces for a rotated block: each strip is stripW wide and its top
+// moves by rise pixels per strip.
+func slopeStrips(startX, startTop, stripW, rise float64, count int) []math2.Rect {
+	rects := make([]math2.Rect, 0, count)
+	for i := 0; i < count; i++ {
+		x := startX + float64(i)*stripW
+		top := startTop + float64(i)*rise
+		rects = append(rects, math2.NewRect(x, top, stripW, 200))
+	}
+	return rects
+}
+
+func TestPlayerWalksUpStripSlope(t *testing.T) {
+	const (
+		stripW = 6.0
+		rise   = -1.6 // 15 degrees upwards to the right
+	)
+	p := &Player{
+		State:    State{IsControlled: true},
+		Movement: Movement{IsGrounded: true, gravity: 1000},
+		Scale:    0.5,
+		X:        80,
+	}
+	p.Y = 100 - p.bodyBottomOffset()
+	p.SetSolidRects(append(
+		[]math2.Rect{math2.NewRect(0, 100, 100, 200)},
+		slopeStrips(100, 100, stripW, rise, 40)...))
+
+	for i := 0; i < 48; i++ {
+		p.moveHorizontal(5)
+		p.Update(10 * time.Millisecond)
+		if !p.Movement.IsGrounded {
+			t.Fatalf("frame %d: player left the ground while climbing", i)
+		}
+	}
+
+	feet := p.bodyRect().Y + p.bodyRect().H
+	if feet > 100-30 {
+		t.Fatalf("feet = %v, want the player carried up the slope", feet)
+	}
+	if p.X < 320 {
+		t.Fatalf("X = %v, want the player to keep walking up the slope", p.X)
+	}
+}
+
+func TestPlayerWalksDownStripSlopeWithoutLeavingGround(t *testing.T) {
+	const (
+		stripW = 6.0
+		drop   = 1.6
+	)
+	p := &Player{
+		State:    State{IsControlled: true},
+		Movement: Movement{IsGrounded: true, gravity: 1000},
+		Scale:    0.5,
+		X:        80,
+	}
+	p.Y = 100 - p.bodyBottomOffset()
+	p.SetSolidRects(append(
+		[]math2.Rect{math2.NewRect(0, 100, 100, 200)},
+		slopeStrips(100, 100, stripW, drop, 40)...))
+
+	for i := 0; i < 40; i++ {
+		p.moveHorizontal(5)
+		p.Update(10 * time.Millisecond)
+		if !p.Movement.IsGrounded {
+			t.Fatalf("frame %d: player became airborne walking down a slope", i)
+		}
+	}
+
+	if p.X < 280 {
+		t.Fatalf("X = %v, want the player to keep walking down the slope", p.X)
+	}
+}
+
+func TestPlayerSnapsDownSmallStep(t *testing.T) {
+	p := &Player{State: State{IsControlled: true}, Scale: 0.5, X: 50}
+	p.Y = 100 - p.bodyBottomOffset()
+	p.Movement = Movement{IsGrounded: true, gravity: 1000}
+	p.SetSolidRects([]math2.Rect{
+		math2.NewRect(0, 100, 100, 50),
+		math2.NewRect(100, 108, 200, 50),
+	})
+
+	p.X = 130
+	p.Update(10 * time.Millisecond)
+
+	if !p.Movement.IsGrounded {
+		t.Fatal("an 8px drop must be followed while walking, not become airborne")
+	}
+	wantY := 108 - p.bodyBottomOffset()
+	if diff := p.Y - wantY; diff < -0.01 || diff > 0.01 {
+		t.Fatalf("Y = %v, want the player snapped to the lower surface at %v", p.Y, wantY)
+	}
+}
+
+func TestPlayerFallsOffTallLedge(t *testing.T) {
+	p := &Player{State: State{IsControlled: true}, Scale: 0.5, X: 50, StageGroundY: 1000}
+	p.Y = 100 - p.bodyBottomOffset()
+	p.Movement = Movement{IsGrounded: true, gravity: 1000}
+	p.SetSolidRects([]math2.Rect{math2.NewRect(0, 100, 100, 50)})
+
+	p.X = 200
+	p.Update(10 * time.Millisecond)
+
+	if p.Movement.IsGrounded {
+		t.Fatal("walking off a tall ledge must leave the grounded state")
+	}
+}
+
+// TestPlayerWalksRotatedStageHill walks the real test_stage hill, which is built
+// from rotated grass blocks. Rotated collision boxes are decomposed into strips,
+// so the walk must stay grounded and never bump more than a few pixels at once.
+// TestPlayerGroundsThreeQuartersOfTheBase pins the ground probe: the body rests
+// where the centre pushed a quarter of its width toward the walk direction meets
+// the floor, so the leading quarter may hang past an edge while three quarters
+// still stand on the ground.
+func TestPlayerGroundsThreeQuartersOfTheBase(t *testing.T) {
+	p := &Player{State: State{IsControlled: true}, Scale: 0.5, X: 160}
+	p.Y = 100 - p.bodyBottomOffset()
+	p.Movement = Movement{IsGrounded: true, gravity: 1000}
+	p.SetSolidRects([]math2.Rect{
+		math2.NewRect(0, 100, 200, 50),
+		math2.NewRect(200, 108, 200, 50),
+	})
+
+	const stepW = 5.0
+	settle := func() {
+		p.moveHorizontal(stepW)
+		p.Update(10 * time.Millisecond)
+	}
+
+	// probe = X + 0.75 + bodyW/4 crosses the step's edge at X = 187.4, which is
+	// exactly where three quarters of the 47.5px base still stand on the upper
+	// floor.
+	for p.X < 185 {
+		settle()
+	}
+	if feet := p.bodyRect().Y + p.bodyRect().H; math.Abs(feet-100) > 0.01 {
+		t.Fatalf("feet = %v, want the body held on the upper floor while three quarters stand on it", feet)
+	}
+	if !p.Movement.IsGrounded {
+		t.Fatal("player must stay grounded while three quarters of the base are supported")
+	}
+
+	settle() // X = 190: only the leading quarter hangs over the drop now.
+	if p.X != 190 {
+		t.Fatalf("X = %v, want 190", p.X)
+	}
+	if feet := p.bodyRect().Y + p.bodyRect().H; math.Abs(feet-108) > 0.01 {
+		t.Fatalf("feet = %v, want the body followed the drop once the probe left the upper floor", feet)
+	}
+	if !p.Movement.IsGrounded {
+		t.Fatal("an 8px drop at the probe must be followed while walking")
+	}
+
+	// Mirror: walking back left lifts the body as soon as the probe reaches the
+	// higher floor, so the probe leads in the walk direction on both sides.
+	p.X = 210
+	p.Y = 108 - p.bodyBottomOffset()
+	p.Movement.IsGrounded = true
+	p.moveHorizontal(-stepW)
+	if feet := p.bodyRect().Y + p.bodyRect().H; math.Abs(feet-100) > 0.01 {
+		t.Fatalf("feet = %v, want the body raised onto the upper floor walking left", feet)
+	}
+}
+
+func TestPlayerWalksRotatedStageHill(t *testing.T) {
+	layout := &stages.TestStage
+	var rects []math2.Rect
+	for i := range layout.Objects {
+		rects = append(rects, layout.Objects[i].SolidRects()...)
+	}
+	if len(rects) < 200 {
+		t.Fatalf("stage produced %d solid rects, want rotated blocks decomposed", len(rects))
+	}
+
+	const halfBody = 47.5 / 2
+	surfaceAt := func(x float64) float64 {
+		top := math.Inf(1)
+		for _, r := range rects {
+			if x+halfBody <= r.X || x-halfBody >= r.X+r.W {
+				continue
+			}
+			top = math.Min(top, r.Y)
+		}
+		return top
+	}
+
+	p := &Player{
+		State:    State{IsControlled: true},
+		Movement: Movement{IsGrounded: true, gravity: 1000},
+		Scale:    0.5,
+		X:        20,
+	}
+	p.Y = surfaceAt(p.X) - p.bodyBottomOffset()
+	p.SetSolidRects(rects)
+
+	walk := func(dir float64, frames int) (maxRise, maxDrop float64) {
+		prev := p.bodyRect().Y + p.bodyRect().H
+		for i := 0; i < frames; i++ {
+			p.moveHorizontal(5 * dir)
+			p.Update(10 * time.Millisecond)
+			if !p.Movement.IsGrounded {
+				t.Fatalf("x=%.1f frame %d: player became airborne on the hill", p.X, i)
+			}
+			feet := p.bodyRect().Y + p.bodyRect().H
+			maxRise = math.Max(maxRise, prev-feet)
+			maxDrop = math.Max(maxDrop, feet-prev)
+			prev = feet
+		}
+		return maxRise, maxDrop
+	}
+
+	if rise, drop := walk(1, 96); rise > 6 || drop > 6 {
+		t.Fatalf("climbing: feet changed %.2f/%.2f px in one frame, want a walkable surface", rise, drop)
+	}
+	if p.X < 496 {
+		t.Fatalf("X = %v, want the player to cross the rotated hill", p.X)
+	}
+
+	if rise, drop := walk(-1, 88); rise > 6 || drop > 6 {
+		t.Fatalf("descending: feet changed %.2f/%.2f px in one frame, want a walkable surface", rise, drop)
+	}
+	if p.X > 64 {
+		t.Fatalf("X = %v, want the player to walk back down the hill", p.X)
 	}
 }

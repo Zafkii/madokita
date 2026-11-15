@@ -1,5 +1,11 @@
 package stage
 
+import (
+	"math"
+
+	math2 "madokita-gems/internal/math"
+)
+
 const (
 	CategoryBG        = "bg"
 	CategoryProp      = "prop"
@@ -148,6 +154,129 @@ func (o Object) EffectiveCollisionBoxes() []Box {
 		return []Box{o.DefaultCollisionBox()}
 	}
 	return nil
+}
+
+// SolidRects converts the object's effective collision boxes into world-space
+// solid rectangles the runtime resolves against. An axis-aligned box (object and
+// box rotation at a multiple of 90 degrees) yields one exact rectangle. A
+// rotated box is decomposed into thin vertical strips whose top edge follows the
+// rotated contour, so a sloped surface stays close to its authored height
+// instead of blocking the player with the rotated box's full bounding box.
+func (o Object) SolidRects() []math2.Rect {
+	boxes := o.EffectiveCollisionBoxes()
+	if len(boxes) == 0 {
+		return nil
+	}
+	rects := make([]math2.Rect, 0, len(boxes))
+	for _, box := range boxes {
+		rects = append(rects, o.solidStrips(box)...)
+	}
+	return rects
+}
+
+// SolidStripWidth is the horizontal width of each axis-aligned strip used to
+// approximate a rotated collision box. Thin strips keep the step height between
+// neighbours small enough for the player's auto step-up to walk them smoothly.
+const SolidStripWidth = 6.0
+
+// solidStrips decomposes one collision box into axis-aligned strips. Each strip
+// spans a slice of the box's world-space X extent and covers the full vertical
+// extent of the rotated box inside that slice, which is conservative: the strip
+// never sticks out sideways past the slice, only upwards to the highest point
+// the surface reaches there.
+func (o Object) solidStrips(box Box) []math2.Rect {
+	if box.Width <= 0 || box.Height <= 0 {
+		return nil
+	}
+
+	rot := (o.Rotation + box.Rotation) * math.Pi / 180
+	cos, sin := math.Cos(rot), math.Sin(rot)
+	cx := o.X + box.X*cos - box.Y*sin
+	cy := o.Y + box.X*sin + box.Y*cos
+	hw, hh := box.Width/2, box.Height/2
+
+	corners := [4][2]float64{
+		{cx - hw*cos + hh*sin, cy - hw*sin - hh*cos},
+		{cx + hw*cos + hh*sin, cy + hw*sin - hh*cos},
+		{cx + hw*cos - hh*sin, cy + hw*sin + hh*cos},
+		{cx - hw*cos - hh*sin, cy - hw*sin + hh*cos},
+	}
+
+	minX, maxX := corners[0][0], corners[0][0]
+	minY, maxY := corners[0][1], corners[0][1]
+	for _, c := range corners[1:] {
+		minX = math.Min(minX, c[0])
+		maxX = math.Max(maxX, c[0])
+		minY = math.Min(minY, c[1])
+		maxY = math.Max(maxY, c[1])
+	}
+
+	// Axis-aligned rotations keep the exact rectangle; no decomposition needed.
+	if math.Abs(sin) < 1e-6 || math.Abs(cos) < 1e-6 {
+		if maxX-minX <= 0 || maxY-minY <= 0 {
+			return nil
+		}
+		return []math2.Rect{math2.NewRect(minX, minY, maxX-minX, maxY-minY)}
+	}
+	if maxX-minX <= 0 {
+		return nil
+	}
+
+	count := int(math.Ceil((maxX - minX) / SolidStripWidth))
+	if count < 1 {
+		count = 1
+	}
+	stripW := (maxX - minX) / float64(count)
+
+	strips := make([]math2.Rect, 0, count)
+	for i := 0; i < count; i++ {
+		x0 := minX + float64(i)*stripW
+		x1 := x0 + stripW
+
+		top, bottom := math.Inf(1), math.Inf(-1)
+		extend := func(y float64) {
+			top = math.Min(top, y)
+			bottom = math.Max(bottom, y)
+		}
+		// Corners inside the slice are extremes of the rotated contour.
+		for _, c := range corners {
+			if c[0] >= x0-1e-9 && c[0] <= x1+1e-9 {
+				extend(c[1])
+			}
+		}
+		// Edges crossing the slice boundaries bound the rest of the contour.
+		for e := 0; e < 4; e++ {
+			a, b := corners[e], corners[(e+1)%4]
+			if math.Abs(b[0]-a[0]) < 1e-9 {
+				continue
+			}
+			for _, x := range [2]float64{x0, x1} {
+				if (x < a[0] && x < b[0]) || (x > a[0] && x > b[0]) {
+					continue
+				}
+				t := (x - a[0]) / (b[0] - a[0])
+				extend(a[1] + t*(b[1]-a[1]))
+			}
+		}
+		if math.IsInf(top, 1) || bottom-top <= 0 {
+			continue
+		}
+		strips = append(strips, math2.NewRect(x0, top, stripW, bottom-top))
+	}
+	return strips
+}
+
+// EffectiveHitboxes returns the authored damage boxes for this object.
+// Backgrounds, start markers, and disabled objects have none. Hitboxes are
+// damage-only and never take part in solid collision.
+func (o Object) EffectiveHitboxes() []Box {
+	if o.Category == CategoryBG || o.Category == CategoryStart || o.CollisionDisabled {
+		return nil
+	}
+	if o.FlipX {
+		return mirrorBoxes(o.Hitboxes)
+	}
+	return o.Hitboxes
 }
 
 // mirrorBoxes mirrors box offsets and rotations across the object's local
