@@ -309,6 +309,14 @@ Each `StageDef` defines `GroundY` (logical ground line Y) and optional `SpawnX`/
 
 There is **no automatic visual foot offset**. The game must resolve ground contact through collision boxes (or place the visual floor independently); never derive `p.Y` from `FrameSize`/`DefaultOriginY`.
 
+## Exporting a Stage to the Game
+
+The editor exports a Go file into `animprite/tmp/wea/<stage>/<stage>.go`; importing it into `internal/game/stages/<stage>.go` is a mechanical transform, never a hand edit:
+
+- Coordinates come from the editor (origin at the stage centre), so add `StageWidth/2` and `StageHeight/2` to every object `X`/`Y` to move them to the runtime origin (top-left). Collision boxes, hitboxes and animation offsets are object-relative and stay untouched.
+- Image paths are relative to the stage directory; prefix them with `../../../assets/images/stages/<stage>/` so `runtimeStageAssetPath` (`internal/game/stages.go`) strips everything up to `/assets/` and the game resolves them against the `assets` base. The start marker keeps `File: ""` and `AnimFile` stays a bare key (`tree_moves/moves.go`), not a path.
+- Keep the `package stages` + dot-import header; verify object count, that every referenced image exists, and that the previous and new exports still agree outside the region that was actually edited.
+
 ## Stage Collision
 
 `GameScene.solidRects()` converts layout geometry into world-space collision rectangles. Blocks (`block`, `anim_block`) without authored boxes use their rendered `Width`/`Height`; props collide only when they have explicit `CollisionBoxes`; backgrounds, start markers, and `CollisionDisabled` objects are ignored. An axis-aligned box (object and box rotation at a multiple of 90°) stays one exact rectangle. A rotated box is decomposed by `stage.Object.SolidRects()` into vertical strips `SolidStripWidth` (6px) wide, each covering the rotated box's vertical extent in that slice, so a slope is walkable instead of blocking with its full axis-aligned bounding box.
