@@ -98,6 +98,12 @@ func (s *Slider) HandleMouse(cx, cy int, justPressed bool) {
 	}
 }
 
+// Dragging reports whether the thumb is currently held, so callers can keep
+// an interaction-scoped state (like an edit session) alive across frames.
+func (s *Slider) Dragging() bool {
+	return s.dragging
+}
+
 func (s *Slider) HandleRelease() {
 	s.dragging = false
 }

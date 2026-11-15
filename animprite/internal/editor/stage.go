@@ -98,6 +98,7 @@ type stageState struct {
 	stageWidthInput  *ui.TextInput
 	stageHeightInput *ui.TextInput
 	opacityInput     *ui.TextInput
+	opacitySlider    *ui.Slider
 	zInput           *ui.TextInput
 	deleteBtn        *ui.Button
 	duplicateBtn     *ui.Button
@@ -856,9 +857,7 @@ func (a *EditorApp) syncStageSelectionUI() {
 	a.props[4].SetNumeric(obj.Rotation)
 	a.props[4].Min = -360
 	a.props[4].Step = 0.5
-	if a.st.opacityInput != nil {
-		a.st.opacityInput.SetNumeric(obj.Opacity)
-	}
+	a.syncStageOpacityInputs(obj.Opacity)
 	if a.st.zInput != nil {
 		a.st.zInput.SetNumeric(obj.Z)
 	}
@@ -1565,6 +1564,7 @@ func (a *EditorApp) flushStageInputs() {
 	if !applyX && !applyY && !applyW && !applyH && !applyRot && !applyOpacity && !applyZ {
 		return
 	}
+	a.beginInfoUndo()
 
 	dx := x - origX
 	dy := y - origY
@@ -1612,8 +1612,47 @@ func (a *EditorApp) flushStageInputs() {
 			obj.Z = z
 		}
 	}
-	if changed && focused != nil {
+	if changed {
+		a.pushInfoUndoIfNeeded()
+		a.dirty = true
+		if focused != nil {
+			a.markStageObjectLiveEdit()
+		}
+	}
+}
+
+// syncStageOpacityInputs mirrors one opacity value into the numeric input and
+// the slider so both editors always agree.
+func (a *EditorApp) syncStageOpacityInputs(opacity float64) {
+	if a.st.opacityInput != nil {
+		a.st.opacityInput.SetNumeric(opacity)
+	}
+	if a.st.opacitySlider != nil {
+		a.st.opacitySlider.Value = clamp(opacity, 0, 1)
+	}
+}
+
+// onStageOpacitySlider applies a slider value to the whole selection at once
+// and mirrors it into the numeric input.
+func (a *EditorApp) onStageOpacitySlider(v float64) {
+	a.beginInfoUndo()
+	v = clamp(v, 0, 1)
+	if a.st.opacityInput != nil {
+		a.st.opacityInput.SetNumeric(v)
+	}
+	changed := false
+	for _, idx := range a.stageSelectedIndices() {
+		obj := &a.proj.Stage.Objects[idx]
+		if obj.Opacity == v {
+			continue
+		}
+		obj.Opacity = v
+		changed = true
+	}
+	if changed {
+		a.pushInfoUndoIfNeeded()
 		a.markStageObjectLiveEdit()
+		a.dirty = true
 	}
 }
 
@@ -1628,9 +1667,7 @@ func (a *EditorApp) syncStageInputs() {
 	a.props[2].SetNumeric(obj.Width)
 	a.props[3].SetNumeric(obj.Height)
 	a.props[4].SetNumeric(obj.Rotation)
-	if a.st.opacityInput != nil {
-		a.st.opacityInput.SetNumeric(obj.Opacity)
-	}
+	a.syncStageOpacityInputs(obj.Opacity)
 	if a.st.zInput != nil {
 		a.st.zInput.SetNumeric(obj.Z)
 	}

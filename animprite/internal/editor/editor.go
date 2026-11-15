@@ -137,6 +137,11 @@ type EditorApp struct {
 	undoStack    []project.ProjectData
 	redoStack    []project.ProjectData
 	wheelChanged bool
+
+	// infoUndoPrev is the project state before the current stage Info editing
+	// burst; the first applied change pushes it as a single undo step.
+	infoUndoPrev   *project.ProjectData
+	infoUndoPushed bool
 }
 
 func (a *EditorApp) Layout(w, h int) (int, int) {
@@ -475,6 +480,16 @@ func (a *EditorApp) initStageWidgets() {
 	opacity.Step = 0.05
 	opacity.SetNumeric(1)
 	a.st.opacityInput = opacity
+
+	opacitySlider := ui.NewSlider(px, 0, iw, rightPanelInputH, th)
+	opacitySlider.Min = 0
+	opacitySlider.Max = 1
+	opacitySlider.Step = 0.05
+	opacitySlider.Value = 1
+	opacitySlider.OnChange = func(v float64) {
+		a.onStageOpacitySlider(v)
+	}
+	a.st.opacitySlider = opacitySlider
 
 	zInput := ui.NewTextInput(px, 0, iw, rightPanelInputH, th)
 	zInput.SetLabel("Z (depth)")

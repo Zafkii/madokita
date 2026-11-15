@@ -14,14 +14,50 @@ func (a *EditorApp) saveSnapshotNoDirty() {
 }
 
 func (a *EditorApp) pushSnapshot() {
-	a.undoStack = append(a.undoStack, project.DeepCopy(&a.proj))
+	a.endInfoUndo()
+	a.pushSnapshotOf(project.DeepCopy(&a.proj))
+}
+
+// pushSnapshotOf adds an already captured project state as the next undo step.
+func (a *EditorApp) pushSnapshotOf(data project.ProjectData) {
+	a.undoStack = append(a.undoStack, data)
 	if len(a.undoStack) > maxUndo {
 		a.undoStack = a.undoStack[1:]
 	}
 	a.redoStack = nil
 }
 
+// beginInfoUndo captures the project state before an Info panel editing burst
+// (typing in a property field or dragging the opacity slider). Every change of
+// that burst collapses into one undo step instead of one per keystroke.
+func (a *EditorApp) beginInfoUndo() {
+	if a.infoUndoPrev != nil {
+		return
+	}
+	prev := project.DeepCopy(&a.proj)
+	a.infoUndoPrev = &prev
+	a.infoUndoPushed = false
+}
+
+// endInfoUndo closes the burst. A burst that changed nothing leaves no step.
+func (a *EditorApp) endInfoUndo() {
+	a.infoUndoPrev = nil
+	a.infoUndoPushed = false
+}
+
+// pushInfoUndoIfNeeded records the captured pre-burst state once the burst
+// actually changed something.
+func (a *EditorApp) pushInfoUndoIfNeeded() {
+	if a.infoUndoPrev == nil || a.infoUndoPushed {
+		return
+	}
+	a.pushSnapshotOf(*a.infoUndoPrev)
+	a.infoUndoPushed = true
+	a.dirty = true
+}
+
 func (a *EditorApp) undo() {
+	a.endInfoUndo()
 	if len(a.undoStack) == 0 {
 		return
 	}
@@ -34,6 +70,7 @@ func (a *EditorApp) undo() {
 }
 
 func (a *EditorApp) redo() {
+	a.endInfoUndo()
 	if len(a.redoStack) == 0 {
 		return
 	}

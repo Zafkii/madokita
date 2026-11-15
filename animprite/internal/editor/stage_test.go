@@ -994,6 +994,59 @@ func TestStageZInputSetsDepthOnSelection(t *testing.T) {
 	}
 }
 
+func TestStageOpacitySliderUpdatesSelectionAndInput(t *testing.T) {
+	app := newStageObjectApp(2)
+	if app.st.opacitySlider == nil {
+		t.Fatal("stage panel has no opacity slider")
+	}
+	app.selectStageObject(0)
+	app.addStageObjectSelection(1)
+	sl := app.st.opacitySlider
+	sl.Visible = true
+	sl.X, sl.Y, sl.W, sl.H = 0, 0, 100, 20
+
+	// Press the thumb (value 1 sits at the end of the track) and drag to the middle.
+	sl.HandleMouse(88, 10, true)
+	sl.HandleMouse(44, 10, false)
+
+	if app.proj.Stage.Objects[0].Opacity != 0.5 || app.proj.Stage.Objects[1].Opacity != 0.5 {
+		t.Fatalf("opacity = %g, %g, want 0.5,0.5", app.proj.Stage.Objects[0].Opacity, app.proj.Stage.Objects[1].Opacity)
+	}
+	if got := app.st.opacityInput.NumericValue(); got != 0.5 {
+		t.Fatalf("opacity input = %g, want 0.5", got)
+	}
+	if sl.Value != 0.5 {
+		t.Fatalf("slider value = %g, want 0.5", sl.Value)
+	}
+
+	// Dragging back to the end keeps the numeric input in sync.
+	sl.HandleMouse(88, 10, false)
+
+	if app.proj.Stage.Objects[0].Opacity != 1 || app.proj.Stage.Objects[1].Opacity != 1 {
+		t.Fatalf("opacity after drag = %g, %g, want 1,1", app.proj.Stage.Objects[0].Opacity, app.proj.Stage.Objects[1].Opacity)
+	}
+	if got := app.st.opacityInput.NumericValue(); got != 1 {
+		t.Fatalf("opacity input after drag = %g, want 1", got)
+	}
+}
+
+func TestStageOpacityInputSyncsSlider(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	app.st.opacityInput.Focused = true
+	app.st.opacityInput.SetNumeric(0.25)
+
+	app.flushStageInputs()
+
+	if app.proj.Stage.Objects[0].Opacity != 0.25 {
+		t.Fatalf("opacity = %g, want 0.25", app.proj.Stage.Objects[0].Opacity)
+	}
+	app.syncStageInputs()
+	if app.st.opacitySlider.Value != 0.25 {
+		t.Fatalf("slider value = %g, want 0.25", app.st.opacitySlider.Value)
+	}
+}
+
 func TestStageZOrdersPickingWithinLayer(t *testing.T) {
 	app := newStageObjectApp(2)
 	// Both objects overlap at (60,40); Z picks which one a click resolves to.
@@ -2189,5 +2242,97 @@ func TestClearStageInputFocusCommitsStageSize(t *testing.T) {
 	}
 	if app.st.stageWidthInput.Focused {
 		t.Fatal("stage width input still focused")
+	}
+}
+
+func TestStageInfoInputEditIsSingleUndoStep(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	obj := &app.proj.Stage.Objects[0]
+	origX := obj.X
+	base := len(app.undoStack)
+
+	// Three keystrokes in the X field are one editing burst, so one undo step.
+	app.props[0].Focused = true
+	for _, typed := range []string{"1", "12", "123"} {
+		app.props[0].Text = typed
+		app.flushStageInputs()
+	}
+	if obj.X != 123 {
+		t.Fatalf("X = %g, want 123", obj.X)
+	}
+	if got := len(app.undoStack); got != base+1 {
+		t.Fatalf("undo steps = %d, want %d", got, base+1)
+	}
+	if !app.dirty {
+		t.Fatal("typing in an Info field must mark the project dirty")
+	}
+
+	// The burst closes when the field loses focus; the next edit is its own step.
+	app.props[0].Focused = false
+	app.endInfoUndo()
+	app.props[0].Text = "400"
+	app.flushStageInputs()
+	if got := len(app.undoStack); got != base+2 {
+		t.Fatalf("undo steps after second burst = %d, want %d", got, base+2)
+	}
+
+	app.undo()
+	if got := app.proj.Stage.Objects[0].X; got != 123 {
+		t.Fatalf("X after one undo = %g, want 123", got)
+	}
+	app.undo()
+	if got := app.proj.Stage.Objects[0].X; got != origX {
+		t.Fatalf("X after two undos = %g, want %g", got, origX)
+	}
+	app.redo()
+	if got := app.proj.Stage.Objects[0].X; got != 123 {
+		t.Fatalf("X after redo = %g, want 123", got)
+	}
+}
+
+func TestStageOpacitySliderDragIsSingleUndoStep(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	orig := app.proj.Stage.Objects[0].Opacity
+	base := len(app.undoStack)
+
+	sl := app.st.opacitySlider
+	sl.Visible = true
+	sl.X, sl.Y, sl.W, sl.H = 0, 0, 100, 20
+	sl.HandleMouse(88, 10, true)  // press the thumb at value 1
+	sl.HandleMouse(60, 10, false) // drag left ...
+	sl.HandleMouse(30, 10, false) // ... and further left
+	sl.HandleRelease()
+	app.endInfoUndo()
+
+	if got := app.proj.Stage.Objects[0].Opacity; got == orig {
+		t.Fatalf("opacity did not change, still %g", got)
+	}
+	if got := len(app.undoStack); got != base+1 {
+		t.Fatalf("undo steps = %d, want %d", got, base+1)
+	}
+
+	app.undo()
+	if got := app.proj.Stage.Objects[0].Opacity; got != orig {
+		t.Fatalf("opacity after undo = %g, want %g", got, orig)
+	}
+	if app.st.opacitySlider.Value != orig {
+		t.Fatalf("slider value after undo = %g, want %g", app.st.opacitySlider.Value, orig)
+	}
+}
+
+func TestStageInfoClickWithoutEditLeavesNoUndoStep(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	base := len(app.undoStack)
+
+	app.props[0].Focused = true
+	app.flushStageInputs()
+	app.props[0].Focused = false
+	app.endInfoUndo()
+
+	if got := len(app.undoStack); got != base {
+		t.Fatalf("undo steps = %d, want %d (a focus without edits must not add one)", got, base)
 	}
 }

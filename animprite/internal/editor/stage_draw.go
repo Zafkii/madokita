@@ -77,6 +77,9 @@ func (a *EditorApp) hideStageObjectInputs() {
 	if a.st.opacityInput != nil {
 		a.st.opacityInput.Visible = false
 	}
+	if a.st.opacitySlider != nil {
+		a.st.opacitySlider.Visible = false
+	}
 	if a.st.zInput != nil {
 		a.st.zInput.Visible = false
 	}
@@ -141,8 +144,30 @@ func (a *EditorApp) drawStageInfo(screen *ebiten.Image, p theme.Palette) {
 	}
 
 	rows := (len(inputs) + cols - 1) / cols
-	hintY := top + 22 + rows*rowH + 4
-	ui.DrawText(screen, "CapsLock + drag moves. Tab + click or box selects. Shift + arrows rotates. Wheel zooms.", x, hintY, 1, p.TextMuted)
+	opacityY := top + 22 + rows*rowH + 2
+	if limit := a.topPanelY() + a.topPanelH - rightPanelInputH - 2; opacityY > limit {
+		opacityY = limit
+	}
+	if a.st.opacitySlider != nil {
+		labelW := 58
+		sliderW := width - labelW
+		if sliderW < 60 {
+			sliderW = 60
+		}
+		a.st.opacitySlider.Visible = true
+		a.st.opacitySlider.X = x + labelW
+		a.st.opacitySlider.Y = opacityY
+		a.st.opacitySlider.W = sliderW
+		a.st.opacitySlider.H = rightPanelInputH
+		a.st.opacitySlider.Value = clamp(obj.Opacity, 0, 1)
+		ui.DrawText(screen, "Opacity", x, opacityY+6, 1, p.LabelColor)
+		a.st.opacitySlider.Draw(screen)
+	}
+	hint := "CapsLock + drag moves. Tab + click or box selects. Shift + arrows rotates. Wheel zooms."
+	hintY := opacityY + rightPanelInputH + 3
+	if hintY+10 <= a.topPanelY()+a.topPanelH {
+		ui.DrawText(screen, hint, x, hintY, 1, p.TextMuted)
+	}
 }
 
 var stageToolTabs = []struct{ Key, Label, Icon string }{

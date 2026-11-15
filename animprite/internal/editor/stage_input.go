@@ -152,6 +152,13 @@ func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 			}
 			a.st.zInput.HandleMouse(mx, my, justL)
 		}
+		if a.st.opacitySlider != nil && a.st.opacitySlider.Visible {
+			sl := a.st.opacitySlider
+			if mx >= sl.X && mx <= sl.X+sl.W && my >= sl.Y && my <= sl.Y+sl.H {
+				hitInput = true
+			}
+			sl.HandleMouse(mx, my, justL)
+		}
 		if focused := a.focusedInput(); focused != nil && focused != focusedBefore {
 			a.markStageObjectLiveEdit()
 		}
