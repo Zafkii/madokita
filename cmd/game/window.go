@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"math"
 	"time"
 
 	"madokita-gems/internal/engine"
 	"madokita-gems/internal/input"
+	"madokita-gems/internal/menu"
 	"madokita-gems/internal/settings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -63,11 +65,18 @@ func (g *GameApp) snapWindowAspect() {
 	}
 }
 
+// finishWindowClose persists the window position and ends the game loop, so an
+// in-game quit behaves exactly like the OS close button: RunGame returns and
+// the deferred runtime/database teardown in main still runs.
+func (g *GameApp) finishWindowClose() error {
+	wx, wy := ebiten.WindowPosition()
+	settings.SetWindowPosition(wx, wy)
+	return ErrWindowClose
+}
+
 func (g *GameApp) Update() error {
 	if ebiten.IsWindowBeingClosed() {
-		wx, wy := ebiten.WindowPosition()
-		settings.SetWindowPosition(wx, wy)
-		return ErrWindowClose
+		return g.finishWindowClose()
 	}
 
 	dt := time.Since(g.lastTick).Seconds()
@@ -81,6 +90,9 @@ func (g *GameApp) Update() error {
 
 	if g.runtime.Phase() == engine.PhaseRunning {
 		if err := g.sceneMgr.Update(dt); err != nil {
+			if errors.Is(err, menu.ErrExit) {
+				return g.finishWindowClose()
+			}
 			return err
 		}
 	}

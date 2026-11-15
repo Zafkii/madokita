@@ -1,6 +1,7 @@
 package menu
 
 import (
+	"errors"
 	"image/color"
 	"madokita-gems/internal/audio"
 	"madokita-gems/internal/input"
@@ -11,6 +12,11 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
+
+// ErrExit is returned by Update when the player picks EXIT in the main menu.
+// The game loop turns it into the same clean shutdown used by the OS close
+// button, so deferred runtime/database teardown still runs.
+var ErrExit = errors.New("exit requested from main menu")
 
 type mainMenuPhase int
 
@@ -41,6 +47,8 @@ type MainMenuScene struct {
 
 	active    bool
 	onNewGame func()
+
+	quitRequested bool
 }
 
 func NewMainMenuScene(mgr *scene.Manager, cache *ui.ImageCache, inputMgr *input.Manager, audioMgr *audio.AudioManager) *MainMenuScene {
@@ -57,6 +65,7 @@ func (s *MainMenuScene) Enter() error {
 	s.phaseTimer = 0
 	s.selectedIdx = 0
 	s.active = true
+	s.quitRequested = false
 
 	s.animTitle, s.gemsTitle = newMenuTitles(s.cache, s.audioMgr)
 
@@ -110,12 +119,16 @@ func (s *MainMenuScene) onOption(idx int) {
 	case 2:
 		s.mgr.SwitchTo("settings")
 	case 3:
+		s.quitRequested = true
 	}
 }
 
 func (s *MainMenuScene) Update(dt float64) error {
 	if !s.active {
 		return nil
+	}
+	if s.quitRequested {
+		return ErrExit
 	}
 	s.phaseTimer += dt
 
@@ -186,6 +199,9 @@ func (s *MainMenuScene) Update(dt float64) error {
 		}
 	}
 
+	if s.quitRequested {
+		return ErrExit
+	}
 	return nil
 }
 
