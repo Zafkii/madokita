@@ -235,7 +235,9 @@ One ordering rule feeds both renderers so the editor previews what the game pain
 
 ## Cycling Overlapped Objects
 
-`stagePickCandidates()` (`animprite/internal/editor/stage.go`) returns every pickable object under the pointer front to back, and `stagePlainPick()` resolves the press: a press inside the current selection keeps it so a freshly placed object still drags, otherwise the top candidate wins. Clicking the **same spot again** (within `stagePickRepeatSlop` screen pixels) steps to the object behind the selected one and wraps around at the back of the stack, so overlapped objects are reachable one click at a time like the Geometry Dash editor. The repeat spot is armed on release of a click on a stack and dropped by a drag, a click elsewhere, or any modifier press, so a lone object keeps plain click-then-drag behavior.
+`stagePickCandidates()` (`animprite/internal/editor/stage.go`) returns every object under the pointer front to back, and the press resolution is two steps. The **first** click on a spot uses `stagePressTarget()`: a press inside the current selection keeps it (so a freshly placed object still drags instead of stealing whatever sits above it), and any other press picks the front-most object under the pointer. Clicking the **same spot again** (within `stagePickRepeatSlop` screen pixels) steps through `stageCycleTarget()` to the object behind the selected one and wraps around at the back of the stack, so several PNGs dropped on one point are reachable one click at a time like the Geometry Dash editor. The repeat spot is armed on the press that hits objects and, while the button is up, dropped as soon as the pointer moves off it (`stageClearPickAnchorIfPointerMoved`), so leaving the spot and coming back starts over at the front object.
+
+Picking is a plain rectangle hit test (`stageObjectContainsWorld`): the object's full box picks, transparent padding included, so a big tree sprite can still be grabbed by its empty area the way it always could.
 
 ## Per-Frame Sprite Composition
 

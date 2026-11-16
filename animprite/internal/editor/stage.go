@@ -76,16 +76,12 @@ type stageState struct {
 	activeLayer    string
 	stageClipboard []project.StageObject
 
-	// pickAnchor* marks the screen spot of the last plain click that landed on
-	// a stack of objects. Repeating a press there steps to the next object
-	// under the pointer so overlapped objects stay reachable. pickPress* is the
-	// press currently being tracked until it ends without dragging.
+	// pickAnchor* marks the screen spot of the last press that landed on a
+	// stack of objects. Pressing there again steps to the next object under the
+	// pointer, so several objects dropped on the same spot stay reachable.
 	pickAnchorValid bool
 	pickAnchorMX    int
 	pickAnchorMY    int
-	pickPressValid  bool
-	pickPressMX     int
-	pickPressMY     int
 
 	dragAsset         int
 	draggingFromPanel bool
@@ -1479,30 +1475,65 @@ func stageObjectContainsWorld(obj project.StageObject, wx, wy float64) bool {
 	return math.Abs(lx) <= obj.Width/2 && math.Abs(ly) <= obj.Height/2
 }
 
-// stagePlainPick resolves the object a plain press should target. A press
+// stagePressTarget resolves the object a plain press should target. A press
 // inside the current selection keeps it, so a freshly placed object that sits
 // under a higher-priority category still drags instead of stealing a different
 // object. Backgrounds stay hit-tested because they cover the whole stage.
-// When repeated over the same spot, the press steps to the object behind the
-// selected one (wrapping around at the back of the stack) so overlapping
-// objects can be reached one click at a time, the way the Geometry Dash editor
-// cycles through them.
-func (a *EditorApp) stagePlainPick(candidates []int, wx, wy float64, repeated bool) int {
-	if len(candidates) == 0 {
-		return -1
-	}
-	if repeated {
-		for k, idx := range candidates {
-			if idx == a.st.selectedObj {
-				return candidates[(k+1)%len(candidates)]
-			}
-		}
-		return candidates[0]
-	}
+func (a *EditorApp) stagePressTarget(wx, wy float64) int {
 	if obj := a.selectedStageObject(); obj != nil &&
 		obj.Category != project.StageCategoryBG &&
 		stageObjectContainsWorld(*obj, wx, wy) {
 		return a.st.selectedObj
+	}
+	return a.stageObjectAtWorld(wx, wy)
+}
+
+// stagePickForPress resolves the object a plain press selects and tracks the
+// repeat spot. The first press on a spot resolves it the usual way; pressing
+// the same spot again steps to the next object under the pointer, so several
+// objects dropped on one spot are reachable with repeated clicks.
+func (a *EditorApp) stagePickForPress(wx, wy float64, mx, my int) int {
+	candidates := a.stagePickCandidates(wx, wy)
+	repeated := a.st.pickAnchorValid &&
+		absInt(mx-a.st.pickAnchorMX) <= stagePickRepeatSlop &&
+		absInt(my-a.st.pickAnchorMY) <= stagePickRepeatSlop
+	idx := -1
+	if repeated {
+		idx = a.stageCycleTarget(candidates)
+	} else {
+		idx = a.stagePressTarget(wx, wy)
+	}
+	// Only a press that hit objects remembers the spot, so a click on empty
+	// canvas starts over next time.
+	a.st.pickAnchorValid = len(candidates) > 0
+	a.st.pickAnchorMX, a.st.pickAnchorMY = mx, my
+	return idx
+}
+
+// stageClearPickAnchorIfPointerMoved drops the repeat spot once the pointer
+// leaves it, so the next click on that spot picks the frontmost object again.
+func (a *EditorApp) stageClearPickAnchorIfPointerMoved(mx, my int) {
+	if !a.st.pickAnchorValid {
+		return
+	}
+	if absInt(mx-a.st.pickAnchorMX) > stagePickRepeatSlop ||
+		absInt(my-a.st.pickAnchorMY) > stagePickRepeatSlop {
+		a.st.pickAnchorValid = false
+	}
+}
+
+// stageCycleTarget resolves the object a repeated press selects: the one right
+// behind the current selection, wrapping around at the back of the stack, so
+// several objects dropped on the same spot are reachable one click at a time
+// the way the Geometry Dash editor cycles through them.
+func (a *EditorApp) stageCycleTarget(candidates []int) int {
+	if len(candidates) == 0 {
+		return -1
+	}
+	for k, idx := range candidates {
+		if idx == a.st.selectedObj {
+			return candidates[(k+1)%len(candidates)]
+		}
 	}
 	return candidates[0]
 }

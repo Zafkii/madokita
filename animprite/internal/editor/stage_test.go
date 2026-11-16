@@ -1069,9 +1069,10 @@ func TestStageZOrdersPickingWithinLayer(t *testing.T) {
 // stageTestPress mimics one plain press at a world point: it resolves the
 // candidates under the pointer and asks the picker for the target, exactly the
 // way handleStageCanvasMouse does with repeated=false/true.
-func stageTestPress(app *EditorApp, wx, wy float64, repeated bool) int {
-	candidates := app.stagePickCandidates(wx, wy)
-	return app.stagePlainPick(candidates, wx, wy, repeated)
+// stageTestPress mimics one plain press at a world point with the pointer at
+// screen (mx,my), exactly like handleStageCanvasMouse does.
+func stageTestPress(app *EditorApp, wx, wy float64, mx, my int) int {
+	return app.stagePickForPress(wx, wy, mx, my)
 }
 
 func TestStageRepeatedClickCyclesOverlappingObjects(t *testing.T) {
@@ -1084,11 +1085,16 @@ func TestStageRepeatedClickCyclesOverlappingObjects(t *testing.T) {
 		app.proj.Stage.Objects[i].Height = 100
 	}
 	top := app.stageObjectAtWorld(60, 40)
+	// The first press on the spot selects the frontmost object and remembers it.
+	if got := stageTestPress(app, 60, 40, 600, 300); got != top {
+		t.Fatalf("first press = %d, want the frontmost object %d", got, top)
+	}
 	app.selectStageObject(top)
 
+	// Every later press lands on the very same spot without moving the pointer.
 	seen := []int{top}
 	for i := 0; i < 2; i++ {
-		app.selectStageObject(stageTestPress(app, 60, 40, true))
+		app.selectStageObject(stageTestPress(app, 60, 40, 600, 300))
 		seen = append(seen, app.st.selectedObj)
 	}
 	for i, idx := range seen {
@@ -1100,9 +1106,28 @@ func TestStageRepeatedClickCyclesOverlappingObjects(t *testing.T) {
 	}
 
 	// The stack wraps around: after the last object the top one comes back.
-	app.selectStageObject(stageTestPress(app, 60, 40, true))
+	app.selectStageObject(stageTestPress(app, 60, 40, 600, 300))
 	if app.st.selectedObj != top {
 		t.Fatalf("cycled back to %d, want the top object %d", app.st.selectedObj, top)
+	}
+}
+
+func TestStagePointerLeavingTheSpotStopsCycling(t *testing.T) {
+	app := newStageObjectApp(3)
+	for i := range app.proj.Stage.Objects {
+		app.proj.Stage.Objects[i].X = 60
+		app.proj.Stage.Objects[i].Y = 40
+		app.proj.Stage.Objects[i].Width = 100
+		app.proj.Stage.Objects[i].Height = 100
+	}
+	top := app.stageObjectAtWorld(60, 40)
+	app.selectStageObject(stageTestPress(app, 60, 40, 600, 300))
+
+	// Moving the pointer away and coming back starts over at the front object
+	// instead of continuing the cycle from wherever it stopped.
+	app.stageClearPickAnchorIfPointerMoved(700, 300)
+	if got := stageTestPress(app, 60, 40, 700, 300); got != top {
+		t.Fatalf("press after moving away = %d, want the frontmost object %d", got, top)
 	}
 }
 
@@ -1110,17 +1135,17 @@ func TestStageClickOnSingleObjectKeepsSelection(t *testing.T) {
 	app := newStageObjectApp(2)
 	app.selectStageObject(1)
 
-	if got := stageTestPress(app, 110, 20, false); got != 1 {
+	if got := stageTestPress(app, 110, 20, 600, 300); got != 1 {
 		t.Fatalf("plain press = %d, want the selected object 1", got)
 	}
 	// A repeated press over a lone object must not steal it: it stays the drag
 	// target, because there is nothing behind it to reach.
-	if got := stageTestPress(app, 110, 20, true); got != 1 {
+	if got := stageTestPress(app, 110, 20, 600, 300); got != 1 {
 		t.Fatalf("repeated press = %d, want the selected object 1", got)
 	}
 }
 
-func TestStageClickOutsideSelectionPicksTopObject(t *testing.T) {
+func TestStageClickOnStackKeepsSelectionUntilRepeated(t *testing.T) {
 	app := newStageObjectApp(2)
 	for i := range app.proj.Stage.Objects {
 		app.proj.Stage.Objects[i].X = 60
@@ -1128,15 +1153,17 @@ func TestStageClickOutsideSelectionPicksTopObject(t *testing.T) {
 		app.proj.Stage.Objects[i].Width = 100
 		app.proj.Stage.Objects[i].Height = 100
 	}
+	// A press inside the current selection keeps it, the original behavior.
 	app.selectStageObject(0)
-
-	if got := stageTestPress(app, 60, 40, false); got != 0 {
+	if got := stageTestPress(app, 60, 40, 600, 300); got != 0 {
 		t.Fatalf("press = %d, want the selected object 0", got)
 	}
 
-	// Pressing away from the stack resolves the top object again.
+	// Pressing away from the selection resolves the frontmost object again,
+	// because moving the pointer drops the repeat spot.
+	app.stageClearPickAnchorIfPointerMoved(700, 300)
 	app.proj.Stage.Objects[1].X = 300
-	if got := stageTestPress(app, 300, 40, false); got != 1 {
+	if got := stageTestPress(app, 300, 40, 700, 300); got != 1 {
 		t.Fatalf("press outside the selection = %d, want the object under the pointer 1", got)
 	}
 }
@@ -1750,8 +1777,12 @@ func TestStagePressKeepsSelectionOverHigherPriorityOverlap(t *testing.T) {
 	if got := app.stageObjectAtWorld(50, 50); got != 0 {
 		t.Fatalf("hit test = %d, want block 0", got)
 	}
-	if got := stageTestPress(app, 50, 50, false); got != 1 {
+	if got := stageTestPress(app, 50, 50, 600, 300); got != 1 {
 		t.Fatalf("press target = %d, want selected prop 1", got)
+	}
+	// Repeating the press on that spot reaches the block behind the prop.
+	if got := stageTestPress(app, 50, 50, 600, 300); got != 0 {
+		t.Fatalf("repeated press = %d, want the block behind the prop 0", got)
 	}
 }
 
@@ -1763,7 +1794,7 @@ func TestStagePressUsesHitTestOutsideSelection(t *testing.T) {
 	}
 	app.selectStageObject(1)
 
-	if got := stageTestPress(app, 50, 50, false); got != 0 {
+	if got := stageTestPress(app, 50, 50, 600, 300); got != 0 {
 		t.Fatalf("press target = %d, want block 0", got)
 	}
 }
@@ -1776,7 +1807,7 @@ func TestStagePressDoesNotPreferSelectedBackground(t *testing.T) {
 	}
 	app.selectStageObject(0)
 
-	if got := stageTestPress(app, 50, 50, false); got != 1 {
+	if got := stageTestPress(app, 50, 50, 600, 300); got != 1 {
 		t.Fatalf("press target = %d, want block 1", got)
 	}
 }
