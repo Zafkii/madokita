@@ -643,6 +643,10 @@ func (a *EditorApp) drawStageRightPanel(screen *ebiten.Image, p theme.Palette, p
 	ui.DrawText(screen, "Snap 50px", px+chkSize+6, iy+2, 1, p.TextPrimary)
 	iy += rightPanelInputH + 4
 
+	iy += 4
+	iy = a.drawStageLayers(screen, p, px, iy)
+	iy += 4
+
 	iy = a.drawSectionHeader(screen, p, px, iy, "Assets")
 
 	categories := []string{
@@ -732,7 +736,6 @@ func (a *EditorApp) drawStageRightPanel(screen *ebiten.Image, p theme.Palette, p
 	}
 
 	iy += 4
-	iy = a.drawStageLayers(screen, p, px, iy)
 	return iy
 }
 
