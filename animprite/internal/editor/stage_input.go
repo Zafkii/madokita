@@ -181,6 +181,7 @@ func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 				a.syncLayout()
 			}
 			a.st.toolTab = r.Key
+			a.st.toolInfoPinned = r.Key == "info"
 			a.st.toolInfoAuto = false
 			a.st.toolInfoHold = 0
 			return

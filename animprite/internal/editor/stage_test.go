@@ -600,6 +600,76 @@ func TestStageToolbarSelectsTabsAndToggles(t *testing.T) {
 	}
 }
 
+func TestStageInfoTabStaysPinnedThroughEdits(t *testing.T) {
+	app := newStageObjectApp(2)
+	app.st.toolTabRects = []stageToolRect{
+		{Key: "edit", X: 0, Y: 0, W: 40, H: 20},
+		{Key: "info", X: 44, Y: 0, W: 40, H: 20},
+	}
+
+	// The user picks Info by hand.
+	app.handleStageToolbarMouse(50, 5, true)
+	if app.st.toolTab != "info" || !app.st.toolInfoPinned {
+		t.Fatalf("tab = %q pinned = %v, want info pinned", app.st.toolTab, app.st.toolInfoPinned)
+	}
+
+	// Selecting an object and editing a property must not leave Info.
+	app.selectStageObject(0)
+	if app.st.toolTab != "info" {
+		t.Fatalf("tab after selection = %q, want info", app.st.toolTab)
+	}
+	app.onStageOpacitySlider(0.5)
+	if app.st.toolTab != "info" {
+		t.Fatalf("tab after an opacity edit = %q, want info", app.st.toolTab)
+	}
+	for i := 0; i < stageInfoHoldFrames+5; i++ {
+		app.tickStageInfoAuto()
+	}
+	if app.st.toolTab != "info" {
+		t.Fatalf("tab after idle frames = %q, want info", app.st.toolTab)
+	}
+	if got := app.proj.Stage.Objects[0].Opacity; got != 0.5 {
+		t.Fatalf("opacity = %v, want 0.5", got)
+	}
+}
+
+func TestStageInfoTabUnpinsWhenAnotherTabIsPicked(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.st.toolTab = "info"
+	app.st.toolInfoPinned = true
+	app.st.toolTabRects = []stageToolRect{
+		{Key: "edit", X: 0, Y: 0, W: 40, H: 20},
+		{Key: "info", X: 44, Y: 0, W: 40, H: 20},
+	}
+
+	app.handleStageToolbarMouse(5, 5, true)
+	if app.st.toolTab != "edit" || app.st.toolInfoPinned {
+		t.Fatalf("tab = %q pinned = %v, want edit unpinned", app.st.toolTab, app.st.toolInfoPinned)
+	}
+
+	// Back to the normal behavior: selecting an object keeps the write actions.
+	app.selectStageObject(0)
+	if app.st.toolTab != "edit" {
+		t.Fatalf("tab after selection = %q, want edit", app.st.toolTab)
+	}
+}
+
+func TestStageAutoInfoStillReturnsToEdit(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	app.markStageObjectLiveEdit()
+	if app.st.toolTab != "info" || !app.st.toolInfoAuto {
+		t.Fatalf("tab = %q auto = %v, want an automatic info", app.st.toolTab, app.st.toolInfoAuto)
+	}
+
+	for i := 0; i < stageInfoHoldFrames+2; i++ {
+		app.tickStageInfoAuto()
+	}
+	if app.st.toolTab != "edit" || app.st.toolInfoAuto {
+		t.Fatalf("tab = %q auto = %v, want the write actions back", app.st.toolTab, app.st.toolInfoAuto)
+	}
+}
+
 func newStageObjectApp(count int) *EditorApp {
 	app := NewEditorApp()
 	app.mode = modeStage

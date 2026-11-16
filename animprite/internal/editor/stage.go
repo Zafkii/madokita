@@ -57,7 +57,10 @@ type stageState struct {
 	categoryRects []stageCategoryRect
 	layerRects    []stageLayerRect
 
-	toolTab         string
+	toolTab string
+	// toolInfoPinned keeps the Info tab open once the user picks it, so manual
+	// property edits never bounce back to Edit. Picking another tab clears it.
+	toolInfoPinned  bool
 	toolInfoAuto    bool
 	toolInfoHold    int
 	toolToggles     map[string]bool
@@ -772,13 +775,19 @@ func (a *EditorApp) markStageObjectLiveEdit() {
 	if a.selectedStageObject() == nil {
 		return
 	}
+	// The user asked to stay in Info, so a live edit must not arm the automatic
+	// return to Edit.
+	if a.st.toolInfoPinned {
+		a.st.toolTab = "info"
+		return
+	}
 	a.st.toolTab = "info"
 	a.st.toolInfoAuto = true
 	a.st.toolInfoHold = stageInfoHoldFrames
 }
 
 func (a *EditorApp) tickStageInfoAuto() {
-	if !a.isStageMode() || !a.st.toolInfoAuto {
+	if !a.isStageMode() || !a.st.toolInfoAuto || a.st.toolInfoPinned {
 		return
 	}
 	if a.focusedInput() != nil {
@@ -833,11 +842,15 @@ func (a *EditorApp) followStageObjectLayer(idx int) {
 func (a *EditorApp) syncStageSelectionUI() {
 	a.syncStageSizeInputs()
 	a.panelMode = panelModeStage
-	if a.st.selectedObj >= 0 || a.st.toolTab == "info" {
-		a.st.toolTab = "edit"
+	// A pinned Info tab survives selection changes and property edits; the
+	// automatic one still hands the toolbar back to Edit.
+	if !a.st.toolInfoPinned {
+		if a.st.selectedObj >= 0 || a.st.toolTab == "info" {
+			a.st.toolTab = "edit"
+		}
+		a.st.toolInfoAuto = false
+		a.st.toolInfoHold = 0
 	}
-	a.st.toolInfoAuto = false
-	a.st.toolInfoHold = 0
 
 	obj := a.selectedStageObject()
 	if obj == nil {

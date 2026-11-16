@@ -227,6 +227,10 @@ The player is locked by phases, derived from `AttackAnimator.Phase()` in `Player
 
 An active layer restricts hit-testing, selection, marquee, select-all, drag, delete, duplicate, and collision edits to that layer. The General view edits every layer. Cut/Paste moves selected objects into the active layer, or into the top layer while in General view; the clipboard is cleared when a stage is loaded.
 
+## Stage Info Tab
+
+The stage toolbar has Build/Edit/Info tabs. A canvas edit (drag, scale, rotate) and a focused property field open Info automatically and hand the toolbar back to Edit once the edit has been idle for a moment. Picking the **Info** tab by hand pins it: selection changes, property edits and the idle timer leave the tab alone, because a manual visit means the user wants to keep tuning values. The pin clears as soon as another tab is picked, and automatic opens never set it.
+
 ## Stage Depth (Z)
 
 Each stage object carries a `Z` depth edited in the Info tab next to Rotation and Opacity. Layers still draw in slice order, so Z only orders objects **inside their own layer**: a larger Z draws closer to the camera, and at equal Z the category order is kept (backgrounds, static and animated props, static and animated blocks). Default Z is 0, so existing stages render exactly as before.
