@@ -24,6 +24,9 @@ func (a *EditorApp) clearStageInputFocus() {
 	if a.st.opacityInput != nil {
 		a.st.opacityInput.Focused = false
 	}
+	if a.st.scaleInput != nil {
+		a.st.scaleInput.Focused = false
+	}
 	for _, inp := range a.stageCollisionInputList() {
 		if inp != nil {
 			inp.Focused = false
@@ -120,7 +123,7 @@ func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 		}
 	}
 	if a.st.toolTab == "edit" {
-		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.mirrorBtn, a.st.cutBtn, a.st.pasteBtn, a.st.collisionEditBtn, a.st.collisionToggleBtn} {
+		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.mirrorBtn, a.st.cutBtn, a.st.pasteBtn, a.st.collisionEditBtn, a.st.collisionToggleBtn, a.st.opacityBtn, a.st.scaleBtn} {
 			if btn == nil || !btn.Visible {
 				continue
 			}
@@ -129,6 +132,38 @@ func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 			if hit {
 				return
 			}
+		}
+	}
+	if a.st.toolTab == "edit" && a.st.editPanel != "" && a.selectedStageObject() != nil {
+		hit := false
+		handle := func(inp *ui.TextInput) {
+			if inp == nil {
+				return
+			}
+			if stageInfoInputHit(inp, mx, my) {
+				hit = true
+			}
+			inp.HandleMouse(mx, my, justL)
+		}
+		handleSlider := func(sl *ui.Slider) {
+			if sl == nil || !sl.Visible {
+				return
+			}
+			if mx >= sl.X && mx <= sl.X+sl.W && my >= sl.Y && my <= sl.Y+sl.H {
+				hit = true
+			}
+			sl.HandleMouse(mx, my, justL)
+		}
+		switch a.st.editPanel {
+		case "opacity":
+			handle(a.st.opacityInput)
+			handleSlider(a.st.opacitySlider)
+		case "scale":
+			handle(a.st.scaleInput)
+			handleSlider(a.st.scaleSlider)
+		}
+		if justL && hit {
+			return
 		}
 	}
 	if a.st.toolTab == "info" && a.selectedStageObject() != nil {
@@ -151,13 +186,6 @@ func (a *EditorApp) handleStageToolbarMouse(mx, my int, justL bool) {
 				hitInput = true
 			}
 			a.st.zInput.HandleMouse(mx, my, justL)
-		}
-		if a.st.opacitySlider != nil && a.st.opacitySlider.Visible {
-			sl := a.st.opacitySlider
-			if mx >= sl.X && mx <= sl.X+sl.W && my >= sl.Y && my <= sl.Y+sl.H {
-				hitInput = true
-			}
-			sl.HandleMouse(mx, my, justL)
 		}
 		if focused := a.focusedInput(); focused != nil && focused != focusedBefore {
 			a.markStageObjectLiveEdit()

@@ -491,6 +491,26 @@ func (a *EditorApp) initStageWidgets() {
 	}
 	a.st.opacitySlider = opacitySlider
 
+	scaleInput := ui.NewTextInput(px, 0, iw, rightPanelInputH, th)
+	scaleInput.SetLabel("Scale %")
+	scaleInput.Numeric = true
+	scaleInput.Min = stageScalePctMin
+	scaleInput.Max = stageScalePctMax
+	scaleInput.HasMax = true
+	scaleInput.Step = 5
+	scaleInput.SetNumeric(100)
+	a.st.scaleInput = scaleInput
+
+	scaleSlider := ui.NewSlider(px, 0, iw, rightPanelInputH, th)
+	scaleSlider.Min = stageScalePctMin
+	scaleSlider.Max = stageScalePctMax
+	scaleSlider.Step = 5
+	scaleSlider.Value = 100
+	scaleSlider.OnChange = func(v float64) {
+		a.onStageScaleSlider(v)
+	}
+	a.st.scaleSlider = scaleSlider
+
 	zInput := ui.NewTextInput(px, 0, iw, rightPanelInputH, th)
 	zInput.SetLabel("Z (depth)")
 	zInput.Numeric = true
@@ -498,6 +518,15 @@ func (a *EditorApp) initStageWidgets() {
 	zInput.Step = 1
 	zInput.SetNumeric(0)
 	a.st.zInput = zInput
+
+	a.st.opacityBtn = ui.NewButton(0, 0, 1, 22, "Opacity", th)
+	a.st.opacityBtn.OnClick = func() {
+		a.toggleStageEditPanel("opacity")
+	}
+	a.st.scaleBtn = ui.NewButton(0, 0, 1, 22, "Scale", th)
+	a.st.scaleBtn.OnClick = func() {
+		a.toggleStageEditPanel("scale")
+	}
 
 	a.st.deleteBtn = ui.NewButton(0, 0, 1, 22, "Delete", th)
 	a.st.deleteBtn.BtnType = ui.BtnRed

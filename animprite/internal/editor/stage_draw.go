@@ -83,6 +83,15 @@ func (a *EditorApp) hideStageObjectInputs() {
 	if a.st.zInput != nil {
 		a.st.zInput.Visible = false
 	}
+	if a.st.opacitySlider != nil {
+		a.st.opacitySlider.Visible = false
+	}
+	if a.st.scaleSlider != nil {
+		a.st.scaleSlider.Visible = false
+	}
+	if a.st.scaleInput != nil {
+		a.st.scaleInput.Visible = false
+	}
 }
 
 func (a *EditorApp) drawStageInfoInput(screen *ebiten.Image, inp *ui.TextInput, x, y, w int) {
@@ -94,6 +103,19 @@ func (a *EditorApp) drawStageInfoInput(screen *ebiten.Image, inp *ui.TextInput, 
 }
 
 func (a *EditorApp) drawStageInfo(screen *ebiten.Image, p theme.Palette) {
+	// The Edit transform widgets never show here: only their values do.
+	if a.st.opacityInput != nil {
+		a.st.opacityInput.SetLabel("Opacity")
+	}
+	if a.st.opacitySlider != nil {
+		a.st.opacitySlider.Visible = false
+	}
+	if a.st.scaleSlider != nil {
+		a.st.scaleSlider.Visible = false
+	}
+	if a.st.scaleInput != nil {
+		a.st.scaleInput.Visible = false
+	}
 	top := a.topPanelY() + topPanelPad
 	x := a.stageToolContentX()
 	width := a.win.outsideWidth - panelPad - x
@@ -144,27 +166,9 @@ func (a *EditorApp) drawStageInfo(screen *ebiten.Image, p theme.Palette) {
 	}
 
 	rows := (len(inputs) + cols - 1) / cols
-	opacityY := top + 22 + rows*rowH + 2
-	if limit := a.topPanelY() + a.topPanelH - rightPanelInputH - 2; opacityY > limit {
-		opacityY = limit
-	}
-	if a.st.opacitySlider != nil {
-		labelW := 58
-		sliderW := width - labelW
-		if sliderW < 60 {
-			sliderW = 60
-		}
-		a.st.opacitySlider.Visible = true
-		a.st.opacitySlider.X = x + labelW
-		a.st.opacitySlider.Y = opacityY
-		a.st.opacitySlider.W = sliderW
-		a.st.opacitySlider.H = rightPanelInputH
-		a.st.opacitySlider.Value = clamp(obj.Opacity, 0, 1)
-		ui.DrawText(screen, "Opacity", x, opacityY+6, 1, p.LabelColor)
-		a.st.opacitySlider.Draw(screen)
-	}
+	// Opacity is edited from the Edit tab; here only its value lives.
 	hint := "CapsLock + drag moves. Tab + click or box selects. Shift + arrows rotates. Wheel zooms."
-	hintY := opacityY + rightPanelInputH + 3
+	hintY := top + 22 + rows*rowH + 3
 	if hintY+10 <= a.topPanelY()+a.topPanelH {
 		ui.DrawText(screen, hint, x, hintY, 1, p.TextMuted)
 	}
@@ -239,6 +243,10 @@ const (
 	// stageInfoHoldFrames keeps the auto-selected Info tab visible for a short
 	// moment after the last live edit before returning to Edit.
 	stageInfoHoldFrames = 45
+
+	// stageScalePctMin/Max bound the proportional Scale slider in the Edit tab.
+	stageScalePctMin = 25.0
+	stageScalePctMax = 400.0
 )
 
 // stageBuildColumns returns how many build toggles fit in width. The grid
@@ -308,7 +316,7 @@ func (a *EditorApp) drawStageEditActions(screen *ebiten.Image, p theme.Palette, 
 		}
 	}
 	hideActions := func() {
-		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.mirrorBtn, a.st.cutBtn, a.st.pasteBtn} {
+		for _, btn := range []*ui.Button{a.st.deleteBtn, a.st.duplicateBtn, a.st.mirrorBtn, a.st.cutBtn, a.st.pasteBtn, a.st.opacityBtn, a.st.scaleBtn} {
 			if btn != nil {
 				btn.Visible = false
 			}
@@ -326,7 +334,18 @@ func (a *EditorApp) drawStageEditActions(screen *ebiten.Image, p theme.Palette, 
 				a.st.mirrorBtn.BtnType = ui.BtnBlue
 			}
 		}
-		buttons = append(buttons, a.st.deleteBtn, a.st.duplicateBtn, a.st.mirrorBtn, a.st.cutBtn)
+		for _, btn := range []*ui.Button{a.st.opacityBtn, a.st.scaleBtn} {
+			if btn == nil {
+				continue
+			}
+			btn.BtnType = ui.BtnDefault
+			if (btn == a.st.opacityBtn && a.st.editPanel == "opacity") ||
+				(btn == a.st.scaleBtn && a.st.editPanel == "scale") {
+				btn.BtnType = ui.BtnBlue
+			}
+		}
+		buttons = append(buttons, a.st.deleteBtn, a.st.duplicateBtn, a.st.mirrorBtn, a.st.cutBtn,
+			a.st.opacityBtn, a.st.scaleBtn)
 		if project.StageCategoryHasCollision(obj.Category) {
 			if a.st.collisionToggleBtn != nil {
 				a.st.collisionToggleBtn.Text = "Collision: On"
@@ -372,6 +391,58 @@ func (a *EditorApp) drawStageEditActions(screen *ebiten.Image, p theme.Palette, 
 		btn.Draw(screen)
 		cx += btn.W + 4
 	}
+
+	if obj != nil {
+		a.drawStageEditPanel(screen, p, x, cy+26, maxRight-x, obj)
+	}
+}
+
+// drawStageEditPanel draws the slider and value field of the open Edit
+// transform panel under its buttons.
+func (a *EditorApp) drawStageEditPanel(screen *ebiten.Image, p theme.Palette, x, y, width int, obj *project.StageObject) {
+	switch a.st.editPanel {
+	case "opacity":
+		a.drawStageEditTransform(screen, p, x, y, width, "Opacity", a.st.opacitySlider, a.st.opacityInput, clamp(obj.Opacity, 0, 1))
+	case "scale":
+		value := 100.0
+		if a.st.scaleSlider != nil {
+			value = a.st.scaleSlider.Value
+		}
+		a.drawStageEditTransform(screen, p, x, y, width, "Scale %", a.st.scaleSlider, a.st.scaleInput, value)
+	}
+}
+
+func (a *EditorApp) drawStageEditTransform(screen *ebiten.Image, p theme.Palette, x, y, width int, label string, sl *ui.Slider, inp *ui.TextInput, value float64) {
+	if sl == nil || inp == nil || width <= 0 {
+		return
+	}
+	const (
+		labelW = 58
+		inputW = 56
+		gap    = 6
+	)
+	sliderW := width - labelW - inputW - 2*gap
+	if sliderW < 60 {
+		sliderW = width - labelW
+	}
+	ui.DrawText(screen, label, x, y+6, 1, p.LabelColor)
+	sl.Visible = true
+	sl.X = x + labelW
+	sl.Y = y
+	sl.W = sliderW
+	sl.H = rightPanelInputH
+	sl.Value = value
+	sl.Draw(screen)
+
+	// The panel label already names the value, so the field shows only the
+	// number; the Info grid restores its own label when it draws the same input.
+	inp.SetLabel("")
+	inp.Visible = true
+	inp.X = sl.X + sliderW + gap
+	inp.Y = y
+	inp.W = inputW
+	inp.H = rightPanelInputH
+	inp.Draw(screen)
 }
 
 func (a *EditorApp) drawStageBuildToggles(screen *ebiten.Image, p theme.Palette, mx, my, x, top, width int) {

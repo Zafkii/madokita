@@ -231,6 +231,15 @@ An active layer restricts hit-testing, selection, marquee, select-all, drag, del
 
 The stage toolbar has Build/Edit/Info tabs. A canvas edit (drag, scale, rotate) and a focused property field open Info automatically and hand the toolbar back to Edit once the edit has been idle for a moment. Picking the **Info** tab by hand pins it: selection changes, property edits and the idle timer leave the tab alone, because a manual visit means the user wants to keep tuning values. The pin clears as soon as another tab is picked, and automatic opens never set it.
 
+## Stage Edit Panels (Opacity / Scale)
+
+The Edit tab's action row carries **Opacity** and **Scale** buttons beside the create-object buttons. Each one toggles its own panel under the button row; pressing the same button again closes it, and opening one closes the other.
+
+- **Opacity** panel shows a slider plus a value field. The field also stays in the Info tab, but the Info tab no longer paints the slider: dragging opacity belongs to Edit, while reading or typing an exact value stays in Info.
+- **Scale** panel resizes the selection as a percentage of the size it had when the drag started: `applyStageScale` captures a `scaleBase` snapshot of the selected objects on the first step and every later slider move multiplies that snapshot, so dragging back and forth never compounds. `resetStageScaleBurst` drops the snapshot (and rewinds the slider/field to 100) whenever the selection changes, the panel toggles, or the drag goes idle. Width and height never drop below 1px, and one undo entry covers the whole drag.
+
+Because the panels own their widgets, the shared hide pass (`hideStageObjectInputs`) hides the opacity slider, the scale slider and the scale field on every other path, so no stale control can be clicked outside its panel.
+
 ## Stage Depth (Z)
 
 Each stage object carries a `Z` depth edited in the Info tab next to Rotation and Opacity. Layers still draw in slice order, so Z only orders objects **inside their own layer**: a larger Z draws closer to the camera, and at equal Z the category order is kept (backgrounds, static and animated props, static and animated blocks). Default Z is 0, so existing stages render exactly as before.

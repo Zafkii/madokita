@@ -2512,3 +2512,91 @@ func TestStageInfoClickWithoutEditLeavesNoUndoStep(t *testing.T) {
 		t.Fatalf("undo steps = %d, want %d (a focus without edits must not add one)", got, base)
 	}
 }
+
+func TestStageScaleSliderScalesFromBurstBase(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+
+	app.onStageScaleSlider(200)
+	if got := app.proj.Stage.Objects[0]; got.Width != 100 || got.Height != 80 {
+		t.Fatalf("size after 200%% = %.2fx%.2f, want 100.00x80.00", got.Width, got.Height)
+	}
+
+	// A second step inside the same drag scales from the original size, so
+	// dragging does not compound the previous percentage.
+	app.onStageScaleSlider(300)
+	if got := app.proj.Stage.Objects[0]; got.Width != 150 || got.Height != 120 {
+		t.Fatalf("size after 300%% = %.2fx%.2f, want 150.00x120.00", got.Width, got.Height)
+	}
+
+	app.onStageScaleSlider(100)
+	if got := app.proj.Stage.Objects[0]; got.Width != 50 || got.Height != 40 {
+		t.Fatalf("size back at 100%% = %.2fx%.2f, want 50.00x40.00", got.Width, got.Height)
+	}
+}
+
+func TestStageScaleSliderResetsWhenSelectionChanges(t *testing.T) {
+	app := newStageObjectApp(2)
+	app.selectStageObject(0)
+	app.onStageScaleSlider(200)
+
+	app.selectStageObject(1)
+	if app.st.scaleSlider.Value != 100 {
+		t.Fatalf("slider after a selection change = %.2f, want 100", app.st.scaleSlider.Value)
+	}
+	app.onStageScaleSlider(200)
+	if got := app.proj.Stage.Objects[1]; got.Width != 100 || got.Height != 80 {
+		t.Fatalf("second object after 200%% = %.2fx%.2f, want 100.00x80.00", got.Width, got.Height)
+	}
+	if got := app.proj.Stage.Objects[0]; got.Width != 100 || got.Height != 80 {
+		t.Fatalf("first object changed after reselecting = %.2fx%.2f, want 100.00x80.00", got.Width, got.Height)
+	}
+}
+
+func TestStageScaleNeverCollapsesBelowOnePixel(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.proj.Stage.Objects[0].Width = 2
+	app.proj.Stage.Objects[0].Height = 2
+	app.selectStageObject(0)
+
+	app.onStageScaleSlider(stageScalePctMin)
+	got := app.proj.Stage.Objects[0]
+	if got.Width < 1 || got.Height < 1 {
+		t.Fatalf("size at the minimum percentage = %.2fx%.2f, want at least 1x1", got.Width, got.Height)
+	}
+}
+
+func TestStageEditPanelTogglesOpenAndClosed(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+
+	app.toggleStageEditPanel("opacity")
+	if app.st.editPanel != "opacity" {
+		t.Fatalf("editPanel = %q, want opacity", app.st.editPanel)
+	}
+	app.toggleStageEditPanel("opacity")
+	if app.st.editPanel != "" {
+		t.Fatalf("editPanel after toggling the same button = %q, want empty", app.st.editPanel)
+	}
+	app.toggleStageEditPanel("scale")
+	if app.st.editPanel != "scale" {
+		t.Fatalf("editPanel = %q, want scale", app.st.editPanel)
+	}
+}
+
+func TestStageEditPanelSwitchDropsTheScaleBase(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	app.onStageScaleSlider(200)
+	if app.st.scaleBase == nil {
+		t.Fatal("scale base missing after a slider step")
+	}
+
+	app.toggleStageEditPanel("opacity")
+	if app.st.scaleBase != nil {
+		t.Fatal("scale base kept after switching panels")
+	}
+	if app.st.scaleSlider.Value != 100 {
+		t.Fatalf("slider = %.2f after switching panels, want 100", app.st.scaleSlider.Value)
+	}
+}

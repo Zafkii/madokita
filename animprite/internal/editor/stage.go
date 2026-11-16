@@ -113,16 +113,26 @@ type stageState struct {
 	stageHeightInput *ui.TextInput
 	opacityInput     *ui.TextInput
 	opacitySlider    *ui.Slider
-	zInput           *ui.TextInput
-	deleteBtn        *ui.Button
-	duplicateBtn     *ui.Button
-	mirrorBtn        *ui.Button
-	cutBtn           *ui.Button
-	pasteBtn         *ui.Button
-	layerAddBtn      *ui.Button
-	layerDeleteBtn   *ui.Button
-	layerUpBtn       *ui.Button
-	layerDownBtn     *ui.Button
+	// editPanel is the transform panel the Edit tab shows under its actions:
+	// "" (closed), "opacity" or "scale".
+	editPanel   string
+	opacityBtn  *ui.Button
+	scaleBtn    *ui.Button
+	scaleSlider *ui.Slider
+	scaleInput  *ui.TextInput
+	// scaleBase keeps each selected object's size at the start of the current
+	// Scale drag, so the slider scales from that size instead of compounding.
+	scaleBase      map[int][2]float64
+	zInput         *ui.TextInput
+	deleteBtn      *ui.Button
+	duplicateBtn   *ui.Button
+	mirrorBtn      *ui.Button
+	cutBtn         *ui.Button
+	pasteBtn       *ui.Button
+	layerAddBtn    *ui.Button
+	layerDeleteBtn *ui.Button
+	layerUpBtn     *ui.Button
+	layerDownBtn   *ui.Button
 
 	collisionViewBtn   *ui.Button
 	collisionEditBtn   *ui.Button
@@ -842,6 +852,9 @@ func (a *EditorApp) followStageObjectLayer(idx int) {
 func (a *EditorApp) syncStageSelectionUI() {
 	a.syncStageSizeInputs()
 	a.panelMode = panelModeStage
+	if a.st.scaleSlider == nil || !a.st.scaleSlider.Dragging() {
+		a.resetStageScaleBurst()
+	}
 	// A pinned Info tab survives selection changes and property edits; the
 	// automatic one still hands the toolbar back to Edit.
 	if !a.st.toolInfoPinned {
@@ -1597,6 +1610,11 @@ func (a *EditorApp) flushStageInputs() {
 	if a.scaleHandle >= 0 || a.st.draggingObj || a.st.draggingFromPanel {
 		return
 	}
+	// Typing a percentage in the Edit Scale field scales the same way the
+	// slider does, from the size the objects had when the burst started.
+	if a.st.editPanel == "scale" && a.st.scaleInput != nil && a.st.scaleInput.Focused {
+		a.applyStageScale(a.st.scaleInput.NumericValue(), false)
+	}
 	primary := a.selectedStageObject()
 	if primary == nil {
 		return
@@ -1703,6 +1721,80 @@ func (a *EditorApp) flushStageInputs() {
 		if focused != nil {
 			a.markStageObjectLiveEdit()
 		}
+	}
+}
+
+// toggleStageEditPanel opens or closes one of the Edit transform panels.
+func (a *EditorApp) toggleStageEditPanel(name string) {
+	if a.st.editPanel == name {
+		a.st.editPanel = ""
+	} else {
+		a.st.editPanel = name
+	}
+	a.resetStageScaleBurst()
+}
+
+// applyStageScale resizes the selection by a percentage of the size it had when
+// the current Scale drag started, so dragging the slider scales from the
+// original size instead of compounding the previous step.
+func (a *EditorApp) applyStageScale(pct float64, fromSlider bool) {
+	pct = clamp(pct, stageScalePctMin, stageScalePctMax)
+	if a.st.scaleInput != nil && fromSlider {
+		a.st.scaleInput.SetNumeric(pct)
+	}
+	if a.st.scaleSlider != nil {
+		a.st.scaleSlider.Value = pct
+	}
+	if a.st.scaleBase == nil {
+		a.st.scaleBase = make(map[int][2]float64)
+		for _, idx := range a.stageSelectedIndices() {
+			if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+				continue
+			}
+			obj := a.proj.Stage.Objects[idx]
+			a.st.scaleBase[idx] = [2]float64{obj.Width, obj.Height}
+		}
+	}
+	if len(a.st.scaleBase) == 0 {
+		return
+	}
+	a.beginInfoUndo()
+	factor := pct / 100
+	changed := false
+	for idx, base := range a.st.scaleBase {
+		if idx < 0 || idx >= len(a.proj.Stage.Objects) {
+			continue
+		}
+		obj := &a.proj.Stage.Objects[idx]
+		w := math.Max(1, math.Round(base[0]*factor*100)/100)
+		h := math.Max(1, math.Round(base[1]*factor*100)/100)
+		if obj.Width == w && obj.Height == h {
+			continue
+		}
+		obj.Width, obj.Height = w, h
+		changed = true
+	}
+	if !changed {
+		return
+	}
+	a.pushInfoUndoIfNeeded()
+	a.dirty = true
+	a.syncStageInputs()
+}
+
+func (a *EditorApp) onStageScaleSlider(v float64) {
+	a.applyStageScale(v, true)
+}
+
+// resetStageScaleBurst drops the Scale drag base and rewinds the slider, so the
+// next drag scales from whatever size the objects have then.
+func (a *EditorApp) resetStageScaleBurst() {
+	a.st.scaleBase = nil
+	if a.st.scaleSlider != nil {
+		a.st.scaleSlider.Value = 100
+	}
+	if a.st.scaleInput != nil && !a.st.scaleInput.Focused {
+		a.st.scaleInput.SetNumeric(100)
 	}
 }
 

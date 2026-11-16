@@ -102,6 +102,9 @@ func (a *EditorApp) Update() error {
 		if a.st.opacitySlider == nil || !a.st.opacitySlider.Dragging() {
 			a.endInfoUndo()
 		}
+		if a.st.scaleSlider == nil || !a.st.scaleSlider.Dragging() {
+			a.resetStageScaleBurst()
+		}
 	}
 	a.handleRightPanelMouse(mx, my, justL)
 	if a.isStageMode() {
@@ -252,6 +255,9 @@ func (a *EditorApp) focusedInput() *ui.TextInput {
 		if a.st.zInput != nil && a.st.zInput.Focused {
 			return a.st.zInput
 		}
+		if a.st.scaleInput != nil && a.st.scaleInput.Focused {
+			return a.st.scaleInput
+		}
 		return nil
 	}
 
@@ -342,6 +348,9 @@ func (a *EditorApp) allInputs() []*ui.TextInput {
 		}
 		if a.st.zInput != nil {
 			all = append(all, a.st.zInput)
+		}
+		if a.st.scaleInput != nil {
+			all = append(all, a.st.scaleInput)
 		}
 		if a.st.collisionEdit {
 			all = append(all, a.stageCollisionInputList()...)
