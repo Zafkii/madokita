@@ -18,6 +18,10 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// stagePickRepeatSlop is the screen distance, in pixels, within which a new
+// press counts as a repeat of the previous click and cycles the pick.
+const stagePickRepeatSlop = 3
+
 type stageAssetRect struct {
 	AssetIdx   int
 	X, Y, W, H int
@@ -71,6 +75,17 @@ type stageState struct {
 	selectedObjs   map[int]bool
 	activeLayer    string
 	stageClipboard []project.StageObject
+
+	// pickAnchor* marks the screen spot of the last plain click that landed on
+	// a stack of objects. Repeating a press there steps to the next object
+	// under the pointer so overlapped objects stay reachable. pickPress* is the
+	// press currently being tracked until it ends without dragging.
+	pickAnchorValid bool
+	pickAnchorMX    int
+	pickAnchorMY    int
+	pickPressValid  bool
+	pickPressMX     int
+	pickPressMY     int
 
 	dragAsset         int
 	draggingFromPanel bool
@@ -1418,11 +1433,15 @@ func (a *EditorApp) moveActiveStageLayer(delta int) {
 	}
 }
 
-func (a *EditorApp) stageObjectAtWorld(wx, wy float64) int {
+// stagePickCandidates returns every object under a world point in front-to-back
+// draw order, so index 0 is the one painted on top and wins a plain click.
+// Only objects of the active layer are considered when a layer is focused.
+func (a *EditorApp) stagePickCandidates(wx, wy float64) []int {
 	if len(a.proj.Stage.Layers) == 0 {
 		a.proj.Stage.NormalizeLayers()
 	}
 	objects := a.proj.Stage.Objects
+	candidates := make([]int, 0, 4)
 	// Walk the draw order from front to back, so the object painted on top wins
 	// the click. The last entry of a layer is its start marker, which never
 	// paints and therefore stays pickable ahead of the artwork.
@@ -1434,8 +1453,15 @@ func (a *EditorApp) stageObjectAtWorld(wx, wy float64) int {
 			continue
 		}
 		if stageObjectContainsWorld(*obj, wx, wy) {
-			return i
+			candidates = append(candidates, i)
 		}
+	}
+	return candidates
+}
+
+func (a *EditorApp) stageObjectAtWorld(wx, wy float64) int {
+	if candidates := a.stagePickCandidates(wx, wy); len(candidates) > 0 {
+		return candidates[0]
 	}
 	return -1
 }
@@ -1453,17 +1479,32 @@ func stageObjectContainsWorld(obj project.StageObject, wx, wy float64) bool {
 	return math.Abs(lx) <= obj.Width/2 && math.Abs(ly) <= obj.Height/2
 }
 
-// stagePressTarget resolves the object a plain press should target. A press
+// stagePlainPick resolves the object a plain press should target. A press
 // inside the current selection keeps it, so a freshly placed object that sits
 // under a higher-priority category still drags instead of stealing a different
 // object. Backgrounds stay hit-tested because they cover the whole stage.
-func (a *EditorApp) stagePressTarget(wx, wy float64) int {
+// When repeated over the same spot, the press steps to the object behind the
+// selected one (wrapping around at the back of the stack) so overlapping
+// objects can be reached one click at a time, the way the Geometry Dash editor
+// cycles through them.
+func (a *EditorApp) stagePlainPick(candidates []int, wx, wy float64, repeated bool) int {
+	if len(candidates) == 0 {
+		return -1
+	}
+	if repeated {
+		for k, idx := range candidates {
+			if idx == a.st.selectedObj {
+				return candidates[(k+1)%len(candidates)]
+			}
+		}
+		return candidates[0]
+	}
 	if obj := a.selectedStageObject(); obj != nil &&
 		obj.Category != project.StageCategoryBG &&
 		stageObjectContainsWorld(*obj, wx, wy) {
 		return a.st.selectedObj
 	}
-	return a.stageObjectAtWorld(wx, wy)
+	return candidates[0]
 }
 
 func (a *EditorApp) updateStageAssetDrag(mx, my int, leftDown bool) {

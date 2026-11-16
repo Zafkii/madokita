@@ -239,6 +239,12 @@ func (m *AssetManager) StageObjectAnimation(stageID string, obj *stage.Object) *
 	return nil
 }
 
+// LoadImage loads a single UI/HUD image through the shared cache. Paths are
+// relative to the game asset root, like every other image the manager loads.
+func (m *AssetManager) LoadImage(path string) (*ebiten.Image, error) {
+	return m.imgCache.Load(path)
+}
+
 func (m *AssetManager) Tint() *TintController {
 	return m.tint
 }

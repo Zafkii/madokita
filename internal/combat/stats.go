@@ -4,6 +4,8 @@ type Stats struct {
 	Strength                  float64
 	MaxHealth                 float64
 	Health                    float64
+	MaxSoul                   float64
+	Soul                      float64
 	MaxStamina                float64
 	Stamina                   float64
 	StaminaRegenDelay         float64
@@ -20,15 +22,17 @@ type Stats struct {
 
 func NewStats() Stats {
 	return Stats{
-		Strength:  1.0,
-		MaxHealth: 100,
-		Health:    100,
+		Strength:   1.0,
+		MaxHealth:  100,
+		Health:     100,
+		MaxSoul:    100,
+		Soul:       100,
 		MaxStamina: 100,
-		Stamina:   100,
-		Attack:    10,
-		Defense:   5,
-		MaxPoise:  100,
-		Poise:     100,
+		Stamina:    100,
+		Attack:     10,
+		Defense:    5,
+		MaxPoise:   100,
+		Poise:      100,
 	}
 }
 

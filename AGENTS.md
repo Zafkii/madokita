@@ -218,6 +218,7 @@ The player is locked by phases, derived from `AttackAnimator.Phase()` in `Player
 | **New frame inherits sprite + frame**               | ✅ Done           |
 | **Strict per-layer stage editing**                  | ✅ Done           |
 | **Per-object Z depth inside a layer**               | ✅ Done           |
+| **Click cycles through overlapped objects**         | ✅ Done           |
 | **Cut/Paste stage objects**                         | ✅ Done           |
 | **Open/Save project files**                         | ❌ Pending        |
 | **Undo/Redo**                                       | ❌ Pending        |
@@ -231,6 +232,10 @@ An active layer restricts hit-testing, selection, marquee, select-all, drag, del
 Each stage object carries a `Z` depth edited in the Info tab next to Rotation and Opacity. Layers still draw in slice order, so Z only orders objects **inside their own layer**: a larger Z draws closer to the camera, and at equal Z the category order is kept (backgrounds, static and animated props, static and animated blocks). Default Z is 0, so existing stages render exactly as before.
 
 One ordering rule feeds both renderers so the editor previews what the game paints: `StageData.RenderOrder()` (`animprite/internal/project/stage.go`) and `stage.DrawOrder()` (`internal/stage/stage.go`) return object indices sorted by layer, then Z, then category rank, then slice position. Rendering walks the list forwards and picking walks it backwards, so the topmost object receives the click. Start markers sort last inside their layer (they never paint) which keeps them pickable ahead of the artwork. Z is display only: collision and hurtboxes ignore it, and the export writes `Z` only when it is not zero.
+
+## Cycling Overlapped Objects
+
+`stagePickCandidates()` (`animprite/internal/editor/stage.go`) returns every pickable object under the pointer front to back, and `stagePlainPick()` resolves the press: a press inside the current selection keeps it so a freshly placed object still drags, otherwise the top candidate wins. Clicking the **same spot again** (within `stagePickRepeatSlop` screen pixels) steps to the object behind the selected one and wraps around at the back of the stack, so overlapped objects are reachable one click at a time like the Geometry Dash editor. The repeat spot is armed on release of a click on a stack and dropped by a drag, a click elsewhere, or any modifier press, so a lone object keeps plain click-then-drag behavior.
 
 ## Per-Frame Sprite Composition
 

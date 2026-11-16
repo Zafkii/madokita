@@ -34,6 +34,7 @@ type GameScene struct {
 	CameraX        float64
 	Player         *player.Player
 	ShowDebug      bool
+	statsHUD       *statsHUD
 	stageAnimClock float64
 }
 
@@ -139,6 +140,8 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 			debug.DrawHitboxes(screen, s.Player, s.CameraX)
 		}
 	}
+
+	s.drawStatsHUD(screen)
 }
 
 func (s *GameScene) DrawOverlay(screen *ebiten.Image) {
@@ -247,6 +250,7 @@ func stageObjectGroup(category string) assets.LayerGroup {
 func (s *GameScene) Enter() error {
 	s.stageAnimClock = 0
 	s.audioMgr.Stop("menu-theme")
+	s.loadStatsHUD()
 	return nil
 }
 

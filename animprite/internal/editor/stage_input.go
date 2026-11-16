@@ -331,6 +331,16 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 			}
 		}
 		a.finishStageMarquee()
+		// A click that did not drag arms the repeat spot for the next press, so
+		// clicking twice in the same place cycles through a stack of objects.
+		// Moving an object invalidates it: the stack under the pointer changed.
+		if a.st.dragMoved || !a.st.pickPressValid {
+			a.st.pickAnchorValid = false
+		} else {
+			a.st.pickAnchorValid = true
+			a.st.pickAnchorMX, a.st.pickAnchorMY = a.st.pickPressMX, a.st.pickPressMY
+		}
+		a.st.pickPressValid = false
 		a.scaleHandle = -1
 		a.rotationDrag.active = false
 		a.st.draggingObj = false
@@ -380,10 +390,19 @@ func (a *EditorApp) handleStageCanvasMouse(mx, my int, leftDown, justPressed boo
 
 		wx, wy := a.canvasWorld(mx, my)
 		idx := -1
+		a.st.pickPressValid = false
 		if tab || ctrl || shift {
 			idx = a.stageObjectAtWorld(wx, wy)
 		} else {
-			idx = a.stagePressTarget(wx, wy)
+			candidates := a.stagePickCandidates(wx, wy)
+			repeated := a.st.pickAnchorValid &&
+				absInt(mx-a.st.pickAnchorMX) <= stagePickRepeatSlop &&
+				absInt(my-a.st.pickAnchorMY) <= stagePickRepeatSlop
+			idx = a.stagePlainPick(candidates, wx, wy, repeated)
+			// Only a click on a stack may seed a cycle spot: on a single object
+			// a repeated press keeps dragging it instead of re-picking.
+			a.st.pickPressValid = len(candidates) > 1
+			a.st.pickPressMX, a.st.pickPressMY = mx, my
 		}
 		if idx >= 0 {
 			a.st.stagePointerOnObject = true
