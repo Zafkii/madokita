@@ -297,6 +297,27 @@ func (p *Player) probeFloorTop(minTop, maxTop float64) (float64, bool) {
 	return p.floorTopAt(p.groundProbeX(), minTop, maxTop)
 }
 
+// airborneFloorTop returns the highest solid top under the base while it falls.
+// The ground probe follows the travel direction, so a turn mid-fall would move
+// the only landing point off a corner the body already hangs over and drop the
+// feet through the block. The middle half of the base is probed instead — centre
+// and both quarter points — so the landing survives the turn; with no travel
+// direction it stays at the centre, where a fall onto a corner still slides off.
+func (p *Player) airborneFloorTop(minTop, maxTop float64) (float64, bool) {
+	body := p.bodyRect()
+	points := []float64{body.X + body.W/2}
+	if p.walkDir != 0 {
+		points = append(points, body.X+probeEdge+body.W/4, body.X+body.W-probeEdge-body.W/4)
+	}
+	top, found := math.Inf(1), false
+	for _, x := range points {
+		if at, ok := p.floorTopAt(x, minTop, maxTop); ok && at < top {
+			top, found = at, true
+		}
+	}
+	return top, found
+}
+
 // floorTopAt returns the highest (smallest Y) solid top under x whose top lies
 // within [minTop, maxTop].
 func (p *Player) floorTopAt(x, minTop, maxTop float64) (float64, bool) {
@@ -332,7 +353,7 @@ func (p *Player) wallAhead() (math2.Rect, bool) {
 	feet := body.Y + body.H
 	probe := p.groundProbeX()
 	for _, solid := range p.solidRects {
-		if !body.Overlaps(solid) || p.behindProbeAt(probe, solid) {
+		if !body.Overlaps(solid) || (p.Movement.IsGrounded && p.behindProbeAt(probe, solid)) {
 			continue
 		}
 		if p.Movement.IsGrounded {
@@ -400,9 +421,19 @@ func (p *Player) resolveSolids(dir int) {
 		if blocker, blocked := p.wallAhead(); blocked {
 			leftOffset := body.X - p.X
 			rightOffset := body.X + body.W - p.X
-			escapeLeft := dir > 0
-			if dir == 0 {
-				escapeLeft = body.X+body.W-blocker.X <= blocker.X+blocker.W-body.X
+			leftPen := body.X + body.W - blocker.X
+			rightPen := blocker.X + blocker.W - body.X
+			escapeLeft := leftPen <= rightPen
+			// A move this frame can only make a shallow overlap on the side it
+			// came from. A deeper one was inherited from a turn, a landing or a
+			// fall, so it must leave through the nearer face instead of the
+			// travel direction — otherwise turning inside a face would eject the
+			// body across the whole block.
+			switch {
+			case dir > 0 && leftPen <= maxAutoStepHeight:
+				escapeLeft = true
+			case dir < 0 && rightPen <= maxAutoStepHeight:
+				escapeLeft = false
 			}
 			if escapeLeft {
 				p.X = blocker.X - rightOffset
@@ -437,7 +468,7 @@ func (p *Player) applyGravity(dtSec float64) {
 		// step: slope strips bury the front of the base by a few pixels, and the
 		// body must ride their surface instead of dropping through it.
 		minTop := math.Min(prevBody.Y+prevBody.H, body.Y+body.H-maxAutoStepHeight)
-		if landingTop, ok := p.probeFloorTop(minTop, body.Y+body.H); ok {
+		if landingTop, ok := p.airborneFloorTop(minTop, body.Y+body.H); ok {
 			p.Y = landingTop - p.bodyBottomOffset()
 			p.Movement.yVelocity = 0
 			p.Movement.IsGrounded = true

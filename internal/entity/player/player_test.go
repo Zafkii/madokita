@@ -818,6 +818,79 @@ func TestPlayerLandsOnlyWhenTheBaseCentreIsOverTheStep(t *testing.T) {
 	}
 }
 
+// TestPlayerTurningMidFallStillLandsOnTheBlock pins the air-side twin of the
+// corner fix: a jump that overshoots a block and turns back on the way down must
+// still land on the block. The landing used to follow the travel direction only,
+// so the turn moved the single landing point off the corner and the body dropped
+// through the block onto the floor.
+func TestPlayerTurningMidFallStillLandsOnTheBlock(t *testing.T) {
+	const blockTop = 50.0
+	block := math2.NewRect(400, blockTop, 50, 100)
+	floor := math2.NewRect(0, 100, 1000, 100)
+	p := &Player{State: State{IsControlled: true}, Scale: 0.5, X: 350, StageGroundY: 0}
+	p.Movement = Movement{gravity: 1000, jumpVelocity: -500}
+	p.Y = 100 - p.bodyBottomOffset()
+	p.SetSolidRects([]math2.Rect{floor, block})
+	p.Movement.IsGrounded = true
+	p.Movement.yVelocity = p.Movement.jumpVelocity
+	p.Movement.IsGrounded = false
+
+	landed := false
+	for i := 0; i < 140; i++ {
+		// Jump past the block, then turn back once the fall is under way with the
+		// base still above the block: that is the input that used to drop the
+		// body through it.
+		dir := 5.0
+		if i >= 34 {
+			dir = -5
+		}
+		p.moveHorizontal(dir)
+		p.Update(16 * time.Millisecond)
+
+		body := p.bodyRect()
+		feet := body.Y + body.H
+		for _, solid := range []math2.Rect{floor, block} {
+			if body.Overlaps(solid) && feet > solid.Y+collisionEpsilon && body.Y < solid.Y+solid.H {
+				t.Fatalf("frame %d: body entered the solid with top %v (X = %v, feet = %v)", i, solid.Y, p.X, feet)
+			}
+		}
+		if p.Movement.IsGrounded {
+			landed = true
+			break
+		}
+	}
+	if !landed {
+		t.Fatal("player never landed")
+	}
+	if feet := p.bodyRect().Y + p.bodyRect().H; math.Abs(feet-blockTop) > 0.01 {
+		t.Fatalf("feet = %v, want the player standing on the block top at %v (X = %v)", feet, blockTop, p.X)
+	}
+}
+
+// TestPlayerTurningInsideAStepFaceIsPushedOutToTheNearSide pins the other half
+// of the turn fix: with the base already overlapping a step's face in the air,
+// turning back must not sink further into the block, and it must not eject the
+// body across the whole block either. That overlap is inherited from the fall,
+// so the travel direction cannot pick the way out; the nearer face must.
+func TestPlayerTurningInsideAStepFaceIsPushedOutToTheNearSide(t *testing.T) {
+	const stepTop = 60.0
+	step := math2.NewRect(300, stepTop, 700, 140)
+	p := &Player{State: State{IsControlled: true}, Scale: 0.5, X: 310, StageGroundY: 0}
+	p.Movement = Movement{gravity: 1000}
+	p.Y = 100 - p.bodyBottomOffset()
+	p.SetSolidRects([]math2.Rect{math2.NewRect(0, 100, 300, 100), step})
+
+	p.moveHorizontal(-5) // turn back while the base still overlaps the face
+
+	body := p.bodyRect()
+	if body.Overlaps(step) && body.Y+body.H > stepTop+collisionEpsilon && body.Y < stepTop+step.H {
+		t.Fatalf("body stayed inside the step after turning (X = %v, feet = %v)", p.X, body.Y+body.H)
+	}
+	if p.X > step.X {
+		t.Fatalf("X = %v, want the body pushed out through the near face at %v", p.X, step.X)
+	}
+}
+
 func TestPlayerWalksRotatedStageHill(t *testing.T) {
 	layout := &stages.TestStage
 	var rects []math2.Rect
@@ -865,11 +938,26 @@ func TestPlayerWalksRotatedStageHill(t *testing.T) {
 		return maxRise, maxDrop
 	}
 
+	// The exported stage now closes the hill with a step taller than
+	// maxAutoStepHeight, so the walk must carry the base all the way to that
+	// face and stop there instead of crossing it.
+	startFeet := p.bodyRect().Y + p.bodyRect().H
+	face := math.Inf(1)
+	for _, r := range rects {
+		if r.Y < startFeet-maxAutoStepHeight && r.X > p.X && r.X < face {
+			face = r.X
+		}
+	}
+	if math.IsInf(face, 1) {
+		t.Fatal("want a step taller than maxAutoStepHeight ahead of the hill")
+	}
+
 	if rise, drop := walk(1, 96); rise > 6 || drop > 6 {
 		t.Fatalf("climbing: feet changed %.2f/%.2f px in one frame, want a walkable surface", rise, drop)
 	}
-	if p.X < 496 {
-		t.Fatalf("X = %v, want the player to cross the rotated hill", p.X)
+	body := p.bodyRect()
+	if front := body.X + body.W; math.Abs(front-(face-1)) > 2 {
+		t.Fatalf("X = %v front = %v, want the base to reach the step face at %v", p.X, front, face-1)
 	}
 
 	if rise, drop := walk(-1, 88); rise > 6 || drop > 6 {
