@@ -157,7 +157,7 @@ func (p *Player) Update(dt time.Duration) {
 	// Walking off a ledge must release the grounded state before gravity, but a
 	// small drop (the staircase of a slope) is followed instead of becoming air.
 	if p.Movement.IsGrounded && !p.hasSupport() {
-		if !p.snapDown() {
+		if !p.snapDown() && !p.baseHasSupport() {
 			p.Movement.IsGrounded = false
 		}
 	}
@@ -165,6 +165,7 @@ func (p *Player) Update(dt time.Duration) {
 	// Gravity runs unconditionally: attacking mid-air must not freeze the fall.
 	if !p.Movement.IsGrounded {
 		p.applyGravity(dtSec)
+		p.resolveSolids(0)
 	}
 
 	p.clampWorldBounds()
@@ -244,9 +245,11 @@ const probeEdge = 0.5
 // groundProbeX is the point where the body meets the floor. Descending, it is
 // the body centre pushed a quarter of its width toward the walking direction, so
 // three quarters of the base stand on the collision and the leading quarter may
-// hang over the drop. Ascending the ground ahead is higher, so the probe moves to
-// the trailing edge: the base rides the lower ground behind it and the rising
-// ground buries the front of the base instead of leaving the whole base airborne.
+// hang over the drop. Ascending — while grounded — the ground ahead is higher, so
+// the probe moves to the trailing edge: the base rides the lower ground behind it
+// and the rising ground buries the front of the base instead of leaving the whole
+// base airborne. In the air the probe stays ahead, because a fall must meet the
+// floor the body is moving toward and never one behind its own base.
 func (p *Player) groundProbeX() float64 {
 	body := p.bodyRect()
 	if p.walkDir == 0 {
@@ -258,7 +261,7 @@ func (p *Player) groundProbeX() float64 {
 		lead, trail = body.X+probeEdge, body.X+body.W-probeEdge
 	}
 	if leadTop, leadOK := p.floorAtX(lead, body); leadOK {
-		if trailTop, trailOK := p.floorAtX(trail, body); trailOK && leadTop < trailTop-collisionEpsilon {
+		if trailTop, trailOK := p.floorAtX(trail, body); trailOK && p.Movement.IsGrounded && leadTop < trailTop-collisionEpsilon {
 			return trail
 		}
 	}
@@ -291,7 +294,12 @@ func (p *Player) floorAtX(x float64, body math2.Rect) (float64, bool) {
 // probe whose top lies within [minTop, maxTop]. Bounding the band keeps overhead
 // geometry — tree canopies, tall props — from hijacking the ground contact.
 func (p *Player) probeFloorTop(minTop, maxTop float64) (float64, bool) {
-	x := p.groundProbeX()
+	return p.floorTopAt(p.groundProbeX(), minTop, maxTop)
+}
+
+// floorTopAt returns the highest (smallest Y) solid top under x whose top lies
+// within [minTop, maxTop].
+func (p *Player) floorTopAt(x, minTop, maxTop float64) (float64, bool) {
 	top := math.Inf(1)
 	found := false
 	for _, solid := range p.solidRects {
@@ -314,6 +322,11 @@ func (p *Player) probeFloorTop(minTop, maxTop float64) (float64, bool) {
 // adjacent ground instead of the feet keeps a climb from reading as a wall: the
 // base rides the low side, so the strips ahead of the feet are legitimately above
 // them, while a real ledge still towers over the ground it stands on.
+//
+// Both walkable exemptions only apply while the player stands on the ground: the
+// climb in resolveSolids lifts the base onto such a step on the same move. In the
+// air nothing lifts the body, so every overlapping solid is a wall and a jump can
+// never insert the body into a block.
 func (p *Player) wallAhead() (math2.Rect, bool) {
 	body := p.bodyRect()
 	feet := body.Y + body.H
@@ -322,15 +335,17 @@ func (p *Player) wallAhead() (math2.Rect, bool) {
 		if !body.Overlaps(solid) || p.behindProbeAt(probe, solid) {
 			continue
 		}
-		if feet-solid.Y <= maxAutoStepHeight {
-			continue
-		}
-		beside := solid.X - 1
-		if p.walkDir < 0 {
-			beside = solid.X + solid.W + 1
-		}
-		if top, ok := p.floorAtX(beside, body); ok && solid.Y >= top-maxAutoStepHeight {
-			continue
+		if p.Movement.IsGrounded {
+			if feet-solid.Y <= maxAutoStepHeight {
+				continue
+			}
+			beside := solid.X - 1
+			if p.walkDir < 0 {
+				beside = solid.X + solid.W + 1
+			}
+			if top, ok := p.floorAtX(beside, body); ok && solid.Y >= top-maxAutoStepHeight {
+				continue
+			}
 		}
 		return solid, true
 	}
@@ -349,6 +364,7 @@ func (p *Player) behindProbeAt(probe float64, solid math2.Rect) bool {
 	return false
 }
 
+// moveHorizontal travels sideways and then resolves whatever the move ran into.
 func (p *Player) moveHorizontal(dx float64) {
 	if dx == 0 {
 		return
@@ -359,6 +375,15 @@ func (p *Player) moveHorizontal(dx float64) {
 		p.walkDir = -1
 	}
 	p.X += dx
+	p.resolveSolids(p.walkDir)
+}
+
+// resolveSolids pushes the body out of walls and, while grounded, lifts it onto
+// walkable steps. dir is the travel direction the body came from; zero means the
+// overlap was not caused by a horizontal move, so each blocker is escaped through
+// the side the body overlaps least. It runs after gravity as well, so a fall can
+// never leave the body inside a block just because no input moved it that frame.
+func (p *Player) resolveSolids(dir int) {
 	if len(p.solidRects) == 0 {
 		return
 	}
@@ -375,7 +400,11 @@ func (p *Player) moveHorizontal(dx float64) {
 		if blocker, blocked := p.wallAhead(); blocked {
 			leftOffset := body.X - p.X
 			rightOffset := body.X + body.W - p.X
-			if dx > 0 {
+			escapeLeft := dir > 0
+			if dir == 0 {
+				escapeLeft = body.X+body.W-blocker.X <= blocker.X+blocker.W-body.X
+			}
+			if escapeLeft {
 				p.X = blocker.X - rightOffset
 			} else {
 				p.X = blocker.X + blocker.W - leftOffset
@@ -383,6 +412,11 @@ func (p *Player) moveHorizontal(dx float64) {
 			continue
 		}
 
+		// Only a grounded body climbs: in the air nothing lifts the base, so a
+		// jump is never boosted onto a step's face.
+		if !p.Movement.IsGrounded {
+			return
+		}
 		top, ok := p.probeFloorTop(feet-maxAutoStepHeight, math.Inf(1))
 		if !ok || top >= feet-collisionEpsilon {
 			return
@@ -398,8 +432,12 @@ func (p *Player) applyGravity(dtSec float64) {
 	body := p.bodyRect()
 
 	if p.Movement.yVelocity > 0 {
-		// Land on the highest surface under the probe that this step crossed.
-		if landingTop, ok := p.probeFloorTop(prevBody.Y+prevBody.H, body.Y+body.H); ok {
+		// Land on the highest surface under the probe that this step crossed, or
+		// that the fall has already buried the feet in by less than a walkable
+		// step: slope strips bury the front of the base by a few pixels, and the
+		// body must ride their surface instead of dropping through it.
+		minTop := math.Min(prevBody.Y+prevBody.H, body.Y+body.H-maxAutoStepHeight)
+		if landingTop, ok := p.probeFloorTop(minTop, body.Y+body.H); ok {
 			p.Y = landingTop - p.bodyBottomOffset()
 			p.Movement.yVelocity = 0
 			p.Movement.IsGrounded = true
@@ -470,6 +508,34 @@ func (p *Player) hasSupport() bool {
 	}
 	// The logical ground line only backs stages with no authored geometry.
 	return len(p.solidRects) == 0 && p.StageGroundY > 0 && math.Abs(p.Y-p.StageGroundY) <= collisionEpsilon
+}
+
+// ledgeSupport is how much of the base must still overlap a floor for the player
+// to stay grounded. A couple of pixels are enough: the base reaches the very edge
+// of the collision before a drop releases, which keeps the jump available at the
+// ledge and stops the fall from starting while most of the base still stands on
+// it. Raise it to release earlier with more of the body hanging over the drop, or
+// set it to 0 to release only once the base has cleared the collision.
+const ledgeSupport = 2.0
+
+// baseHasSupport reports whether any part of the base still rests on a floor at
+// feet level. The ground probe is a single point a quarter of the width ahead of
+// the centre, so it leaves a ledge while most of the base is still standing; the
+// release follows the whole base instead, down to the last couple of pixels.
+func (p *Player) baseHasSupport() bool {
+	body := p.bodyRect()
+	feet := body.Y + body.H
+	for _, solid := range p.solidRects {
+		if math.Abs(solid.Y-feet) > collisionEpsilon {
+			continue
+		}
+		overlap := math.Min(solid.X+solid.W, body.X+body.W) - math.Max(solid.X, body.X)
+		if overlap >= ledgeSupport {
+			return true
+		}
+	}
+	// The logical ground line only backs stages with no authored geometry.
+	return len(p.solidRects) == 0 && p.StageGroundY > 0 && math.Abs(feet-p.StageGroundY) <= collisionEpsilon
 }
 
 func horizontalOverlap(a, b math2.Rect) bool {

@@ -650,6 +650,174 @@ func TestPlayerGroundsThreeQuartersOfTheBase(t *testing.T) {
 	}
 }
 
+// TestPlayerHoldsTheLedgeDownToTwoPixels pins the ledge tolerance: the release
+// follows the whole base, so the drop only starts once the base has left the
+// collision instead of stopping while most of the body still stands on it.
+func TestPlayerHoldsTheLedgeDownToTwoPixels(t *testing.T) {
+	newPlayer := func() *Player {
+		p := &Player{State: State{IsControlled: true}, Scale: 0.5, X: 160, StageGroundY: 1000}
+		p.Y = 100 - p.bodyBottomOffset()
+		p.Movement = Movement{IsGrounded: true, gravity: 1000, jumpVelocity: -500}
+		p.SetSolidRects([]math2.Rect{math2.NewRect(0, 100, 200, 50)})
+		return p
+	}
+	// The body spans X-23 .. X+24.5, so the overlap with a ledge ending at 200
+	// is 223 - X.
+	overlapAt := func(x float64) float64 { return 223 - x }
+
+	// Three pixels of the base still on the ledge: the drop has not released.
+	p := newPlayer()
+	p.X = 220
+	p.Update(10 * time.Millisecond)
+	if !p.Movement.IsGrounded {
+		t.Fatalf("X = %v: player fell with %vpx of the base on the ledge", p.X, overlapAt(p.X))
+	}
+	if feet := p.bodyRect().Y + p.bodyRect().H; math.Abs(feet-100) > 0.01 {
+		t.Fatalf("feet = %v, want the body held on the ledge top at 100", feet)
+	}
+
+	// Exactly the tolerance still supports the body, so walking to the very
+	// edge of the collision keeps the jump available.
+	p = newPlayer()
+	p.X = 200 + (23 - ledgeSupport)
+	p.Update(10 * time.Millisecond)
+	if !p.Movement.IsGrounded {
+		t.Fatalf("X = %v: player fell with %vpx of the base on the ledge, want the tolerance to hold", p.X, ledgeSupport)
+	}
+
+	// One pixel less and the drop releases.
+	p = newPlayer()
+	p.X = 200 + (23 - ledgeSupport) + 1
+	p.Update(10 * time.Millisecond)
+	if p.Movement.IsGrounded {
+		t.Fatalf("X = %v: player held the ledge with %vpx of the base on it", p.X, overlapAt(p.X))
+	}
+}
+
+// TestPlayerJumpingIntoAStepNeverEntersTheBlock pins the airborne side of the
+// step tolerance: the 16px "walkable step" exemption only exists so the grounded
+// climb can lift the base onto the step on the same move. In the air nothing
+// lifts the body, so an overlapping solid is a wall until the feet clear its top
+// and the jump must never insert the body into the block.
+func TestPlayerJumpingIntoAStepNeverEntersTheBlock(t *testing.T) {
+	p := &Player{State: State{IsControlled: true}, Scale: 0.5, X: 272, StageGroundY: 0}
+	p.Movement = Movement{gravity: 1000, jumpVelocity: -500}
+	p.Y = 100 - p.bodyBottomOffset()
+	p.Movement.IsGrounded = true
+
+	stepTop := 60.0
+	step := math2.NewRect(300, stepTop, 700, 140)
+	p.SetSolidRects([]math2.Rect{math2.NewRect(0, 100, 300, 100), step})
+
+	p.Movement.yVelocity = p.Movement.jumpVelocity
+	p.Movement.IsGrounded = false
+
+	for i := 0; i < 120; i++ {
+		p.moveHorizontal(5)
+		p.Update(16 * time.Millisecond)
+
+		body := p.bodyRect()
+		feet := body.Y + body.H
+		if body.Overlaps(step) && feet > stepTop+collisionEpsilon {
+			t.Fatalf("frame %d: body entered the step (X = %v, feet = %v, step top = %v)", i, p.X, feet, stepTop)
+		}
+		if p.Movement.IsGrounded {
+			break
+		}
+	}
+
+	// The arc must still carry the jump onto the step instead of stalling at the
+	// face forever.
+	if !p.Movement.IsGrounded {
+		t.Fatalf("player must land on the step, IsGrounded = false (X = %v)", p.X)
+	}
+	if feet := p.bodyRect().Y + p.bodyRect().H; math.Abs(feet-stepTop) > 0.01 {
+		t.Fatalf("feet = %v, want the player standing on the step top at %v", feet, stepTop)
+	}
+}
+
+// TestPlayerFallingBesideAStepNeverSinksIntoIt pins the corner case: falling
+// while the base straddles a step's face. The ground probe must not move to the
+// trailing edge just because the ground ahead is higher, and the body must not
+// sink into the block while the centre of the base is still outside it.
+func TestPlayerFallingBesideAStepNeverSinksIntoIt(t *testing.T) {
+	const stepTop = 50.0
+	step := math2.NewRect(300, stepTop, 700, 50)
+	p := &Player{State: State{IsControlled: true}, Scale: 0.5, X: 265, StageGroundY: 0}
+	p.Movement = Movement{gravity: 1000, jumpVelocity: -500}
+	p.Y = 100 - p.bodyBottomOffset()
+	p.SetSolidRects([]math2.Rect{math2.NewRect(0, 100, 300, 100), step})
+	p.Movement.IsGrounded = true
+	p.Movement.yVelocity = p.Movement.jumpVelocity
+	p.Movement.IsGrounded = false
+
+	landed := false
+	for i := 0; i < 120; i++ {
+		// Steer right only during the fall, which is what makes the front of the
+		// base reach the step's face while the feet are already dropping past it.
+		if p.Movement.yVelocity > 0 {
+			p.moveHorizontal(5)
+		}
+		p.Update(16 * time.Millisecond)
+
+		body := p.bodyRect()
+		feet := body.Y + body.H
+		if body.Overlaps(step) && feet > stepTop+collisionEpsilon {
+			t.Fatalf("frame %d: body sank into the step (X = %v, feet = %v, top = %v)", i, p.X, feet, stepTop)
+		}
+		if p.Movement.IsGrounded {
+			landed = true
+			break
+		}
+	}
+	if !landed {
+		t.Fatal("player never landed")
+	}
+}
+
+// TestPlayerLandsOnlyWhenTheBaseCentreIsOverTheStep pins the landing rule: a fall
+// that puts just the leading quarter over a step's corner must not land on the
+// step and must not sink into the block either. The base is pushed out of the
+// face and slides down to the low ground, and the step is only caught once the
+// probe — the centre, with no travel direction — is over it.
+func TestPlayerLandsOnlyWhenTheBaseCentreIsOverTheStep(t *testing.T) {
+	const stepTop = 50.0
+	step := math2.NewRect(300, stepTop, 700, 50)
+	p := &Player{State: State{IsControlled: true}, Scale: 0.5, X: 290, StageGroundY: 0}
+	p.Movement = Movement{gravity: 1000}
+	p.SetSolidRects([]math2.Rect{math2.NewRect(0, 100, 300, 100), step})
+
+	// Drop from just above the step with the centre 9px short of its face, so the
+	// leading quarter hangs over the corner but the base cannot rest on it.
+	p.X = 290
+	p.Y = stepTop - 5 - p.bodyBottomOffset()
+	p.Movement.yVelocity = 300
+
+	for i := 0; i < 60; i++ {
+		p.Update(16 * time.Millisecond)
+		body := p.bodyRect()
+		feet := body.Y + body.H
+		if body.Overlaps(step) && feet > stepTop+collisionEpsilon {
+			t.Fatalf("frame %d: body sank into the step (X = %v, feet = %v)", i, p.X, feet)
+		}
+		if p.Movement.IsGrounded {
+			// The base centre never crossed the face, so the only floor it may
+			// stand on is the low ground beside the step.
+			if math.Abs(feet-100) > 0.01 {
+				t.Fatalf("frame %d: stood on feet = %v, want the low ground at 100 (X = %v, centre = %v)", i, feet, p.X, body.X+body.W/2)
+			}
+			break
+		}
+	}
+	body := p.bodyRect()
+	if feet := body.Y + body.H; math.Abs(feet-100) > 0.01 {
+		t.Fatalf("feet = %v, want the fall to reach the ground at 100 after sliding off the face", feet)
+	}
+	if body.X+body.W > step.X+collisionEpsilon {
+		t.Fatalf("body front = %v, want the fall pushed out of the step face at %v", body.X+body.W, step.X)
+	}
+}
+
 func TestPlayerWalksRotatedStageHill(t *testing.T) {
 	layout := &stages.TestStage
 	var rects []math2.Rect
