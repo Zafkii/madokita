@@ -796,6 +796,35 @@ func (a *EditorApp) markStageObjectLiveEdit() {
 	a.st.toolInfoHold = stageInfoHoldFrames
 }
 
+// releaseStageSliders drops the held state of every stage slider once the left
+// button is up. A slider that never receives the release keeps following the
+// pointer, which also keeps the undo and scale bursts open because their idle
+// guards check Dragging().
+func (a *EditorApp) releaseStageSliders() {
+	if a.st.opacitySlider != nil {
+		a.st.opacitySlider.HandleRelease()
+	}
+	if a.st.scaleSlider != nil {
+		a.st.scaleSlider.HandleRelease()
+	}
+}
+
+// stageEditPanelOwnsInput reports whether the field the user is typing into is
+// painted inside an open Edit transform panel. Those panels put the control in
+// Edit on purpose, so editing from one must not pull the toolbar over to Info.
+func (a *EditorApp) stageEditPanelOwnsInput(in *ui.TextInput) bool {
+	if in == nil || a.st.editPanel == "" || a.st.toolTab != "edit" {
+		return false
+	}
+	switch a.st.editPanel {
+	case "opacity":
+		return in == a.st.opacityInput
+	case "scale":
+		return in == a.st.scaleInput
+	}
+	return false
+}
+
 func (a *EditorApp) tickStageInfoAuto() {
 	if !a.isStageMode() || !a.st.toolInfoAuto || a.st.toolInfoPinned {
 		return
@@ -1718,7 +1747,7 @@ func (a *EditorApp) flushStageInputs() {
 	if changed {
 		a.pushInfoUndoIfNeeded()
 		a.dirty = true
-		if focused != nil {
+		if focused != nil && !a.stageEditPanelOwnsInput(focused) {
 			a.markStageObjectLiveEdit()
 		}
 	}
@@ -1828,7 +1857,6 @@ func (a *EditorApp) onStageOpacitySlider(v float64) {
 	}
 	if changed {
 		a.pushInfoUndoIfNeeded()
-		a.markStageObjectLiveEdit()
 		a.dirty = true
 	}
 }

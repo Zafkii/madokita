@@ -93,8 +93,8 @@ func (a *EditorApp) Update() error {
 	}
 
 	a.handleTopPanelMouse(mx, my, justL)
-	if a.isStageMode() && a.st.opacitySlider != nil && !leftDown {
-		a.st.opacitySlider.HandleRelease()
+	if a.isStageMode() && !leftDown {
+		a.releaseStageSliders()
 	}
 	// One undo step per stage Info editing burst: it ends when no field keeps
 	// the focus and the opacity slider is not being dragged.

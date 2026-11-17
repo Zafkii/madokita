@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"animprite/internal/project"
+	"animprite/internal/ui"
 )
 
 func TestStageCategoryForFile(t *testing.T) {
@@ -2598,5 +2599,130 @@ func TestStageEditPanelSwitchDropsTheScaleBase(t *testing.T) {
 	}
 	if app.st.scaleSlider.Value != 100 {
 		t.Fatalf("slider = %.2f after switching panels, want 100", app.st.scaleSlider.Value)
+	}
+}
+
+// The opacity slider lives in the Edit tab now, so dragging it must not yank
+// the toolbar over to Info.
+func TestStageOpacitySliderStaysInTheEditPanel(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	app.st.toolTab = "edit"
+	app.toggleStageEditPanel("opacity")
+
+	app.onStageOpacitySlider(0.5)
+
+	if app.st.toolTab != "edit" || app.st.toolInfoAuto {
+		t.Fatalf("tab after dragging opacity = %q auto=%v, want edit", app.st.toolTab, app.st.toolInfoAuto)
+	}
+	if got := app.proj.Stage.Objects[0].Opacity; got != 0.5 {
+		t.Fatalf("opacity = %.2f, want 0.50", got)
+	}
+}
+
+// Typing an exact value into the same panel's field follows the same rule.
+func TestStageOpacityFieldInTheEditPanelKeepsTheEditTab(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	app.st.toolTab = "edit"
+	app.toggleStageEditPanel("opacity")
+	app.st.opacityInput.SetNumeric(0.25)
+	app.st.opacityInput.Focused = true
+
+	app.flushStageInputs()
+
+	if app.st.toolTab != "edit" || app.st.toolInfoAuto {
+		t.Fatalf("tab after typing opacity = %q auto=%v, want edit", app.st.toolTab, app.st.toolInfoAuto)
+	}
+	if got := app.proj.Stage.Objects[0].Opacity; got != 0.25 {
+		t.Fatalf("opacity = %.2f, want 0.25", got)
+	}
+}
+
+// Canvas edits keep opening Info: that behaviour is untouched.
+func TestStageCanvasDragStillOpensInfo(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	app.st.toolTab = "edit"
+	app.toggleStageEditPanel("opacity")
+
+	app.markStageObjectLiveEdit()
+
+	if app.st.toolTab != "info" || !app.st.toolInfoAuto {
+		t.Fatalf("tab after a canvas edit = %q auto=%v, want info auto", app.st.toolTab, app.st.toolInfoAuto)
+	}
+}
+
+// A scale drag ends on the button release: without the release the thumb keeps
+// following the pointer and the burst never closes.
+func TestStageScaleSliderStopsFollowingThePointerOnRelease(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	sl := app.st.scaleSlider
+	sl.Visible = true
+	sl.X, sl.Y, sl.W, sl.H = 0, 0, 100, 20
+	sl.Value = sl.Max // park the thumb at the right end so the press grabs it
+
+	sl.HandleMouse(88, 10, true)  // grab the thumb
+	sl.HandleMouse(50, 10, false) // drag left
+	if !sl.Dragging() {
+		t.Fatal("slider is not held after the press")
+	}
+
+	app.releaseStageSliders()
+	if sl.Dragging() {
+		t.Fatal("scale slider stayed held after the release")
+	}
+
+	// With the button up the pointer must no longer resize anything.
+	width := app.proj.Stage.Objects[0].Width
+	sl.HandleMouse(10, 10, false)
+	if got := app.proj.Stage.Objects[0].Width; got != width {
+		t.Fatalf("width moved after the release: %.2f, want %.2f", got, width)
+	}
+}
+
+// The released drag also closes the burst, so the next selection starts from a
+// clean 100% instead of keeping the previous drag base.
+func TestStageScaleBurstClosesAfterRelease(t *testing.T) {
+	app := newStageObjectApp(2)
+	app.selectStageObject(0)
+	sl := app.st.scaleSlider
+	sl.Visible = true
+	sl.X, sl.Y, sl.W, sl.H = 0, 0, 100, 20
+	sl.Value = sl.Max
+
+	sl.HandleMouse(88, 10, true)
+	sl.HandleMouse(50, 10, false)
+	if !sl.Dragging() {
+		t.Fatal("scale slider did not start dragging")
+	}
+	app.releaseStageSliders()
+
+	app.selectStageObject(1)
+	if app.st.scaleBase != nil {
+		t.Fatal("scale base survived the release and a selection change")
+	}
+	if sl.Value != 100 {
+		t.Fatalf("slider value after the release = %.2f, want 100", sl.Value)
+	}
+}
+
+// The opacity slider is released by the same pass, so both panels behave alike.
+func TestStageSliderReleaseCoversBothSliders(t *testing.T) {
+	app := newStageObjectApp(1)
+	app.selectStageObject(0)
+	for _, sl := range []*ui.Slider{app.st.opacitySlider, app.st.scaleSlider} {
+		sl.Visible = true
+		sl.X, sl.Y, sl.W, sl.H = 0, 0, 100, 20
+	}
+	app.st.opacitySlider.HandleMouse(88, 10, true)
+	app.st.scaleSlider.HandleMouse(88, 10, true)
+
+	app.releaseStageSliders()
+
+	if app.st.opacitySlider.Dragging() || app.st.scaleSlider.Dragging() {
+		t.Fatalf("sliders still held: opacity=%v scale=%v",
+			app.st.opacitySlider.Dragging(), app.st.scaleSlider.Dragging())
 	}
 }
