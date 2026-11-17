@@ -58,6 +58,8 @@ func (a *EditorApp) navigateToSprite(spriteIdx int) {
 
 func (a *EditorApp) navigateToHurtbox(hbIdx int) {
 	a.hurtboxTable.SelectedIdx = hbIdx
+	a.hitboxTable.SelectedIdx = -1
+	a.syncHitboxBtns()
 	a.syncHurtboxBtns()
 
 	if a.hurtboxTable.SelectedIdx >= 0 {
@@ -135,6 +137,11 @@ func (a *EditorApp) canvasSelectionTarget() (rightPanelMode, bool) {
 			return panelModeHurtbox, true
 		}
 	}
+	if htIdx := a.hitboxTable.SelectedIdx; htIdx >= 0 {
+		if htp := a.hitboxList(); htp != nil && htIdx < len(*htp) {
+			return panelModeHitbox, true
+		}
+	}
 	if s := a.spriteTable.SelectedIdx; s >= 0 && s < len(a.proj.Sprites) {
 		return panelModeSprite, true
 	}
@@ -157,6 +164,8 @@ func (a *EditorApp) syncPanelToSelection() {
 	switch mode {
 	case panelModeHurtbox:
 		a.navigateToHurtbox(a.hurtboxTable.SelectedIdx)
+	case panelModeHitbox:
+		a.navigateToHitbox(a.hitboxTable.SelectedIdx)
 	case panelModeSprite:
 		a.navigateToSprite(a.spriteTable.SelectedIdx)
 	case panelModeAnimFrame:
@@ -172,6 +181,9 @@ func (a *EditorApp) syncPanelToSelection() {
 
 func (a *EditorApp) navigateToHitbox(hbIdx int) {
 	a.hitboxTable.SelectedIdx = hbIdx
+	// The four tables share one selection, so the hitbox row must take it.
+	a.hurtboxTable.SelectedIdx = -1
+	a.syncHurtboxBtns()
 	a.syncHitboxBtns()
 
 	if hbIdx >= 0 {

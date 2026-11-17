@@ -63,7 +63,7 @@ func (a *EditorApp) initScaleOrig(h int) {
 	o.origRot = sel.Rotation
 
 	switch o.target {
-	case panelModeHurtbox:
+	case panelModeHurtbox, panelModeHitbox:
 		sx, sy, ox, oy, rotDeg := a.getSpriteTransformForHurtboxSel()
 		o.hbSx, o.hbSy = sx, sy
 		o.hbOx, o.hbOy = ox, oy
@@ -106,7 +106,7 @@ func (a *EditorApp) initScaleOrig(h int) {
 func (a *EditorApp) applyHandleScale(mx, my int) {
 	o := &a.scaleOrig
 	if o.pxW <= 0 || o.pxH <= 0 {
-		if o.target == panelModeSprite || o.target == panelModeAnimFrame || o.target == panelModeHitbox {
+		if o.target == panelModeSprite || o.target == panelModeAnimFrame {
 			return
 		}
 	}
@@ -226,6 +226,23 @@ func (a *EditorApp) applyHandleScale(mx, my int) {
 			a.props[1].SetNumeric(hb.Y)
 			a.props[2].SetNumeric(hb.Width)
 			a.props[3].SetNumeric(hb.Height)
+		}
+	case panelModeHitbox:
+		if htp := a.hitboxList(); htp != nil &&
+			a.hitboxTable.SelectedIdx >= 0 && a.hitboxTable.SelectedIdx < len(*htp) {
+			ht := &(*htp)[a.hitboxTable.SelectedIdx]
+			// Hitboxes carry no rotation of their own, so the selection was
+			// drawn with the frame's sprite rotation and the inverse uses the
+			// same angle.
+			ht.Width = math.Max(1, math.Round(newW/o.hbSx*100)/100)
+			ht.Height = math.Max(1, math.Round(newH/o.hbSy*100)/100)
+			ht.X = math.Round(((newCx-o.hbOx)*o.hbCos+(newCy-o.hbOy)*o.hbSin)/o.hbSx*100) / 100
+			ht.Y = math.Round((-(newCx-o.hbOx)*o.hbSin+(newCy-o.hbOy)*o.hbCos)/o.hbSy*100) / 100
+			a.props[0].SetNumeric(ht.X)
+			a.props[1].SetNumeric(ht.Y)
+			a.props[2].SetNumeric(ht.Width)
+			a.props[3].SetNumeric(ht.Height)
+			a.syncHitboxBtns()
 		}
 	case panelModeSprite:
 		if s := a.spriteTable.SelectedIdx; s >= 0 && s < len(a.proj.Sprites) {

@@ -151,24 +151,7 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 				a.syncHurtboxBtns()
 			}
 		} else if htIdx := a.hitboxTable.SelectedIdx; htIdx >= 0 {
-			htp := a.hitboxList()
-			if htp != nil && htIdx < len(*htp) {
-				sx, sy, _, _, rotDeg := a.getSpriteTransformForHurtboxSel()
-				rot := rotDeg * math.Pi / 180
-				a.panelMode = panelModeHitbox
-				ht := &(*htp)[htIdx]
-				cos := math.Cos(rot)
-				sin := math.Sin(rot)
-				wdx := dx / a.canvas.Cam.Zoom
-				wdy := dy / a.canvas.Cam.Zoom
-				ldx := (wdx*cos + wdy*sin) / sx
-				ldy := (-wdx*sin + wdy*cos) / sy
-				ht.X = math.Round((ht.X+ldx)*100) / 100
-				ht.Y = math.Round((ht.Y+ldy)*100) / 100
-				a.props[0].SetNumeric(ht.X)
-				a.props[1].SetNumeric(ht.Y)
-				a.syncHitboxBtns()
-			}
+			a.dragHitbox(htIdx, dx, dy)
 		} else if a.panelMode == panelModeSprite && a.spriteTable.SelectedIdx >= 0 {
 			a.panelMode = panelModeSprite
 			row := &a.proj.Sprites[a.spriteTable.SelectedIdx]
@@ -282,4 +265,32 @@ func (a *EditorApp) dispatchWheel(mx, my int, wy float64) {
 	} else {
 		a.handleCanvasWheel(mx, my, wy, ctrl, shift)
 	}
+}
+
+// dragHitbox moves the selected hitbox by a screen-space delta. The whole right
+// panel is rewritten from the box, because a stale Width or Height (for example
+// a sprite's rotation/scale left over from a panel sync) would otherwise be
+// flushed straight back into the hitbox on the next frame.
+func (a *EditorApp) dragHitbox(htIdx int, dx, dy float64) {
+	htp := a.hitboxList()
+	if htp == nil || htIdx < 0 || htIdx >= len(*htp) {
+		return
+	}
+	sx, sy, _, _, rotDeg := a.getSpriteTransformForHurtboxSel()
+	rot := rotDeg * math.Pi / 180
+	a.panelMode = panelModeHitbox
+	ht := &(*htp)[htIdx]
+	cos := math.Cos(rot)
+	sin := math.Sin(rot)
+	wdx := dx / a.canvas.Cam.Zoom
+	wdy := dy / a.canvas.Cam.Zoom
+	ldx := (wdx*cos + wdy*sin) / sx
+	ldy := (-wdx*sin + wdy*cos) / sy
+	ht.X = math.Round((ht.X+ldx)*100) / 100
+	ht.Y = math.Round((ht.Y+ldy)*100) / 100
+	a.props[0].SetNumeric(ht.X)
+	a.props[1].SetNumeric(ht.Y)
+	a.props[2].SetNumeric(ht.Width)
+	a.props[3].SetNumeric(ht.Height)
+	a.syncHitboxBtns()
 }

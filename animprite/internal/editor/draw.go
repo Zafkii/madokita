@@ -17,7 +17,10 @@ func (a *EditorApp) Draw(screen *ebiten.Image) {
 	a.drawStatusbar(screen, p)
 
 	a.buildSpriteRenders()
-	a.canvas.RotationHandleVisible = ebiten.IsKeyPressed(ebiten.KeyShift) || a.rotationDrag.active
+	// A hitbox has no rotation of its own, so its selection must not offer a
+	// rotation handle that cannot do anything.
+	a.canvas.RotationHandleVisible = (ebiten.IsKeyPressed(ebiten.KeyShift) || a.rotationDrag.active) &&
+		a.panelMode != panelModeHitbox
 	a.canvas.Draw(screen)
 	a.drawStageStartMarker(screen, p)
 	a.drawStageMarquee(screen, p)

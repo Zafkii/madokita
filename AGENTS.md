@@ -280,7 +280,7 @@ AttackF(PhaseActive,
 ),
 ```
 
-The editor paints them on the canvas in red (the selected one filled) through the same box overlay list as hurtboxes: every entry carries a `Kind` (`RenderHurtbox`, `RenderHitbox`, `RenderCollision`) that picks the palette. Holding CapsLock and dragging the canvas moves the selected hitbox with the hurtbox math, rotation included, and the frame's rotation applies to the drawn box even though a hitbox itself has none.
+The editor paints them on the canvas in red (the selected one filled) through the same box overlay list as hurtboxes: every entry carries a `Kind` (`RenderHurtbox`, `RenderHitbox`, `RenderCollision`) that picks the palette. Holding CapsLock and dragging the canvas moves the selected hitbox with the hurtbox math, and Ctrl-dragging a corner handle resizes it (the handle snapshots the box, so one undo covers the whole drag). The frame's rotation applies to the drawn box even though a hitbox itself has none, which is also why a selected hitbox shows no rotation handle: there is no angle to store. Picking a hitbox row clears the hurtbox row and vice versa, so the shared selection always names one box.
 
 `HB` writes its rotation and damage multiplier only when they differ from 0 and 1 (`HB(20, 20, -4, -10, 30, 1.5)`); `HIT` always takes exactly four values. The importer accepts `S`, `HB`, `HBR` and `HIT` in any order and rejects anything else. On the game side `animation.AttackFrame` carries `Hurtboxes` and `Hitboxes`, and `Player.CurrentAttackHitboxes()` returns the playing frame's authored boxes in world space (mirrored by `FlipX`); damage itself still comes from the code-driven `combat.AttackConfig`.
 

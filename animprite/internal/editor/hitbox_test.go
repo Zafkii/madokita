@@ -235,3 +235,124 @@ func TestHitboxesRenderOnTheCanvas(t *testing.T) {
 		t.Fatalf("box renders without boxes = %d, want 0", len(got))
 	}
 }
+
+func TestHitboxSelectionSurvivesAPanelSync(t *testing.T) {
+	app := newHitboxTestApp(t)
+	app.proj.Animations[0].Frames[0].Hitboxes = []project.HitboxRow{
+		{X: 0, Y: 0, Width: 40, Height: 20},
+	}
+	// A sprite row stays selected after opening a project, which is what the
+	// canvas used to re-sync the panel to.
+	app.spriteTable.SelectedIdx = 0
+	app.navigateToHitbox(0)
+
+	if mode, ok := app.canvasSelectionTarget(); !ok || mode != panelModeHitbox {
+		t.Fatalf("canvas selection target = %v/%v, want hitbox", mode, ok)
+	}
+	app.syncPanelToSelection()
+	if app.panelMode != panelModeHitbox {
+		t.Fatalf("panel mode after a canvas press = %v, want hitbox", app.panelMode)
+	}
+	app.flushInputsToData()
+
+	got := app.proj.Animations[0].Frames[0].Hitboxes[0]
+	if got.Width != 40 || got.Height != 20 {
+		t.Fatalf("hitbox after a canvas press = %+v, want Width 40 Height 20", got)
+	}
+}
+
+func TestHitboxDragKeepsWidthAndHeight(t *testing.T) {
+	app := newHitboxTestApp(t)
+	app.proj.Animations[0].Frames[0].Hitboxes = []project.HitboxRow{
+		{X: 0, Y: 0, Width: 40, Height: 20},
+	}
+	app.spriteTable.SelectedIdx = 0
+	app.navigateToHitbox(0)
+
+	// The panel was showing the sprite entry (rotation 0, scale 1) right
+	// before the drag, which is how Width/Height used to become 0 and 1.
+	app.loadAnimFrameProps(0, 0)
+	app.dragHitbox(0, 12, -6)
+	app.flushInputsToData()
+
+	got := app.proj.Animations[0].Frames[0].Hitboxes[0]
+	want := project.HitboxRow{X: 12, Y: -6, Width: 40, Height: 20}
+	if got != want {
+		t.Fatalf("hitbox after dragging = %+v, want %+v", got, want)
+	}
+}
+
+func TestSelectingAHitboxTakesTheSelectionFromTheHurtbox(t *testing.T) {
+	app := newHitboxTestApp(t)
+	app.proj.Animations[0].Frames[0].Hurtboxes = []project.HurtboxRow{
+		{X: 0, Y: 0, Width: 10, Height: 10},
+	}
+	app.proj.Animations[0].Frames[0].Hitboxes = []project.HitboxRow{
+		{X: 0, Y: 0, Width: 40, Height: 20},
+	}
+	app.syncHurtboxBtns()
+	app.navigateToHurtbox(0)
+	app.navigateToHitbox(0)
+
+	if got := app.hurtboxTable.SelectedIdx; got != -1 {
+		t.Fatalf("hurtbox row still selected = %d, want -1", got)
+	}
+	if got := app.hitboxTable.SelectedIdx; got != 0 {
+		t.Fatalf("hitbox row = %d, want 0", got)
+	}
+	if mode, ok := app.canvasSelectionTarget(); !ok || mode != panelModeHitbox {
+		t.Fatalf("canvas selection target = %v/%v, want hitbox", mode, ok)
+	}
+
+	// The next flush must edit the hitbox, never the hurtbox it left behind.
+	app.flushInputsToData()
+	hb := app.proj.Animations[0].Frames[0].Hurtboxes[0]
+	if hb != (project.HurtboxRow{X: 0, Y: 0, Width: 10, Height: 10, DmgMult: 0}) && hb.Width != 10 {
+		t.Fatalf("hurtbox was rewritten = %+v", hb)
+	}
+
+	// And the reverse: picking the hurtbox drops the hitbox selection.
+	app.navigateToHurtbox(0)
+	if got := app.hitboxTable.SelectedIdx; got != -1 {
+		t.Fatalf("hitbox row after picking the hurtbox = %d, want -1", got)
+	}
+}
+
+func TestHitboxScaleHandlesResizeTheBox(t *testing.T) {
+	app := newHitboxTestApp(t)
+	app.proj.Animations[0].Frames[0].Hitboxes = []project.HitboxRow{
+		{X: 0, Y: 0, Width: 40, Height: 20},
+	}
+	app.navigateToHitbox(0)
+	// Same rect the renderer publishes for a hitbox centred on the origin.
+	app.canvas.Selection = canvas.SelectionRect{X: -20, Y: -10, W: 40, H: 20, Visible: true}
+
+	// The press handler records the grabbed handle before snapshotting the
+	// original box.
+	app.scaleHandle = 2 // bottom-right
+	app.initScaleOrig(2)
+	// Drag the bottom-right corner out to world (40, 30): the opposite
+	// (top-left) corner stays at (-20, -10), so the box becomes 60x40 centred
+	// on (10, 10). X/Y hold the centre, like hurtboxes.
+	mx, my := hitboxScreenPoint(app, 40, 30)
+	app.applyHandleScale(mx, my)
+
+	got := app.proj.Animations[0].Frames[0].Hitboxes[0]
+	want := project.HitboxRow{X: 10, Y: 10, Width: 60, Height: 40}
+	if got != want {
+		t.Fatalf("scaled hitbox = %+v, want %+v", got, want)
+	}
+	app.flushInputsToData()
+	if got := app.proj.Animations[0].Frames[0].Hitboxes[0]; got != want {
+		t.Fatalf("hitbox after flush = %+v, want %+v", got, want)
+	}
+}
+
+// hitboxScreenPoint mirrors the screen<-world conversion applyHandleScale
+// undoes, so tests can express drags in world coordinates.
+func hitboxScreenPoint(app *EditorApp, wx, wy float64) (int, int) {
+	zoom := app.canvas.Cam.Zoom
+	mx := wx*zoom + float64(app.canvas.Width)/2 + app.canvas.Cam.X + float64(app.canvas.X)
+	my := wy*zoom + float64(app.canvas.Height)/2 + app.canvas.Cam.Y + float64(app.canvas.Y)
+	return int(mx), int(my)
+}
