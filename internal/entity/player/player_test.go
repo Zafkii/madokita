@@ -1032,3 +1032,78 @@ func TestCurrentAttackHitboxesIsEmptyWithoutAuthoredBoxes(t *testing.T) {
 		t.Fatalf("hitboxes = %+v, want none for an attack without authored boxes", got)
 	}
 }
+
+// The frame's authored hitbox is what the game resolves: the config geometry
+// is only a fallback for defs that predate the editor.
+func TestActiveHitboxesUseTheAuthoredFrameGeometry(t *testing.T) {
+	p := commitmentTestPlayer()
+	p.attackAnim = animation.NewAttackAnimator(authoredHitboxDef())
+	p.X, p.Y = 100, 200
+	p.Combat.controllers["atk"].Hitbox().Config = combat.HitboxConfig{
+		W: 999, H: 999, OffsetX: 500, OffsetY: 500,
+	}
+
+	if !p.TryAttack("atk") {
+		t.Fatal("attack should start")
+	}
+	p.updateAttacking(0.05) // windup frame
+	p.updateAttacking(0.05) // first active frame
+
+	got := p.ActiveHitboxes()
+	want := math2.Rect{X: 140, Y: 165, W: 40, H: 30}
+	if len(got) != 1 || got[0] != want {
+		t.Fatalf("active hitboxes = %v, want the authored %v", got, want)
+	}
+
+	p.FlipX = true
+	flipped := p.ActiveHitboxes()
+	wantFlip := math2.Rect{X: 20, Y: 165, W: 40, H: 30}
+	if len(flipped) != 1 || flipped[0] != wantFlip {
+		t.Fatalf("flipped hitboxes = %v, want %v", flipped, wantFlip)
+	}
+}
+
+// attackHurtboxDef gives every phase a different authored hurtbox so the
+// overlay can only show the right one by following the playing frame.
+func attackHurtboxDef() animation.Attack {
+	return animation.Attack{
+		Animations: map[string]animation.AttackAnimDef{
+			"atk": animation.AttackAnim(10, false, 0, 0, 0, 1000, 4, 1, 1, 1,
+				animation.AttackF(animation.PhaseWindup,
+					animation.S(0, 0), animation.HB(10, 12, 1, 2)),
+				animation.AttackF(animation.PhaseActive,
+					animation.S(0, 1), animation.HB(40, 50, 30, -20)),
+				animation.AttackF(animation.PhaseRecover,
+					animation.S(0, 2), animation.HB(70, 80, 5, 6)),
+			),
+		},
+	}
+}
+
+func TestCurrentAttackHurtboxesFollowThePlayingFrame(t *testing.T) {
+	p := commitmentTestPlayer()
+	p.attackAnim = animation.NewAttackAnimator(attackHurtboxDef())
+	if got := p.CurrentAttackHurtboxes(); len(got) != 0 {
+		t.Fatalf("idle attack hurtboxes = %v, want none", got)
+	}
+
+	if !p.TryAttack("atk") {
+		t.Fatal("attack should start")
+	}
+	if got := p.CurrentAttackHurtboxes(); len(got) != 1 || got[0].W != 10 {
+		t.Fatalf("windup hurtboxes = %+v, want the windup box", got)
+	}
+
+	p.updateAttacking(0.05)
+	p.updateAttacking(0.05) // first active frame
+	got := p.CurrentAttackHurtboxes()
+	if len(got) != 1 || got[0].W != 40 || got[0].H != 50 || got[0].OffsetX != 30 || got[0].OffsetY != -20 {
+		t.Fatalf("active hurtboxes = %+v, want the active box", got)
+	}
+
+	p.updateAttacking(0.05)
+	p.updateAttacking(0.05) // recover frame
+	if got := p.CurrentAttackHurtboxes(); len(got) != 1 || got[0].W != 70 {
+		t.Fatalf("recover hurtboxes = %+v, want the recover box", got)
+	}
+}

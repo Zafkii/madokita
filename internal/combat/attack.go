@@ -134,6 +134,12 @@ func (c *Controller) SyncPhase(p AttackPhase) {
 	}
 }
 
+// SetGeometry installs the hitbox geometry authored on the playing attack
+// frame. Damage, poise and stagger still come from the config.
+func (c *Controller) SetGeometry(boxes []HitboxGeometry) {
+	c.hitbox.SetGeometry(boxes)
+}
+
 func (c *Controller) Phase() AttackPhase   { return c.phase }
 func (c *Controller) Config() AttackConfig { return c.config }
 func (c *Controller) Hitbox() *Hitbox      { return c.hitbox }

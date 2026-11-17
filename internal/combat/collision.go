@@ -46,10 +46,14 @@ func (cs *CollisionSystem) Update() []HitResult {
 			if cs.alreadyProcessed(h.OwnerID, a.ActorID) {
 				continue
 			}
-			for _, hurtbox := range a.HurtboxSystem.Hurtboxes() {
-				hbRect := h.Rect(math2.Vec2{}, false)
-				hbRect2 := hurtbox.Rect(math2.Vec2{}, false)
-				if hbRect.Overlaps(hbRect2) {
+			// The hitbox carries the geometry authored on the playing attack
+			// frame, so a single attack frame can have several boxes.
+			for _, hbRect := range h.Rects(math2.Vec2{}, false) {
+				hitHurtbox := false
+				for _, hurtbox := range a.HurtboxSystem.Hurtboxes() {
+					if !hbRect.Overlaps(hurtbox.Rect(math2.Vec2{}, false)) {
+						continue
+					}
 					result := CalculateHit(
 						owner.Stats.Attack,
 						a.Stats.Defense,
@@ -66,6 +70,10 @@ func (cs *CollisionSystem) Update() []HitResult {
 					a.ReceiveHit(result)
 					cs.markProcessed(h.OwnerID, a.ActorID)
 					results = append(results, result)
+					hitHurtbox = true
+					break
+				}
+				if hitHurtbox {
 					break
 				}
 			}

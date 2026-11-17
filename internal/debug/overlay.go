@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"math"
 
+	"madokita-gems/internal/animation"
 	"madokita-gems/internal/entity/player"
 	"madokita-gems/internal/input"
 	"madokita-gems/internal/stage"
@@ -57,18 +58,28 @@ func drawBox(screen *ebiten.Image, cx, cy, w, h, rotation, cameraX float64, fill
 }
 
 func DrawHurtboxes(screen *ebiten.Image, p *player.Player, cameraX float64) {
-	if p.Animations.Animator == nil {
-		return
+	// While an attack plays, its frames own the body geometry: the movement
+	// animator is frozen on the last movement frame and would draw a stale
+	// box. Frames without authored hurtboxes fall back to the movement ones.
+	var boxes []animation.FrameHurtbox
+	if p.State.IsAttacking {
+		boxes = p.CurrentAttackHurtboxes()
 	}
-	frame := p.Animations.Animator.CurrentFrame()
-	if frame == nil {
-		return
+	if len(boxes) == 0 {
+		if p.Animations.Animator == nil {
+			return
+		}
+		frame := p.Animations.Animator.CurrentFrame()
+		if frame == nil {
+			return
+		}
+		boxes = frame.Hurtboxes
 	}
 	fillCM := colorm.ColorM{}
 	fillCM.Scale(1, 1, 0, 0.20)
 	stroke := color.RGBA{255, 255, 0, 230}
 
-	for _, hb := range frame.Hurtboxes {
+	for _, hb := range boxes {
 		ox := hb.OffsetX * p.Scale
 		oy := hb.OffsetY * p.Scale
 		if p.FlipX {

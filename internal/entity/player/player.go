@@ -641,8 +641,8 @@ func (p *Player) SetupCombat(def *animation.Attack, configs []combat.AttackConfi
 }
 
 // ActiveHitboxes returns the world-space hitboxes of the current attack that
-// are active during this frame. Used by the debug overlay; gameplay collision
-// remains owned by the combat controllers.
+// are active during this frame: the boxes authored on the playing attack
+// frame, or the config box when the frame carries none.
 func (p *Player) ActiveHitboxes() []math2.Rect {
 	if p.Combat.controllers == nil || p.Combat.currentID == "" {
 		return nil
@@ -655,7 +655,22 @@ func (p *Player) ActiveHitboxes() []math2.Rect {
 	if hitbox == nil || !hitbox.Active {
 		return nil
 	}
-	return []math2.Rect{hitbox.Rect(math2.Vec2{X: p.X, Y: p.Y}, p.FlipX)}
+	return hitbox.Rects(math2.Vec2{X: p.X, Y: p.Y}, p.FlipX)
+}
+
+// CurrentAttackHurtboxes returns the hurtboxes authored on the playing attack
+// frame, so the debug overlay can draw the geometry the editor animated
+// instead of the frozen movement frame. Combat does not resolve damage against
+// them yet.
+func (p *Player) CurrentAttackHurtboxes() []animation.FrameHurtbox {
+	if p.attackAnim == nil {
+		return nil
+	}
+	frame := p.attackAnim.CurrentFrame()
+	if frame == nil {
+		return nil
+	}
+	return frame.Hurtboxes
 }
 
 // CurrentAttackHitboxes returns the hitboxes authored on the playing attack
@@ -753,6 +768,7 @@ func (p *Player) updateAttacking(dtSec float64) {
 
 	if controller, ok := p.Combat.controllers[p.Combat.currentID]; ok {
 		controller.SyncPhase(mapAnimToCombatPhase(p.attackAnim.Phase()))
+		controller.SetGeometry(authoredGeometry(p.attackAnim.CurrentFrame()))
 	}
 
 	// Commitment by phase: immobile while windup+active, free to move during
@@ -784,6 +800,22 @@ func (p *Player) updateAttacking(dtSec float64) {
 		p.PlayAnim("walk")
 		return
 	}
+}
+
+// authoredGeometry converts the editor-authored hitboxes of one attack frame
+// into the geometry the combat hitbox resolves. Frames without boxes clear
+// it, so the config fallback applies.
+func authoredGeometry(frame *animation.AttackFrame) []combat.HitboxGeometry {
+	if frame == nil || len(frame.Hitboxes) == 0 {
+		return nil
+	}
+	boxes := make([]combat.HitboxGeometry, 0, len(frame.Hitboxes))
+	for _, hb := range frame.Hitboxes {
+		boxes = append(boxes, combat.HitboxGeometry{
+			W: hb.W, H: hb.H, OffsetX: hb.OffsetX, OffsetY: hb.OffsetY,
+		})
+	}
+	return boxes
 }
 
 func mapAnimToCombatPhase(p animation.AttackPhase) combat.AttackPhase {
