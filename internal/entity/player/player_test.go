@@ -1107,3 +1107,28 @@ func TestCurrentAttackHurtboxesFollowThePlayingFrame(t *testing.T) {
 		t.Fatalf("recover hurtboxes = %+v, want the recover box", got)
 	}
 }
+
+// The editor authors boxes in the frame's pixel space, so the player scale
+// applies to the hitbox exactly like it does to the sprites: at Scale 0.5 a
+// 40x30 authored box must be 20x15 on screen, not twice its size.
+func TestAuthoredHitboxScalesWithThePlayer(t *testing.T) {
+	p := commitmentTestPlayer()
+	p.attackAnim = animation.NewAttackAnimator(authoredHitboxDef())
+	p.X, p.Y = 100, 200
+	p.Scale = 0.5
+
+	if !p.TryAttack("atk") {
+		t.Fatal("attack should start")
+	}
+	p.updateAttacking(0.05) // windup frame
+	p.updateAttacking(0.05) // first active frame
+
+	// HIT(40, 30, 60, -20) at Scale 0.5: 20x15 centred 30 right, 10 above.
+	want := math2.Rect{X: 120, Y: 182.5, W: 20, H: 15}
+	if got := p.ActiveHitboxes(); len(got) != 1 || got[0] != want {
+		t.Fatalf("active hitboxes = %v, want %v", got, want)
+	}
+	if got := p.CurrentAttackHitboxes(); len(got) != 1 || got[0] != want {
+		t.Fatalf("authored hitboxes = %v, want %v", got, want)
+	}
+}

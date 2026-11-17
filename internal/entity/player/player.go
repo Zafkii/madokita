@@ -685,17 +685,20 @@ func (p *Player) CurrentAttackHitboxes() []math2.Rect {
 	if frame == nil || len(frame.Hitboxes) == 0 {
 		return nil
 	}
+	scale := p.collisionScale()
 	rects := make([]math2.Rect, 0, len(frame.Hitboxes))
 	for _, hb := range frame.Hitboxes {
-		ox := hb.OffsetX
+		ox := hb.OffsetX * scale
 		if p.FlipX {
 			ox = -ox
 		}
+		w := hb.W * scale
+		h := hb.H * scale
 		rects = append(rects, math2.NewRect(
-			p.X+ox-hb.W/2,
-			p.Y+hb.OffsetY-hb.H/2,
-			hb.W,
-			hb.H,
+			p.X+ox-w/2,
+			p.Y+hb.OffsetY*scale-h/2,
+			w,
+			h,
 		))
 	}
 	return rects
@@ -768,7 +771,7 @@ func (p *Player) updateAttacking(dtSec float64) {
 
 	if controller, ok := p.Combat.controllers[p.Combat.currentID]; ok {
 		controller.SyncPhase(mapAnimToCombatPhase(p.attackAnim.Phase()))
-		controller.SetGeometry(authoredGeometry(p.attackAnim.CurrentFrame()))
+		controller.SetGeometry(authoredGeometry(p.attackAnim.CurrentFrame(), p.collisionScale()))
 	}
 
 	// Commitment by phase: immobile while windup+active, free to move during
@@ -803,16 +806,21 @@ func (p *Player) updateAttacking(dtSec float64) {
 }
 
 // authoredGeometry converts the editor-authored hitboxes of one attack frame
-// into the geometry the combat hitbox resolves. Frames without boxes clear
-// it, so the config fallback applies.
-func authoredGeometry(frame *animation.AttackFrame) []combat.HitboxGeometry {
+// into world geometry the combat hitbox resolves. The editor authors in the
+// frame's pixel space, so the player scale applies exactly as it does to the
+// sprites and hurtboxes. Frames without boxes clear it, so the config
+// fallback applies.
+func authoredGeometry(frame *animation.AttackFrame, scale float64) []combat.HitboxGeometry {
 	if frame == nil || len(frame.Hitboxes) == 0 {
 		return nil
 	}
 	boxes := make([]combat.HitboxGeometry, 0, len(frame.Hitboxes))
 	for _, hb := range frame.Hitboxes {
 		boxes = append(boxes, combat.HitboxGeometry{
-			W: hb.W, H: hb.H, OffsetX: hb.OffsetX, OffsetY: hb.OffsetY,
+			W:       hb.W * scale,
+			H:       hb.H * scale,
+			OffsetX: hb.OffsetX * scale,
+			OffsetY: hb.OffsetY * scale,
 		})
 	}
 	return boxes
