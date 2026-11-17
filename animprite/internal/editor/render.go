@@ -165,7 +165,7 @@ func (a *EditorApp) buildSpriteRenders() {
 		if hbp != nil && hbIdx < len(*hbp) {
 			hb := (*hbp)[hbIdx]
 			// Hurtboxes render against the frame's first sprite entry
-			// (see buildHurtboxRenders), so the selection must use the same
+			// (see boxRenders), so the selection must use the same
 			// transform instead of the sprite-selected entry.
 			sx, sy, ox, oy, spriteRot := a.spriteTransformForFrame(activeFrame)
 			rotRad := spriteRot * math.Pi / 180
@@ -177,6 +177,22 @@ func (a *EditorApp) buildSpriteRenders() {
 			wh := hb.Height * sy
 			hbRotRad := (spriteRot + hb.Rotation) * math.Pi / 180
 			a.canvas.SetSelectionRect(canvas.SelectionRect{X: wcx - ww/2, Y: wcy - wh/2, W: ww, H: wh, Rotation: hbRotRad, Visible: true})
+		} else {
+			a.canvas.SetSelectionRect(canvas.SelectionRect{Visible: false})
+		}
+	} else if htIdx := a.hitboxTable.SelectedIdx; htIdx >= 0 {
+		htp := a.hitboxList()
+		if htp != nil && htIdx < len(*htp) {
+			ht := (*htp)[htIdx]
+			sx, sy, ox, oy, spriteRot := a.spriteTransformForFrame(activeFrame)
+			rotRad := spriteRot * math.Pi / 180
+			cos := math.Cos(rotRad)
+			sin := math.Sin(rotRad)
+			wcx := (ht.X*sx)*cos - (ht.Y*sy)*sin + ox
+			wcy := (ht.X*sx)*sin + (ht.Y*sy)*cos + oy
+			ww := ht.Width * sx
+			wh := ht.Height * sy
+			a.canvas.SetSelectionRect(canvas.SelectionRect{X: wcx - ww/2, Y: wcy - wh/2, W: ww, H: wh, Rotation: rotRad, Visible: true})
 		} else {
 			a.canvas.SetSelectionRect(canvas.SelectionRect{Visible: false})
 		}
@@ -202,78 +218,59 @@ func (a *EditorApp) buildSpriteRenders() {
 		a.canvas.SetSelectionRect(canvas.SelectionRect{Visible: false})
 	}
 
-	a.buildHurtboxRenders()
+	a.buildBoxRenders()
 }
 
-func (a *EditorApp) buildHurtboxRenders() {
-	var activeFrame *project.AnimationFrame
-	if a.animTable.SelectedIdx >= 0 && a.animTable.SelectedIdx < len(a.proj.Animations) {
-		anim := &a.proj.Animations[a.animTable.SelectedIdx]
-		if anim.CurrentIdx >= 0 && anim.CurrentIdx < len(anim.Frames) {
-			activeFrame = &anim.Frames[anim.CurrentIdx]
-		}
+// boxRenders projects the current frame's hurtboxes and attack hitboxes into
+// world space, using the same transform for both so the overlay lines up with
+// the artwork. The canvas picks the palette from Kind.
+func (a *EditorApp) boxRenders() []canvas.BoxRender {
+	frame := a.currentFrame()
+	if frame == nil {
+		return nil
 	}
-
-	selectedHbIdx := a.hurtboxTable.SelectedIdx
-
-	if activeFrame != nil {
-		sx, sy, ox, oy, spriteRot := a.spriteTransformForFrame(activeFrame)
-		rotRad := spriteRot * math.Pi / 180
-		cos := math.Cos(rotRad)
-		sin := math.Sin(rotRad)
-
-		hbRenders := make([]canvas.HurtboxRender, 0, len(activeFrame.Hurtboxes))
-		for i, hb := range activeFrame.Hurtboxes {
-			if hb.Width <= 0 || hb.Height <= 0 {
-				continue
-			}
-			hbRot := (spriteRot + hb.Rotation) * math.Pi / 180
-			wx := (hb.X*sx)*cos - (hb.Y*sy)*sin + ox
-			wy := (hb.X*sx)*sin + (hb.Y*sy)*cos + oy
-			hbRenders = append(hbRenders, canvas.HurtboxRender{
-				OffsetX:     wx,
-				OffsetY:     wy,
-				WorldWidth:  hb.Width * sx,
-				WorldHeight: hb.Height * sy,
-				Rotation:    hbRot,
-				Selected:    i == selectedHbIdx,
-			})
-		}
-		a.canvas.SetHurtboxRenders(hbRenders)
-		return
-	}
-
-	// Fallback: no active animation frame
-	hbp := a.hurtboxList()
-	if hbp == nil {
-		a.canvas.SetHurtboxRenders(nil)
-		return
-	}
-	hbList := *hbp
-
-	sx, sy, ox, oy, spriteRot := a.getSpriteTransformForHurtboxSel()
-
-	hbRenders := make([]canvas.HurtboxRender, 0, len(hbList))
+	sx, sy, ox, oy, spriteRot := a.spriteTransformForFrame(frame)
 	rotRad := spriteRot * math.Pi / 180
 	cos := math.Cos(rotRad)
 	sin := math.Sin(rotRad)
-	for i, hb := range hbList {
+
+	renders := make([]canvas.BoxRender, 0, len(frame.Hurtboxes)+len(frame.Hitboxes))
+	selectedHbIdx := a.hurtboxTable.SelectedIdx
+	for i, hb := range frame.Hurtboxes {
 		if hb.Width <= 0 || hb.Height <= 0 {
 			continue
 		}
-		hbRot := (spriteRot + hb.Rotation) * math.Pi / 180
-		wx := (hb.X*sx)*cos - (hb.Y*sy)*sin + ox
-		wy := (hb.X*sx)*sin + (hb.Y*sy)*cos + oy
-		hbRenders = append(hbRenders, canvas.HurtboxRender{
-			OffsetX:     wx,
-			OffsetY:     wy,
+		renders = append(renders, canvas.BoxRender{
+			OffsetX:     (hb.X*sx)*cos - (hb.Y*sy)*sin + ox,
+			OffsetY:     (hb.X*sx)*sin + (hb.Y*sy)*cos + oy,
 			WorldWidth:  hb.Width * sx,
 			WorldHeight: hb.Height * sy,
-			Rotation:    hbRot,
+			Rotation:    (spriteRot + hb.Rotation) * math.Pi / 180,
 			Selected:    i == selectedHbIdx,
+			Kind:        canvas.RenderHurtbox,
 		})
 	}
-	a.canvas.SetHurtboxRenders(hbRenders)
+
+	selectedHtIdx := a.hitboxTable.SelectedIdx
+	for i, ht := range frame.Hitboxes {
+		if ht.Width <= 0 || ht.Height <= 0 {
+			continue
+		}
+		renders = append(renders, canvas.BoxRender{
+			OffsetX:     (ht.X*sx)*cos - (ht.Y*sy)*sin + ox,
+			OffsetY:     (ht.X*sx)*sin + (ht.Y*sy)*cos + oy,
+			WorldWidth:  ht.Width * sx,
+			WorldHeight: ht.Height * sy,
+			Rotation:    spriteRot * math.Pi / 180,
+			Selected:    i == selectedHtIdx,
+			Kind:        canvas.RenderHitbox,
+		})
+	}
+	return renders
+}
+
+func (a *EditorApp) buildBoxRenders() {
+	a.canvas.SetBoxRenders(a.boxRenders())
 }
 
 func (a *EditorApp) spriteTransformForFrame(frame *project.AnimationFrame) (sx, sy, ox, oy, rotDeg float64) {

@@ -47,7 +47,7 @@ func (a *EditorApp) buildStageRenders() {
 		renders = nil
 	}
 	a.canvas.SetSpriteRenders(renders)
-	a.canvas.SetHurtboxRenders(a.stageCollisionRenders())
+	a.canvas.SetBoxRenders(a.stageCollisionRenders())
 
 	extras := make([]canvas.SelectionRect, 0, a.stageSelectionCount())
 	for _, idx := range a.stageSelectedIndices() {
@@ -139,11 +139,11 @@ func (a *EditorApp) stageObjectRender(obj *project.StageObject, opacity float64)
 
 // stageBoxRender places an authored box in world space using the object's
 // center and rotation. Box X/Y are offsets from that center.
-func stageBoxRender(obj *project.StageObject, box project.StageBox, kind canvas.RenderKind, selected bool) canvas.HurtboxRender {
+func stageBoxRender(obj *project.StageObject, box project.StageBox, kind canvas.RenderKind, selected bool) canvas.BoxRender {
 	rot := obj.Rotation * math.Pi / 180
 	cos := math.Cos(rot)
 	sin := math.Sin(rot)
-	return canvas.HurtboxRender{
+	return canvas.BoxRender{
 		OffsetX:     obj.X + box.X*cos - box.Y*sin,
 		OffsetY:     obj.Y + box.X*sin + box.Y*cos,
 		WorldWidth:  box.Width,
@@ -157,12 +157,12 @@ func stageBoxRender(obj *project.StageObject, box project.StageBox, kind canvas.
 // stageCollisionRenders builds the collision and hitbox overlays shown when
 // the Layers panel's show-collisions toggle is on. Disabled blocks produce no
 // overlays; blocks without authored collision fall back to their block size.
-func (a *EditorApp) stageCollisionRenders() []canvas.HurtboxRender {
+func (a *EditorApp) stageCollisionRenders() []canvas.BoxRender {
 	if !a.st.showCollisions {
 		return nil
 	}
 	stage := &a.proj.Stage
-	var out []canvas.HurtboxRender
+	var out []canvas.BoxRender
 	for i := range stage.Objects {
 		obj := &stage.Objects[i]
 		collisions := obj.EffectiveCollisionBoxes()

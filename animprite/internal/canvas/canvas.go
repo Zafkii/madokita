@@ -41,7 +41,7 @@ const (
 	RenderCollision
 )
 
-type HurtboxRender struct {
+type BoxRender struct {
 	OffsetX     float64
 	OffsetY     float64
 	WorldWidth  float64
@@ -71,7 +71,7 @@ type Canvas struct {
 	HighlightedHandle         int
 	RotationHandleVisible     bool
 	HighlightedRotationHandle bool
-	hurtboxRenders            []HurtboxRender
+	boxRenders            []BoxRender
 	whitePixel                *ebiten.Image
 	fillPixel                 *ebiten.Image
 }
@@ -88,8 +88,8 @@ func (c *Canvas) SetExtraSelections(r []SelectionRect) {
 	c.ExtraSelections = r
 }
 
-func (c *Canvas) SetHurtboxRenders(r []HurtboxRender) {
-	c.hurtboxRenders = r
+func (c *Canvas) SetBoxRenders(r []BoxRender) {
+	c.boxRenders = r
 }
 
 func New(x, y, w, h int, th *theme.Manager) *Canvas {
@@ -138,8 +138,8 @@ func (c *Canvas) Draw(screen *ebiten.Image) {
 	for _, sel := range c.ExtraSelections {
 		c.drawSelectionOutline(c.drawBuf, cam, p, sel)
 	}
-	if len(c.hurtboxRenders) > 0 {
-		c.drawHurtboxes(c.drawBuf, cam)
+	if len(c.boxRenders) > 0 {
+		c.drawBoxes(c.drawBuf, cam)
 	}
 	if c.Selection.Visible && c.RotationHandleVisible {
 		c.drawRotationGuide(c.drawBuf, p)
@@ -550,8 +550,8 @@ func boxColors(kind RenderKind, selected bool) (fill, border color.RGBA) {
 	return fill, border
 }
 
-func (c *Canvas) drawHurtboxes(screen *ebiten.Image, cam *camera.Camera) {
-	for _, h := range c.hurtboxRenders {
+func (c *Canvas) drawBoxes(screen *ebiten.Image, cam *camera.Camera) {
+	for _, h := range c.boxRenders {
 		if h.WorldWidth <= 0 || h.WorldHeight <= 0 {
 			continue
 		}

@@ -150,6 +150,25 @@ func (a *EditorApp) handleCanvasMouse(mx, my int, leftDown, justPressed bool) {
 				a.props[1].SetNumeric(hb.Y)
 				a.syncHurtboxBtns()
 			}
+		} else if htIdx := a.hitboxTable.SelectedIdx; htIdx >= 0 {
+			htp := a.hitboxList()
+			if htp != nil && htIdx < len(*htp) {
+				sx, sy, _, _, rotDeg := a.getSpriteTransformForHurtboxSel()
+				rot := rotDeg * math.Pi / 180
+				a.panelMode = panelModeHitbox
+				ht := &(*htp)[htIdx]
+				cos := math.Cos(rot)
+				sin := math.Sin(rot)
+				wdx := dx / a.canvas.Cam.Zoom
+				wdy := dy / a.canvas.Cam.Zoom
+				ldx := (wdx*cos + wdy*sin) / sx
+				ldy := (-wdx*sin + wdy*cos) / sy
+				ht.X = math.Round((ht.X+ldx)*100) / 100
+				ht.Y = math.Round((ht.Y+ldy)*100) / 100
+				a.props[0].SetNumeric(ht.X)
+				a.props[1].SetNumeric(ht.Y)
+				a.syncHitboxBtns()
+			}
 		} else if a.panelMode == panelModeSprite && a.spriteTable.SelectedIdx >= 0 {
 			a.panelMode = panelModeSprite
 			row := &a.proj.Sprites[a.spriteTable.SelectedIdx]

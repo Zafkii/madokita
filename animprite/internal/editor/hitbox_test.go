@@ -3,6 +3,7 @@ package editor
 import (
 	"testing"
 
+	"animprite/internal/canvas"
 	"animprite/internal/project"
 )
 
@@ -193,5 +194,44 @@ func TestFrameSwitchRefreshesHitboxRows(t *testing.T) {
 	}
 	if got := app.hitboxTable.SelectedIdx; got != -1 {
 		t.Fatalf("selection on an empty frame = %d, want -1", got)
+	}
+}
+
+func TestHitboxesRenderOnTheCanvas(t *testing.T) {
+	app := newHitboxTestApp(t)
+	app.proj.Animations[0].Frames[0].Hurtboxes = []project.HurtboxRow{
+		{X: 2, Y: 3, Width: 10, Height: 12},
+	}
+	app.proj.Animations[0].Frames[0].Hitboxes = []project.HitboxRow{
+		{X: 10, Y: -4, Width: 40, Height: 20},
+	}
+	app.hitboxTable.SelectedIdx = 0
+
+	renders := app.boxRenders()
+	if len(renders) != 2 {
+		t.Fatalf("box renders = %d, want 2 (one hurtbox, one hitbox)", len(renders))
+	}
+	if renders[0].Kind != canvas.RenderHurtbox || renders[0].Selected {
+		t.Fatalf("hurtbox render = %+v, want unselected hurtbox", renders[0])
+	}
+	ht := renders[1]
+	if ht.Kind != canvas.RenderHitbox {
+		t.Fatalf("hitbox render kind = %v, want RenderHitbox", ht.Kind)
+	}
+	if !ht.Selected {
+		t.Fatal("the selected hitbox row must render as selected")
+	}
+	if ht.OffsetX != 10 || ht.OffsetY != -4 || ht.WorldWidth != 40 || ht.WorldHeight != 20 {
+		t.Fatalf("hitbox render = %+v, want world box at (10,-4) 40x20", ht)
+	}
+	if ht.Rotation != 0 {
+		t.Fatalf("hitbox rotation = %v, want 0", ht.Rotation)
+	}
+
+	// An empty frame draws nothing from the attack box list.
+	app.proj.Animations[0].Frames[0].Hitboxes = nil
+	app.proj.Animations[0].Frames[0].Hurtboxes = nil
+	if got := app.boxRenders(); len(got) != 0 {
+		t.Fatalf("box renders without boxes = %d, want 0", len(got))
 	}
 }
