@@ -25,6 +25,7 @@ type AnimationFrame struct {
 	Sprites   []FrameSpriteEntry
 	Phase     FramePhase
 	Hurtboxes []HurtboxRow
+	Hitboxes  []HitboxRow
 }
 
 type AnimationRow struct {
@@ -68,7 +69,12 @@ type HurtboxRow struct {
 	DmgMult  float64
 }
 
+// HitboxRow is a damage box attached to a frame. Unlike HurtboxRow it carries
+// no rotation and no damage multiplier: position and size is all an attack
+// frame needs to place its hit.
 type HitboxRow struct {
+	X      float64
+	Y      float64
 	Width  float64
 	Height float64
 }
@@ -80,6 +86,5 @@ type ProjectData struct {
 	DefaultOriginY float64
 	Animations     []AnimationRow
 	Sprites        []SpriteRow
-	HitDefs        []HitboxRow
 	Stage          StageData
 }

@@ -53,6 +53,13 @@ func ExportAttack(path string, proj *project.ProjectData) error {
 					s.OffsetX, s.OffsetY, s.Rotation, s.ScaleX, s.ScaleY,
 					s.OriginX, s.OriginY)
 			}
+			for _, hb := range frame.Hurtboxes {
+				b.WriteString("\t\t\t\t" + exportHurtboxCall(hb) + ",\n")
+			}
+			for _, ht := range frame.Hitboxes {
+				fmt.Fprintf(&b, "\t\t\t\tHIT(%g, %g, %g, %g),\n",
+					ht.Width, ht.Height, ht.X, ht.Y)
+			}
 			b.WriteString("\t\t\t),\n")
 		}
 
@@ -62,6 +69,21 @@ func ExportAttack(path string, proj *project.ProjectData) error {
 	b.WriteString("\t},\n}\n")
 
 	return os.WriteFile(path, []byte(b.String()), 0644)
+}
+
+// exportHurtboxCall renders one hurtbox in the data-DSL form. The trailing
+// rotation and damage multiplier are only written when they differ from their
+// defaults, so ordinary boxes stay short.
+func exportHurtboxCall(hb project.HurtboxRow) string {
+	base := fmt.Sprintf("HB(%g, %g, %g, %g", hb.Width, hb.Height, hb.X, hb.Y)
+	switch {
+	case hb.DmgMult != 1:
+		return base + fmt.Sprintf(", %g, %g)", hb.Rotation, hb.DmgMult)
+	case hb.Rotation != 0:
+		return base + fmt.Sprintf(", %g)", hb.Rotation)
+	default:
+		return base + ")"
+	}
 }
 
 func countPhaseFrames(frames []project.AnimationFrame) (wu, atk, rc int) {
@@ -240,10 +262,27 @@ func parseAttackFFrame(call *ast.CallExpr) (project.AnimationFrame, error) {
 	frame.Phase = phaseFromIdent(phaseIdent.Name)
 	for i := 1; i < len(call.Args); i++ {
 		inner, ok := call.Args[i].(*ast.CallExpr)
-		if !ok || exprString(inner.Fun) != "S" {
-			return frame, fmt.Errorf("AttackF only accepts S(...) sprites")
+		if !ok {
+			return frame, fmt.Errorf("AttackF only accepts S(...), HB(...) and HIT(...)")
 		}
-		frame.Sprites = append(frame.Sprites, parseSpriteEntry(inner))
+		switch name := exprString(inner.Fun); name {
+		case "S":
+			frame.Sprites = append(frame.Sprites, parseSpriteEntry(inner))
+		case "HB", "HBR":
+			hb, err := parseAttackHurtbox(name, inner)
+			if err != nil {
+				return frame, err
+			}
+			frame.Hurtboxes = append(frame.Hurtboxes, hb)
+		case "HIT":
+			ht, err := parseHitboxCall(inner)
+			if err != nil {
+				return frame, err
+			}
+			frame.Hitboxes = append(frame.Hitboxes, ht)
+		default:
+			return frame, fmt.Errorf("AttackF only accepts S(...), HB(...) and HIT(...), got %s", name)
+		}
 	}
 	if len(frame.Sprites) == 0 {
 		return frame, fmt.Errorf("AttackF requires at least one S(...) sprite")
@@ -265,4 +304,42 @@ func phaseFromIdent(name string) project.FramePhase {
 	default:
 		return project.PhaseWindup
 	}
+}
+
+// parseHurtboxCall reads HB(w, h, ox, oy[, rot[, dmg]]) or the older fixed
+// HBR(w, h, ox, oy, rot) form.
+func parseAttackHurtbox(name string, call *ast.CallExpr) (project.HurtboxRow, error) {
+	var hb project.HurtboxRow
+	args := call.Args
+	minArgs := 4
+	if name == "HBR" {
+		minArgs = 5
+	}
+	if len(args) < minArgs || len(args) > 6 {
+		return hb, fmt.Errorf("%s requires width, height, offset x, offset y and optional rotation/damage", name)
+	}
+	hb.Width = floatLit(args[0])
+	hb.Height = floatLit(args[1])
+	hb.X = floatLit(args[2])
+	hb.Y = floatLit(args[3])
+	hb.DmgMult = 1
+	if len(args) > 4 {
+		hb.Rotation = floatLit(args[4])
+	}
+	if len(args) > 5 {
+		hb.DmgMult = floatLit(args[5])
+	}
+	return hb, nil
+}
+
+func parseHitboxCall(call *ast.CallExpr) (project.HitboxRow, error) {
+	var ht project.HitboxRow
+	if len(call.Args) != 4 {
+		return ht, fmt.Errorf("HIT requires width, height, offset x and offset y")
+	}
+	ht.Width = floatLit(call.Args[0])
+	ht.Height = floatLit(call.Args[1])
+	ht.X = floatLit(call.Args[2])
+	ht.Y = floatLit(call.Args[3])
+	return ht, nil
 }

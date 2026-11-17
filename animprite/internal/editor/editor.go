@@ -97,6 +97,8 @@ type EditorApp struct {
 	hurtboxWidthInputs   []*ui.TextInput
 	hurtboxHeightInputs  []*ui.TextInput
 	hurtboxDmgMultInputs []*ui.TextInput
+	hitboxXInputs        []*ui.TextInput
+	hitboxYInputs        []*ui.TextInput
 	hitboxWidthInputs    []*ui.TextInput
 	hitboxHeightInputs   []*ui.TextInput
 	hurtboxXInputs       []*ui.TextInput
@@ -176,6 +178,7 @@ func NewEditorApp() *EditorApp {
 		prevSelectedAnimIdx:      -1,
 		prevSelectedAnimFrameIdx: -1,
 		spriteEditIdx:            0,
+		scaleHandle:              -1,
 		loadedSprites:            make(map[int]*ebiten.Image),
 		st: stageState{
 			images:     make(map[string]*ebiten.Image),

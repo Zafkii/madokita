@@ -159,8 +159,8 @@ The player is locked by phases, derived from `AttackAnimator.Phase()` in `Player
 ## Animation System (`internal/animation/`)
 
 - **Animator**: frame-based playback with FPS timing (`NewAnimator(def)`)
-- **Types**: `Frame`, `FrameSprite`, `Movement`, `Attack`, `MovementAnimDef`, `AttackAnimDef`, `SpriteSheetDef`
-- Each `Frame` composes **N sprites** (`Sprites []FrameSprite`) + M hurtboxes (`Hurtboxes []FrameHurtbox`)
+- **Types**: `Frame`, `FrameSprite`, `FrameHurtbox`, `FrameHitbox`, `Movement`, `Attack`, `MovementAnimDef`, `AttackAnimDef`, `SpriteSheetDef`
+- Each `Frame` composes **N sprites** (`Sprites []FrameSprite`) + M hurtboxes (`Hurtboxes []FrameHurtbox`); each `AttackFrame` composes N sprites + hurtboxes + hitboxes (`Hitboxes []FrameHitbox`)
 - Frame phases: windup/active/recover/armed (for attacks)
 - `Movement`/`Attack` declare their images in `Sprites []SpriteSheetDef` (File relative to `assets/`, FrameW/H/Count); bootstrap converts them via `assets.LoadCharacter` and the player fetches frames with `GetFrame(charKey, sheetIdx, frameIdx)`
 
@@ -264,6 +264,24 @@ When switching frames via `loadAnimFrameProps()`, `SpriteRow.CurrentIdx` is sync
 
 **Files**: `internal/project/types.go` (fields), `sync.go` (◀▶ buttons via `frameSpriteEntry()`), `selection.go` (frame load, `ensureFrameSprites`), `render.go` (canvas render of all entries)
 
+## Attack Hitboxes
+
+An attack's hitboxes live on the frames that carry them, exactly like hurtboxes: `AnimationFrame.Hitboxes []HitboxRow` with the four values X, Y, Width and Height and nothing else (no rotation, no damage multiplier). The Hitbox table in the top panel shows the frame you are editing, its `+` seeds a 32x32 box, `-` removes the selected one and the copy button clones the previous frame's boxes into an empty frame. Clicking a row opens X / Y / Width / Height in the right panel.
+
+`HitDefs` no longer exists on `ProjectData`: a global box list could not say which frame or animation owned it, so nothing ever reached the game. Adding a frame clones the previous frame's hitboxes, and every frame switch rebuilds the hitbox table rows, so the inputs can never show the previous frame's numbers (or index past a shorter list).
+
+The export writes them inside the frame, so they survive a save:
+
+```go
+AttackF(PhaseActive,
+	S(0, 8, 0, 0, 0, 1, 1, 0.5, 0.5),
+	HB(95, 61, 1.5, -32.5),
+	HIT(40, 30, 60, -20),
+),
+```
+
+`HB` writes its rotation and damage multiplier only when they differ from 0 and 1 (`HB(20, 20, -4, -10, 30, 1.5)`); `HIT` always takes exactly four values. The importer accepts `S`, `HB`, `HBR` and `HIT` in any order and rejects anything else. On the game side `animation.AttackFrame` carries `Hurtboxes` and `Hitboxes`, and `Player.CurrentAttackHitboxes()` returns the playing frame's authored boxes in world space (mirrored by `FlipX`); damage itself still comes from the code-driven `combat.AttackConfig`.
+
 ## Table Exclusive Selection
 
 Only one table row is highlighted at a time. Clicking any row in Animation, Sprite, Hurtbox, or Hitbox tables deselects all others. This also applies to the "+ Add" hurtbox button.
@@ -303,9 +321,10 @@ var SayakaMovement = Movement{
 | `Anim(fps, loop, frames...)` | FPS, loop flag, variadic frames | Wraps `MovementAnimDef` |
 | `F(parts ...any)` | Mixed `S()` sprites and `HB()`/`HBR()` hurtboxes, any order | Wraps `Frame` |
 | `S(spriteIdx, spriteFrameIdx, rest ...float64)` | Sheet index, sub-frame index, then offsetX, offsetY, rotation, scaleX, scaleY, originX, originY | Wraps `FrameSprite` (defaults: 0, 0, 0, 1, 1, 0.5, 0.5) |
-| `HB(w, h, ox, oy)` | Width, Height, OffsetX, OffsetY | Wraps `FrameHurtbox` (scale=1, rot=0, mult=1) |
-| `HBR(w, h, ox, oy, rot)` | + Rotation for angled hurtboxes | Same with custom rotation |
-| `AttackF(phase, sprites...)` | Phase constant + variadic `S()` sprites (at least 1) | Wraps `AttackFrame` (one or more sprites) |
+| `HB(w, h, ox, oy, rot?, dmg?)` | Width, Height, OffsetX, OffsetY, then optional rotation and damage multiplier | Wraps `FrameHurtbox` (scale=1, rot=0, mult=1) |
+| `HBR(w, h, ox, oy, rot)` | Same as `HB` with a rotation, kept as its own name for readability | `FrameHurtbox` with custom rotation |
+| `HIT(w, h, ox, oy)` | Width, Height, OffsetX, OffsetY | Wraps `FrameHitbox` (attack damage box, no rotation) |
+| `AttackF(phase, parts ...any)` | Phase constant + mixed `S()` sprites and `HB()`/`HBR()`/`HIT()` boxes, any order (at least one `S()`) | Wraps `AttackFrame` |
 | `AttackAnim(fps, loop, wu, atk, rc, armed, armedFPS, wuF, atkF, rcF, frames...)` | FPS, loop, phase timings (incl. armed) + frame counts, variadic frames | Wraps `AttackAnimDef` |
 
 **Rules:**
@@ -313,6 +332,7 @@ var SayakaMovement = Movement{
 - Never use struct literals — always the constructors (the `Sprites: []SpriteSheetDef{...}` block is the only allowed literal)
 - Keep everything inline (no extracted vars), each frame is one `F(...)`/`AttackF(...)` call
 - Multi-sprite frames: one `S(...)` per image rendered in that frame
+- Attack hitboxes are authored per frame: `AttackF(PhaseActive, S(...), HIT(40, 30, 60, -20))`. The four values are width, height, offsetX, offsetY, in the same pivot-relative space as hurtboxes
 - Every `F(...)` and `AttackF(...)` must declare at least one `S(...)` — the editor rejects sprite-less frames
 - The editor only imports/exports this constructor format; struct-literal frames (`AttackFrame{...}`, legacy `OffsetX: [...]` fields) are rejected
 

@@ -6,6 +6,13 @@ type FrameHurtbox struct {
 	DamageMultiplier         float64
 }
 
+// FrameHitbox is a damage box authored per attack frame. It carries only the
+// four values the editor exposes: size and centre offset from the frame's
+// pivot, in the same space as FrameHurtbox.
+type FrameHitbox struct {
+	W, H, OffsetX, OffsetY float64
+}
+
 type SpriteSheetDef struct {
 	File       string
 	FrameW     int
@@ -55,8 +62,10 @@ const (
 )
 
 type AttackFrame struct {
-	Sprites []FrameSprite
-	Phase   *AttackPhase
+	Sprites   []FrameSprite
+	Hurtboxes []FrameHurtbox
+	Hitboxes  []FrameHitbox
+	Phase     *AttackPhase
 }
 
 type AttackAnimDef struct {
@@ -131,12 +140,22 @@ func F(parts ...any) Frame {
 	return f
 }
 
-func AttackF(phase AttackPhase, sprites ...FrameSprite) AttackFrame {
+// AttackF builds an attack frame from S(...) sprites, HB(...)/HBR(...)
+// hurtboxes and HIT(...) hitboxes, in any order and any combination.
+func AttackF(phase AttackPhase, parts ...any) AttackFrame {
 	p := phase
-	return AttackFrame{
-		Sprites: sprites,
-		Phase:   &p,
+	f := AttackFrame{Phase: &p}
+	for _, part := range parts {
+		switch v := part.(type) {
+		case FrameSprite:
+			f.Sprites = append(f.Sprites, v)
+		case FrameHurtbox:
+			f.Hurtboxes = append(f.Hurtboxes, v)
+		case FrameHitbox:
+			f.Hitboxes = append(f.Hitboxes, v)
+		}
 	}
+	return f
 }
 
 func AttackAnim(fps float64, loop bool, windup, active, recover, armed, armedFPS float64, windupFrames, activeFrames, recoverFrames int, frames ...AttackFrame) AttackAnimDef {
@@ -149,16 +168,30 @@ func AttackAnim(fps float64, loop bool, windup, active, recover, armed, armedFPS
 	}
 }
 
-func HB(w, h, ox, oy float64) FrameHurtbox {
-	return FrameHurtbox{
+// HB builds a hurtbox. The optional trailing values are the rotation in
+// degrees and the damage multiplier, both defaulting to 0 and 1.
+func HB(w, h, ox, oy float64, rest ...float64) FrameHurtbox {
+	hb := FrameHurtbox{
 		W: w, H: h, OffsetX: ox, OffsetY: oy,
-		ScaleX: 1, ScaleY: 1, Rotation: 0, DamageMultiplier: 1,
+		ScaleX: 1, ScaleY: 1, DamageMultiplier: 1,
 	}
+	if len(rest) > 0 {
+		hb.Rotation = rest[0]
+	}
+	if len(rest) > 1 {
+		hb.DamageMultiplier = rest[1]
+	}
+	return hb
 }
 
+// HBR builds a rotated hurtbox. It is the two-argument tail of HB kept as its
+// own name because the movement data reads better with it.
 func HBR(w, h, ox, oy, rot float64) FrameHurtbox {
-	return FrameHurtbox{
-		W: w, H: h, OffsetX: ox, OffsetY: oy,
-		ScaleX: 1, ScaleY: 1, Rotation: rot, DamageMultiplier: 1,
-	}
+	return HB(w, h, ox, oy, rot)
+}
+
+// HIT builds the hitbox of an attack frame: width, height and the centre
+// offset from the frame's pivot.
+func HIT(w, h, ox, oy float64) FrameHitbox {
+	return FrameHitbox{W: w, H: h, OffsetX: ox, OffsetY: oy}
 }

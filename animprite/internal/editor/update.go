@@ -178,6 +178,15 @@ func (a *EditorApp) flushInputsToData() {
 			hb.Height = a.props[3].NumericValue()
 			hb.Rotation = a.props[4].NumericValue()
 		}
+	} else if mode == panelModeHitbox && a.hitboxTable.SelectedIdx >= 0 {
+		htp := a.hitboxList()
+		if htp != nil && a.hitboxTable.SelectedIdx < len(*htp) {
+			ht := &(*htp)[a.hitboxTable.SelectedIdx]
+			ht.X = a.props[0].NumericValue()
+			ht.Y = a.props[1].NumericValue()
+			ht.Width = a.props[2].NumericValue()
+			ht.Height = a.props[3].NumericValue()
+		}
 	} else if mode == panelModeAnimFrame {
 		if !a.prev.previewPlaying {
 			if entry := a.currentFrameSpriteEntry(); entry != nil {
@@ -301,6 +310,12 @@ func (a *EditorApp) focusedInput() *ui.TextInput {
 	}
 	htvs, htve := a.hitboxTable.VisibleRange()
 	for i := htvs; i < htve; i++ {
+		if i < len(a.hitboxXInputs) && a.hitboxXInputs[i].Focused {
+			return a.hitboxXInputs[i]
+		}
+		if i < len(a.hitboxYInputs) && a.hitboxYInputs[i].Focused {
+			return a.hitboxYInputs[i]
+		}
 		if i < len(a.hitboxWidthInputs) && a.hitboxWidthInputs[i].Focused {
 			return a.hitboxWidthInputs[i]
 		}

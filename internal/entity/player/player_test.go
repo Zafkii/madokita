@@ -967,3 +967,68 @@ func TestPlayerWalksRotatedStageHill(t *testing.T) {
 		t.Fatalf("X = %v, want the player to walk back down the hill", p.X)
 	}
 }
+
+// authoredHitboxDef puts one authored hitbox on the active frame so the
+// world-space rects can be checked against the numbers the editor exports.
+func authoredHitboxDef() animation.Attack {
+	return animation.Attack{
+		Animations: map[string]animation.AttackAnimDef{
+			"atk": animation.AttackAnim(10, false, 0, 0, 0, 1000, 4, 1, 1, 1,
+				animation.AttackF(animation.PhaseWindup, animation.S(0, 0)),
+				animation.AttackF(animation.PhaseActive,
+					animation.S(0, 1),
+					animation.HIT(40, 30, 60, -20),
+				),
+				animation.AttackF(animation.PhaseRecover, animation.S(0, 2)),
+			),
+		},
+	}
+}
+
+func TestCurrentAttackHitboxesFollowsTheActiveFrame(t *testing.T) {
+	p := commitmentTestPlayer()
+	p.attackAnim = animation.NewAttackAnimator(authoredHitboxDef())
+	p.X, p.Y = 100, 200
+	if !p.TryAttack("atk") {
+		t.Fatal("attack should start")
+	}
+
+	// Windup frame carries no authored hitbox.
+	p.updateAttacking(0.05)
+	if got := p.CurrentAttackHitboxes(); len(got) != 0 {
+		t.Fatalf("windup hitboxes = %+v, want none", got)
+	}
+
+	p.updateAttacking(0.05)
+	got := p.CurrentAttackHitboxes()
+	if len(got) != 1 {
+		t.Fatalf("active hitboxes = %d, want 1", len(got))
+	}
+	// Centre at (160, 180), 40x30 around it.
+	want := math2.Rect{X: 140, Y: 165, W: 40, H: 30}
+	if got[0] != want {
+		t.Fatalf("hitbox = %+v, want %+v", got[0], want)
+	}
+
+	// Facing left mirrors the offset around the player.
+	p.FlipX = true
+	got = p.CurrentAttackHitboxes()
+	// Mirroring the +60 offset puts the centre at 40, so the 40-wide box starts
+	// at 20.
+	if len(got) != 1 || got[0].X != 20 {
+		t.Fatalf("flipped hitbox = %+v, want X 20", got)
+	}
+}
+
+func TestCurrentAttackHitboxesIsEmptyWithoutAuthoredBoxes(t *testing.T) {
+	p := commitmentTestPlayer()
+	p.X, p.Y = 0, 0
+	if !p.TryAttack("atk") {
+		t.Fatal("attack should start")
+	}
+	p.updateAttacking(0.05)
+	p.updateAttacking(0.05)
+	if got := p.CurrentAttackHitboxes(); len(got) != 0 {
+		t.Fatalf("hitboxes = %+v, want none for an attack without authored boxes", got)
+	}
+}

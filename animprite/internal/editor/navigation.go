@@ -172,24 +172,32 @@ func (a *EditorApp) syncPanelToSelection() {
 
 func (a *EditorApp) navigateToHitbox(hbIdx int) {
 	a.hitboxTable.SelectedIdx = hbIdx
+	a.syncHitboxBtns()
 
-	if hbIdx >= 0 && hbIdx < len(a.proj.HitDefs) {
+	if hbIdx >= 0 {
 		a.panelMode = panelModeHitbox
-		hb := a.proj.HitDefs[hbIdx]
-		a.props[0].SetLabel("Width")
-		a.props[0].SetNumeric(hb.Width)
-		a.props[0].Min = 0
-		a.props[0].Step = 1
-		a.props[1].SetLabel("Height")
-		a.props[1].SetNumeric(hb.Height)
-		a.props[1].Min = 0
-		a.props[1].Step = 1
-		a.props[2].SetLabel("")
-		a.props[2].SetNumeric(0)
-		a.props[3].SetLabel("")
-		a.props[3].SetNumeric(0)
-		a.props[4].SetLabel("")
-		a.props[4].SetNumeric(0)
+		htp := a.hitboxList()
+		if htp != nil && hbIdx < len(*htp) {
+			ht := (*htp)[hbIdx]
+			a.props[0].SetLabel("Offset X")
+			a.props[0].SetNumeric(ht.X)
+			a.props[0].Min = -99999
+			a.props[0].Step = 0.5
+			a.props[1].SetLabel("Offset Y")
+			a.props[1].SetNumeric(ht.Y)
+			a.props[1].Min = -99999
+			a.props[1].Step = 0.5
+			a.props[2].SetLabel("Width")
+			a.props[2].SetNumeric(ht.Width)
+			a.props[2].Min = 0
+			a.props[2].Step = 1
+			a.props[3].SetLabel("Height")
+			a.props[3].SetNumeric(ht.Height)
+			a.props[3].Min = 0
+			a.props[3].Step = 1
+			a.props[4].SetLabel("")
+			a.props[4].SetNumeric(0)
+		}
 	}
 
 	a.syncLayout()

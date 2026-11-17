@@ -8,7 +8,6 @@ func DeepCopy(src *ProjectData) ProjectData {
 		DefaultOriginY: src.DefaultOriginY,
 		Animations:     make([]AnimationRow, len(src.Animations)),
 		Sprites:        make([]SpriteRow, len(src.Sprites)),
-		HitDefs:        append([]HitboxRow(nil), src.HitDefs...),
 		Stage:          src.Stage.DeepCopy(),
 	}
 	for i := range src.Animations {
@@ -20,6 +19,7 @@ func DeepCopy(src *ProjectData) ProjectData {
 			dst.Animations[i].Frames[j].Sprites = make([]FrameSpriteEntry, len(srcF.Sprites))
 			copy(dst.Animations[i].Frames[j].Sprites, srcF.Sprites)
 			dst.Animations[i].Frames[j].Hurtboxes = append([]HurtboxRow(nil), srcF.Hurtboxes...)
+			dst.Animations[i].Frames[j].Hitboxes = append([]HitboxRow(nil), srcF.Hitboxes...)
 		}
 	}
 	copy(dst.Sprites, src.Sprites)

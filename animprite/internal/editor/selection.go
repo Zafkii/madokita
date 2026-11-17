@@ -90,6 +90,7 @@ func (a *EditorApp) loadAnimFrameProps(animIdx, frameIdx int) {
 	a.prevSelectedAnimIdx = animIdx
 	a.prevSelectedAnimFrameIdx = frameIdx
 	a.syncHurtboxBtns()
+	a.syncHitboxBtns()
 	a.syncLayout()
 	a.syncMovementInputs()
 }

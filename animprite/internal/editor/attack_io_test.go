@@ -35,11 +35,23 @@ func TestAttackRoundTrip(t *testing.T) {
 						Sprites: []project.FrameSpriteEntry{
 							{SpriteIdx: 0, SpriteFrameIdx: 9, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
 						},
+						Hurtboxes: []project.HurtboxRow{
+							{X: 1.5, Y: -32.5, Width: 95, Height: 61, DmgMult: 1},
+						},
+						Hitboxes: []project.HitboxRow{
+							{X: 60, Y: -20, Width: 40, Height: 30},
+						},
 					},
 					{
 						Phase: project.PhaseRecover,
 						Sprites: []project.FrameSpriteEntry{
 							{SpriteIdx: 0, SpriteFrameIdx: 10, ScaleX: 1, ScaleY: 1, OriginX: 0.5, OriginY: 0.5},
+						},
+						Hurtboxes: []project.HurtboxRow{
+							{X: -4, Y: -10, Width: 20, Height: 20, Rotation: 30, DmgMult: 1.5},
+						},
+						Hitboxes: []project.HitboxRow{
+							{X: 0, Y: 12.5, Width: 12, Height: 8},
 						},
 					},
 				},
@@ -79,7 +91,12 @@ func TestAttackRoundTrip(t *testing.T) {
 			t.Errorf("generated file must not contain %q (constructor-only format)", banned)
 		}
 	}
-	for _, required := range []string{"AttackF(PhaseWindup,", "AttackF(PhaseActive,", "AttackF(PhaseRecover,", "AttackF(PhaseArmed,", "Armed"} {
+	for _, required := range []string{
+		"AttackF(PhaseWindup,", "AttackF(PhaseActive,", "AttackF(PhaseRecover,", "AttackF(PhaseArmed,", "Armed",
+		"HB(95, 61, 1.5, -32.5)",       // plain hurtbox
+		"HB(20, 20, -4, -10, 30, 1.5)", // rotated hurtbox with a damage multiplier
+		"HIT(40, 30, 60, -20)",         // hitbox: w, h, offset x, offset y
+	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("generated file must contain %q", required)
 		}
@@ -165,6 +182,26 @@ func TestAttackRoundTrip(t *testing.T) {
 				if gotS.OriginX != wantS.OriginX || gotS.OriginY != wantS.OriginY {
 					t.Errorf("anim[%s].frame[%d].sprite[%d] origin: got (%v,%v), want (%v,%v)",
 						gotA.Name, j, si, gotS.OriginX, gotS.OriginY, wantS.OriginX, wantS.OriginY)
+				}
+			}
+			if len(gotF.Hurtboxes) != len(wantF.Hurtboxes) {
+				t.Fatalf("anim[%s].frame[%d] hurtbox count: got %d, want %d",
+					gotA.Name, j, len(gotF.Hurtboxes), len(wantF.Hurtboxes))
+			}
+			for hi := range wantF.Hurtboxes {
+				if gotF.Hurtboxes[hi] != wantF.Hurtboxes[hi] {
+					t.Errorf("anim[%s].frame[%d].hurtbox[%d]: got %+v, want %+v",
+						gotA.Name, j, hi, gotF.Hurtboxes[hi], wantF.Hurtboxes[hi])
+				}
+			}
+			if len(gotF.Hitboxes) != len(wantF.Hitboxes) {
+				t.Fatalf("anim[%s].frame[%d] hitbox count: got %d, want %d",
+					gotA.Name, j, len(gotF.Hitboxes), len(wantF.Hitboxes))
+			}
+			for hi := range wantF.Hitboxes {
+				if gotF.Hitboxes[hi] != wantF.Hitboxes[hi] {
+					t.Errorf("anim[%s].frame[%d].hitbox[%d]: got %+v, want %+v",
+						gotA.Name, j, hi, gotF.Hitboxes[hi], wantF.Hitboxes[hi])
 				}
 			}
 		}

@@ -658,6 +658,34 @@ func (p *Player) ActiveHitboxes() []math2.Rect {
 	return []math2.Rect{hitbox.Rect(math2.Vec2{X: p.X, Y: p.Y}, p.FlipX)}
 }
 
+// CurrentAttackHitboxes returns the hitboxes authored on the playing attack
+// frame, in world space. Damage is still owned by the combat controllers; this
+// exposes the editor-authored geometry (X, Y, W, H per phase) so gameplay and
+// the debug overlay can read the same numbers the editor exported.
+func (p *Player) CurrentAttackHitboxes() []math2.Rect {
+	if p.attackAnim == nil {
+		return nil
+	}
+	frame := p.attackAnim.CurrentFrame()
+	if frame == nil || len(frame.Hitboxes) == 0 {
+		return nil
+	}
+	rects := make([]math2.Rect, 0, len(frame.Hitboxes))
+	for _, hb := range frame.Hitboxes {
+		ox := hb.OffsetX
+		if p.FlipX {
+			ox = -ox
+		}
+		rects = append(rects, math2.NewRect(
+			p.X+ox-hb.W/2,
+			p.Y+hb.OffsetY-hb.H/2,
+			hb.W,
+			hb.H,
+		))
+	}
+	return rects
+}
+
 // TryAttack starts the given attack if the player is free and the controller
 // allows it (stamina). The AttackAnimator drives the phases; the controller
 // follows via SyncPhase so hitbox activation matches the frames. Movement is

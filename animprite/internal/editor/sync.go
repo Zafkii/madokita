@@ -89,6 +89,8 @@ func (a *EditorApp) syncAnimBtns() {
 				}
 				frame.Hurtboxes = make([]project.HurtboxRow, len(prev.Hurtboxes))
 				copy(frame.Hurtboxes, prev.Hurtboxes)
+				frame.Hitboxes = make([]project.HitboxRow, len(prev.Hitboxes))
+				copy(frame.Hitboxes, prev.Hitboxes)
 				frame.Phase = prev.Phase
 			}
 			a.proj.Animations[i].Frames = append(a.proj.Animations[i].Frames, frame)
@@ -464,35 +466,67 @@ func (a *EditorApp) syncHurtboxBtns() {
 	}
 }
 
+func (a *EditorApp) hitboxList() *[]project.HitboxRow {
+	frame := a.currentFrame()
+	if frame == nil {
+		return nil
+	}
+	return &frame.Hitboxes
+}
+
 func (a *EditorApp) syncHitboxBtns() {
-	n := len(a.proj.HitDefs)
+	htListPtr := a.hitboxList()
+	var htList []project.HitboxRow
+	if htListPtr != nil {
+		htList = *htListPtr
+	}
+	n := len(htList)
 	a.hitboxTable.RowCount = n
-	for len(a.hitboxWidthInputs) < n {
-		inp := ui.NewTextInput(0, 0, 50, topPanelBtnH, a.th)
-		inp.Numeric = true
-		inp.Min = 1
-		inp.Step = 1
-		a.hitboxWidthInputs = append(a.hitboxWidthInputs, inp)
+	ensure := func(list *[]*ui.TextInput, min, step float64) {
+		for len(*list) < n {
+			inp := ui.NewTextInput(0, 0, 50, topPanelBtnH, a.th)
+			inp.Numeric = true
+			inp.Min = min
+			inp.Step = step
+			*list = append(*list, inp)
+		}
+		*list = (*list)[:n]
 	}
-	for len(a.hitboxHeightInputs) < n {
-		inp := ui.NewTextInput(0, 0, 50, topPanelBtnH, a.th)
-		inp.Numeric = true
-		inp.Min = 1
-		inp.Step = 1
-		a.hitboxHeightInputs = append(a.hitboxHeightInputs, inp)
-	}
-	a.hitboxWidthInputs = a.hitboxWidthInputs[:n]
-	a.hitboxHeightInputs = a.hitboxHeightInputs[:n]
+	ensure(&a.hitboxXInputs, -99999, 0.5)
+	ensure(&a.hitboxYInputs, -99999, 0.5)
+	ensure(&a.hitboxWidthInputs, 0, 1)
+	ensure(&a.hitboxHeightInputs, 0, 1)
 	for idx := 0; idx < n; idx++ {
 		i := idx
-		a.hitboxWidthInputs[i].SetNumeric(float64(a.proj.HitDefs[i].Width))
+		a.hitboxXInputs[i].SetNumeric(htList[i].X)
+		a.hitboxXInputs[i].OnChange = func(_ string) {
+			if list := a.hitboxList(); list != nil && i < len(*list) {
+				(*list)[i].X = a.hitboxXInputs[i].NumericValue()
+			}
+		}
+		a.hitboxYInputs[i].SetNumeric(htList[i].Y)
+		a.hitboxYInputs[i].OnChange = func(_ string) {
+			if list := a.hitboxList(); list != nil && i < len(*list) {
+				(*list)[i].Y = a.hitboxYInputs[i].NumericValue()
+			}
+		}
+		a.hitboxWidthInputs[i].SetNumeric(htList[i].Width)
 		a.hitboxWidthInputs[i].OnChange = func(_ string) {
-			a.proj.HitDefs[i].Width = a.hitboxWidthInputs[i].NumericValue()
+			if list := a.hitboxList(); list != nil && i < len(*list) {
+				(*list)[i].Width = a.hitboxWidthInputs[i].NumericValue()
+			}
 		}
-		a.hitboxHeightInputs[i].SetNumeric(float64(a.proj.HitDefs[i].Height))
+		a.hitboxHeightInputs[i].SetNumeric(htList[i].Height)
 		a.hitboxHeightInputs[i].OnChange = func(_ string) {
-			a.proj.HitDefs[i].Height = a.hitboxHeightInputs[i].NumericValue()
+			if list := a.hitboxList(); list != nil && i < len(*list) {
+				(*list)[i].Height = a.hitboxHeightInputs[i].NumericValue()
+			}
 		}
+	}
+	if n == 0 {
+		a.hitboxTable.SelectedIdx = -1
+	} else if a.hitboxTable.SelectedIdx >= n {
+		a.hitboxTable.SelectedIdx = n - 1
 	}
 }
 
@@ -538,7 +572,11 @@ func (a *EditorApp) computeTopPanelHeight() {
 		hbCount = len(*hbp)
 	}
 	a.hurtboxTable.RowCount = hbCount
-	a.hitboxTable.RowCount = len(a.proj.HitDefs)
+	htCount := 0
+	if htp := a.hitboxList(); htp != nil {
+		htCount = len(*htp)
+	}
+	a.hitboxTable.RowCount = htCount
 
 	ah := a.animTable.Height()
 	sh := a.spriteTable.Height()

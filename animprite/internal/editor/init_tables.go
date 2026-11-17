@@ -34,8 +34,10 @@ func (a *EditorApp) initTables() {
 	}, 4, th)
 	a.hitboxTable = ui.NewTable("Hitbox", []ui.TableColumn{
 		{Label: "No.", Width: 0},
-		{Label: "Width", Width: 0},
-		{Label: "Height", Width: 0},
+		{Label: "X", Width: 0},
+		{Label: "Y", Width: 0},
+		{Label: "W", Width: 0},
+		{Label: "H", Width: 0},
 	}, 4, th)
 
 	// ── Animation table buttons ──
@@ -391,32 +393,67 @@ func (a *EditorApp) initTables() {
 	addHtBtn.BtnType = ui.BtnBlue
 	addHtBtn.Tooltip = "Add hitbox"
 	addHtBtn.OnClick = func() {
-		a.saveSnapshot()
-		a.proj.HitDefs = append(a.proj.HitDefs, project.HitboxRow{})
+		a.flushInputsToData()
+		a.saveSnapshotNoDirty()
+		htp := a.hitboxList()
+		if htp == nil {
+			return
+		}
+		a.dirty = true
+		*htp = append(*htp, project.HitboxRow{Width: 32, Height: 32})
 		a.syncHitboxBtns()
-		a.syncLayout()
+		a.navigateToHitbox(len(*htp) - 1)
 	}
 	delHtBtn := ui.NewButton(0, 0, ui.ButtonWidth("-"), topPanelBtnH, "-", th)
 	delHtBtn.BtnType = ui.BtnRed
 	delHtBtn.Tooltip = "Remove hitbox"
 	delHtBtn.OnClick = func() {
+		a.flushInputsToData()
 		a.saveSnapshotNoDirty()
-		if idx := a.hitboxTable.SelectedIdx; idx >= 0 && idx < len(a.proj.HitDefs) {
-			a.proj.HitDefs = append(a.proj.HitDefs[:idx], a.proj.HitDefs[idx+1:]...)
-			a.dirty = true
-			a.syncHitboxBtns()
-			a.syncLayout()
+		idx := a.hitboxTable.SelectedIdx
+		htp := a.hitboxList()
+		if idx < 0 || htp == nil || idx >= len(*htp) {
+			return
+		}
+		a.dirty = true
+		*htp = append((*htp)[:idx], (*htp)[idx+1:]...)
+		a.syncHitboxBtns()
+		switch {
+		case idx > 0:
+			a.navigateToHitbox(idx - 1)
+		case len(*htp) > 0:
+			a.navigateToHitbox(0)
+		default:
+			a.navigateToHitbox(-1)
 		}
 	}
 	copyHtBtn := ui.NewButton(0, 0, ui.ButtonWidth("\U000F04AE"), topPanelBtnH, "\U000F04AE", th)
-	copyHtBtn.Tooltip = "Copy previous hitbox"
+	copyHtBtn.Tooltip = "Copy previous frame's hitboxes"
 	copyHtBtn.OnClick = func() {
+		a.flushInputsToData()
 		a.saveSnapshotNoDirty()
-		if len(a.proj.HitDefs) >= 2 {
-			last := len(a.proj.HitDefs) - 1
-			a.proj.HitDefs[last] = a.proj.HitDefs[last-1]
-			a.dirty = true
+		frame := a.currentFrame()
+		htp := a.hitboxList()
+		if frame == nil || htp == nil || len(*htp) > 0 {
+			return
 		}
+		animIdx := a.animTable.SelectedIdx
+		if animIdx < 0 || animIdx >= len(a.proj.Animations) {
+			return
+		}
+		anim := &a.proj.Animations[animIdx]
+		prevIdx := anim.CurrentIdx - 1
+		if prevIdx < 0 || prevIdx >= len(anim.Frames) {
+			return
+		}
+		prev := anim.Frames[prevIdx]
+		if len(prev.Hitboxes) == 0 {
+			return
+		}
+		a.dirty = true
+		frame.Hitboxes = append([]project.HitboxRow(nil), prev.Hitboxes...)
+		a.syncHitboxBtns()
+		a.syncLayout()
 	}
 	a.hitboxTable.AddBtn = addHtBtn
 	a.hitboxTable.RemoveBtn = delHtBtn
@@ -424,25 +461,21 @@ func (a *EditorApp) initTables() {
 
 	a.hitboxTable.DrawRow = func(screen *ebiten.Image, p theme.Palette, tx, rowY, cw int, xs []int, idx int) {
 		ui.DrawText(screen, fmt.Sprintf("%d", idx+1), tx+xs[0], rowY+3, 1, p.TextPrimary)
-		iw := xs[2] - xs[1] - 2
-		if iw < 20 {
-			iw = 20
+		rowInput := func(inp *ui.TextInput, startX, endX int) {
+			w := endX - startX - 2
+			if w < 20 {
+				w = 20
+			}
+			inp.X = tx + startX
+			inp.Y = rowY + (topTableRowH-topPanelBtnH)/2
+			inp.W = w
+			inp.H = topPanelBtnH
+			inp.Draw(screen)
 		}
-		a.hitboxWidthInputs[idx].X = tx + xs[1]
-		a.hitboxWidthInputs[idx].Y = rowY + (topTableRowH-topPanelBtnH)/2
-		a.hitboxWidthInputs[idx].W = iw
-		a.hitboxWidthInputs[idx].H = topPanelBtnH
-		a.hitboxWidthInputs[idx].Draw(screen)
-
-		ih := (tx + cw - tableColPad) - (tx + xs[2]) - 2
-		if ih < 20 {
-			ih = 20
-		}
-		a.hitboxHeightInputs[idx].X = tx + xs[2]
-		a.hitboxHeightInputs[idx].Y = rowY + (topTableRowH-topPanelBtnH)/2
-		a.hitboxHeightInputs[idx].W = ih
-		a.hitboxHeightInputs[idx].H = topPanelBtnH
-		a.hitboxHeightInputs[idx].Draw(screen)
+		rowInput(a.hitboxXInputs[idx], xs[1], xs[2])
+		rowInput(a.hitboxYInputs[idx], xs[2], xs[3])
+		rowInput(a.hitboxWidthInputs[idx], xs[3], xs[4])
+		rowInput(a.hitboxHeightInputs[idx], xs[4], cw-tableColPad)
 	}
 
 	a.syncAnimBtns()
